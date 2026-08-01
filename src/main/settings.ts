@@ -4,7 +4,7 @@ import * as path from 'path'
 import type { Settings } from '../shared/ipc-contract'
 
 const DEFAULTS: Settings = {
-  sidebarWidth: 260,
+  sidebarWidth: 30,
   themeOverride: null
 }
 

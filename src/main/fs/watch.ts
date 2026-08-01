@@ -9,6 +9,7 @@ interface ChangeCallback {
 
 export class WorkspaceWatcher {
   private watcher: FSWatcher | null = null
+  private watchedDirs = new Set<string>()
   private suppressedPaths = new Map<string, number>()
   private callback: ChangeCallback | null = null
 
@@ -18,10 +19,14 @@ export class WorkspaceWatcher {
     }
 
     this.callback = cb
+    this.watchedDirs.add(root)
 
+    // Only the root is scanned at startup. Deeper directories are added via
+    // addPath() when the tree expands them or a document in them is opened,
+    // so opening a large folder does not trigger a full-tree scan.
     this.watcher = chokidarWatch(root, {
       ignoreInitial: true,
-      depth: Infinity,
+      depth: 0,
       followSymlinks: false,
       ignored: ['**/node_modules/**', '**/.git/**', '**/.*']
     })
@@ -71,6 +76,14 @@ export class WorkspaceWatcher {
     this.suppressedPaths.set(path, Date.now())
   }
 
+  addPath(absolutePath: string): void {
+    if (this.watchedDirs.has(absolutePath)) return
+    this.watchedDirs.add(absolutePath)
+    if (this.watcher) {
+      this.watcher.add(absolutePath)
+    }
+  }
+
   private isSuppressed(filePath: string): boolean {
     const now = Date.now()
     for (const [suppressed, timestamp] of this.suppressedPaths.entries()) {
@@ -91,6 +104,7 @@ export class WorkspaceWatcher {
       this.watcher.close()
       this.watcher = null
     }
+    this.watchedDirs.clear()
     this.callback = null
   }
 }

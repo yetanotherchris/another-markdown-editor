@@ -1,4 +1,5 @@
 import * as fs from 'fs'
+import * as path from 'path'
 import { readDir } from './fs/read'
 import { WorkspaceWatcher } from './fs/watch'
 import type { DirEntry, WatchEvent, DocumentChangeEvent } from '../shared/ipc-contract'
@@ -35,6 +36,11 @@ export class WorkspaceState {
     } catch {
       return []
     }
+  }
+
+  watchDir(rootRelativePath: string): void {
+    if (!this.rootPath) return
+    this.watcher.addPath(path.resolve(this.rootPath, rootRelativePath))
   }
 
   suppressWatch(absolutePath: string): void {

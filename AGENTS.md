@@ -197,6 +197,14 @@ AGENTS.md                         This file
 - Report honestly. If something is stubbed, partly done, or unverified, say so
   plainly. A confident wrong summary is worse than an uncertain accurate one.
 - Do not commit, push, or open PRs unless asked.
+- **Write Playwright e2e tests for every spec implementation, and run them.**
+  Each phase that adds user-visible behaviour gets a spec in
+  `tests/e2e/` covering its acceptance scenarios against the real built app
+  (`npm run test:e2e` — builds, then launches Electron via Playwright).
+  Native dialogs are stubbed in the main process with
+  `electronApp.evaluate`; the tree/editor are driven with normal locators.
+  The suite must pass before a phase is declared complete, alongside
+  `npm run lint`, `npm run typecheck`, and `npm run test`.
 - Every pull request description MUST end with a single line stating AI usage.
   Do not use a heading or section for this; it is the last line of the
   description. Use the form:
@@ -240,7 +248,7 @@ AGENTS.md                         This file
 | Phase 1: Setup | Complete | `phase-1-setup` | #2 |
 | Phase 2: Security & IPC | Complete | `phase-1-setup` | #2 |
 | Phase 3: US1 — Editor MVP | Complete | `phase-3-editor` | — |
-| Phase 4: US2 — Folder Browser | Pending | — | — |
+| Phase 4: US2 — Folder Browser | Complete | `phase-4-explorer` | #6 |
 | Phase 5: US3 — Multiple Tabs | Pending | — | — |
 | Phase 6: US4 — File Operations | Pending | — | — |
 | Phase 7: Polish | Pending | — | — |

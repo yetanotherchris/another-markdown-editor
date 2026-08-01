@@ -144,3 +144,8 @@ vite.config.ts.timestamp-*
 
 # electron-vite build output
 out/
+
+# Playwright
+test-results/
+playwright-report/
+

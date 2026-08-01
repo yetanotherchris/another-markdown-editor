@@ -1,0 +1,63 @@
+.tree-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+.tree-empty {
+  padding: 16px;
+  color: #888;
+  font-size: 13px;
+  text-align: center;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  border-radius: 4px;
+  margin: 0 4px;
+}
+
+.tree-node:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tree-node.selected {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.tree-node-toggle {
+  width: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #888;
+  font-size: 10px;
+  user-select: none;
+}
+
+.tree-node-toggle:hover {
+  color: #333;
+}
+
+.tree-node-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tree-node-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-node.leaf {
+  padding-left: 22px;
+}

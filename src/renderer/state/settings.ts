@@ -1,7 +1,7 @@
 import type { Settings } from '../../shared/ipc-contract'
 
 const defaults: Settings = {
-  sidebarWidth: 260,
+  sidebarWidth: 30,
   themeOverride: null
 }
 
