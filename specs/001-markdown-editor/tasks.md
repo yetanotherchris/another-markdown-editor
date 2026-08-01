@@ -16,14 +16,14 @@ implementation.
 
 **Purpose**: Toolchain, scaffolding, linting, and three-target electron-vite build.
 
-- [ ] T001 [P] Scaffold electron-vite TypeScript project with `src/main`, `src/preload`, `src/renderer`, `tests/main`, `tests/renderer` (Vite 5 + React 19 + Electron 43)
-- [ ] T002 [P] Install runtime dependencies: `react`, `react-dom`, `@milkdown/crepe`, `react-arborist`, `react-resizable-panels`, `chokidar`
-- [ ] T003 [P] Install dev dependencies: `typescript`, `vitest`, `jsdom`, `@vitejs/plugin-react`, `electron-vite`, `@types/node`, `@types/react`, `@types/react-dom`, `eslint`, `prettier`
-- [ ] T004 [P] Configure `tsconfig.json` with `strict: true` for each of main, preload, renderer, and shared types
-- [ ] T005 [P] Configure `vitest.workspace.ts` with a `node` project for `tests/main` and a `jsdom` project for `tests/renderer`
-- [ ] T006 Configure npm scripts: `npm run dev`, `npm run build`, `npm run test`, `npm run lint`, `npm run typecheck`
-- [ ] T007 Add ESLint rule forbidding `import ... from 'fs'` or `require('fs')` outside `src/main/`
-- [ ] T008 Add a smoke script verifying `electron-vite dev` starts without crashing
+- [X] T001 [P] Scaffold electron-vite TypeScript project with `src/main`, `src/preload`, `src/renderer`, `tests/main`, `tests/renderer` (Vite 5 + React 19 + Electron 43)
+- [X] T002 [P] Install runtime dependencies: `react`, `react-dom`, `@milkdown/crepe`, `react-arborist`, `react-resizable-panels`, `chokidar`
+- [X] T003 [P] Install dev dependencies: `typescript`, `vitest`, `jsdom`, `@vitejs/plugin-react`, `electron-vite`, `@types/node`, `@types/react`, `@types/react-dom`, `eslint`, `prettier`
+- [X] T004 [P] Configure `tsconfig.json` with `strict: true` for each of main, preload, renderer, and shared types
+- [X] T005 [P] Configure `vitest.workspace.ts` with a `node` project for `tests/main` and a `jsdom` project for `tests/renderer`
+- [X] T006 Configure npm scripts: `npm run dev`, `npm run build`, `npm run test`, `npm run lint`, `npm run typecheck`
+- [X] T007 Add ESLint rule forbidding `import ... from 'fs'` or `require('fs')` outside `src/main/`
+- [X] T008 Add a smoke script verifying `electron-vite dev` starts without crashing
 
 **Checkpoint**: `npm run dev` boots, `npm run test` runs both Vitest projects, and `npm run typecheck` passes.
 
@@ -74,21 +74,21 @@ must be in place before any renderer code touches the filesystem.
 
 ### Tests
 
-- [ ] T029 [P] Renderer document reducer tests in `tests/renderer/documents.test.ts`: dirty derived from content vs baseline, save success clears dirty, save failure keeps dirty, never-saved document gets a path on first save
-- [ ] T030 [P] Renderer dirty-tracking tests: undoing to baseline clears dirty, normalised baseline does not falsely mark a file dirty
-- [ ] T031 [P] End-to-end characterisation in `tests/renderer/roundtrip.test.ts`: load a markdown fixture, capture baseline, save if not dirty, assert disk bytes unchanged
+- [X] T029 [P] Renderer document reducer tests in `tests/renderer/documents.test.ts`: dirty derived from content vs baseline, save success clears dirty, save failure keeps dirty, never-saved document gets a path on first save
+- [X] T030 [P] Renderer dirty-tracking tests: undoing to baseline clears dirty, normalised baseline does not falsely mark a file dirty
+- [X] T031 [P] End-to-end characterisation in `tests/renderer/roundtrip.test.ts`: load a markdown fixture, capture baseline, save if not dirty, assert disk bytes unchanged
 
 ### Implementation
 
-- [ ] T032 [P] Implement `src/renderer/state/documents.ts`: document reducer, `createEmpty`, `openFile`, `updateContent`, `saveSuccess`, `markDirtyFromEditor`, `closeDocument`, `evict`, `reactivate`
-- [ ] T033 [P] Implement `src/renderer/state/settings.ts`: sidebar width, theme override
-- [ ] T034 [P] Implement `src/renderer/editor/CrepeHost.tsx`: mounts one Crepe instance, passes `defaultValue`, subscribes `markdownUpdated`, calls `getMarkdown`, isolates from React DOM
-- [ ] T035 [P] Implement `src/renderer/editor/instancePool.ts`: LRU cap of 8, eviction only for clean documents, reactivation restores cursor and scroll
-- [ ] T036 [P] Implement `src/renderer/main.tsx` and `src/renderer/App.tsx`: shell without sidebar, single active document, tabs if US3 is not yet present
-- [ ] T037 [P] Implement `src/renderer/editor/EditorPanel.tsx`: active editor, wires document state, `visibility: hidden` for inactive
-- [ ] T038 [P] Implement `src/renderer/App.tsx` menu command handlers: open-file dialog, save, save-as
-- [ ] T039 [P] Implement save-as flow: calls `saveFileDialog`, then `writeFile`, then updates document path
-- [ ] T040 [P] Implement `tests/renderer/roundtrip.test.ts` fixture corpus and assertions
+- [X] T032 [P] Implement `src/renderer/state/documents.ts`: document reducer, `createEmpty`, `openFile`, `updateContent`, `saveSuccess`, `markDirtyFromEditor`, `closeDocument`, `evict`, `reactivate`
+- [X] T033 [P] Implement `src/renderer/state/settings.ts`: sidebar width, theme override
+- [X] T034 [P] Implement `src/renderer/editor/CrepeHost.tsx`: mounts one Crepe instance, passes `defaultValue`, subscribes `markdownUpdated`, calls `getMarkdown`, isolates from React DOM
+- [X] T035 [P] Implement `src/renderer/editor/instancePool.ts`: LRU cap of 8, eviction only for clean documents, reactivation restores cursor and scroll
+- [X] T036 [P] Implement `src/renderer/main.tsx` and `src/renderer/App.tsx`: shell without sidebar, single active document, tabs if US3 is not yet present
+- [X] T037 [P] Implement `src/renderer/editor/EditorPanel.tsx`: active editor, wires document state, `visibility: hidden` for inactive
+- [X] T038 [P] Implement `src/renderer/App.tsx` menu command handlers: open-file dialog, save, save-as
+- [X] T039 [P] Implement save-as flow: calls `saveFileDialog`, then `writeFile`, then updates document path
+- [X] T040 [P] Implement `tests/renderer/roundtrip.test.ts` fixture corpus and assertions
 
 **Checkpoint**: A file can be opened, edited, saved, and the saved file is unchanged if opened and closed without edits.
 
