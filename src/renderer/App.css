@@ -22,6 +22,7 @@ html, body, #root {
   padding: 8px 12px;
   border-bottom: 1px solid #e0e0e0;
   background: #fafafa;
+  flex-shrink: 0;
 }
 
 .toolbar button {
@@ -40,6 +41,69 @@ html, body, #root {
 .document-title {
   font-size: 13px;
   margin-left: 8px;
+}
+
+.workspace-name {
+  font-size: 13px;
+  color: #666;
+  margin-left: auto;
+}
+
+.main-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.panel-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #f8f8f8;
+  border-right: 1px solid #e0e0e0;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.workspace-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #555;
+}
+
+.resize-handle {
+  width: 4px;
+  background: #e0e0e0;
+  cursor: col-resize;
+  transition: background 0.15s;
+}
+
+.resize-handle:hover {
+  background: #c0c0c0;
+}
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .editor-area {

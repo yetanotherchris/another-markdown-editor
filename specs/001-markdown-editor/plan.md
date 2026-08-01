@@ -155,6 +155,11 @@ renderer means the renderer is never told that hidden files exist.
 **Document identity** is the resolved workspace-relative path for saved
 documents, and a generated id for never-saved ones — see `data-model.md`.
 
+**Watch scope is lazy** (2026-08-01, research.md R16): chokidar scans only the
+workspace root at open; directories are added to the watch set when the tree
+expands them or a document inside them is opened. A full-tree scan made opening
+a 7,000-file folder take ~8 s on Windows.
+
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
@@ -163,6 +168,18 @@ documents, and a generated id for never-saved ones — see `data-model.md`.
 
 No other principle is violated. The memory cost above is bounded by the LRU cap
 in research.md R2, which never evicts a dirty document.
+
+## Phase status
+
+| Phase | Status |
+|-------|--------|
+| Phase 1: Setup | ✅ Complete |
+| Phase 2: Foundational Security and IPC | ✅ Complete |
+| Phase 3: US1 — Write and Save (P1) | ✅ Complete |
+| Phase 4: US2 — Browse a Folder (P2) | ✅ Complete (2026-08-01) |
+| Phase 5: US3 — Multiple Tabs (P2) | Pending |
+| Phase 6: US4 — Reorganise Files and Folders (P3) | Pending |
+| Phase 7: Cross-Cutting and Polish | Pending |
 
 ## Deferred to a later feature
 

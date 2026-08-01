@@ -264,6 +264,26 @@ and would breach SC-005. Lazy expansion bounds the work to what is on screen.
 Symlinked directories are not followed during traversal, which also disposes of
 the symlink-loop edge case.
 
+
+## R16. Lazy watch set (SC-005, FR-034)
+
+**Decision change (2026-08-01)**: The workspace watcher no longer scans the
+whole folder tree at open. chokidar starts with `depth: 0` (root level only);
+deeper directories are added to the watch set lazily via `WorkspaceWatcher.addPath`
+when the renderer reads them (`workspace:readDir` on expand) or when a document
+inside them is opened (`file:read`, `file:openDialog`).
+
+**Evidence**: Opening `Psychology-Notes` (7,195 files / 1,007 directories, 336
+markdown) previously took **7.7 s** for chokidar's initial full-tree scan
+(`depth: Infinity`) on Windows, during which the main process was saturated and
+the app felt frozen. With `depth: 0` the scan settles in **102 ms**. The tree
+already loads lazily (R14), so nothing visible is lost: an unexpanded folder's
+contents are read fresh on expand, and open documents' parent directories are
+watched explicitly, preserving FR-034–FR-038.
+
+**Rejected alternative**: keeping `depth: Infinity` but filtering non-markdown
+files via chokidar's `ignored` callback. readdirp still stats every entry
+(`alwaysStat: true`) before the filter runs, so the scan cost is not avoided.
 ## R15. Deferred
 
 | Item | Status |
