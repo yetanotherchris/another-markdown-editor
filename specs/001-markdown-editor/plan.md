@@ -169,6 +169,18 @@ a 7,000-file folder take ~8 s on Windows.
 No other principle is violated. The memory cost above is bounded by the LRU cap
 in research.md R2, which never evicts a dirty document.
 
+## Phase status
+
+| Phase | Status |
+|-------|--------|
+| Phase 1: Setup | ✅ Complete |
+| Phase 2: Foundational Security and IPC | ✅ Complete |
+| Phase 3: US1 — Write and Save (P1) | ✅ Complete |
+| Phase 4: US2 — Browse a Folder (P2) | ✅ Complete (2026-08-01) |
+| Phase 5: US3 — Multiple Tabs (P2) | Pending |
+| Phase 6: US4 — Reorganise Files and Folders (P3) | Pending |
+| Phase 7: Cross-Cutting and Polish | Pending |
+
 ## Deferred to a later feature
 
 Packaging (electron-builder), release automation (GitHub Actions), `.md` file

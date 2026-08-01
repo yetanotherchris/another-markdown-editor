@@ -31,6 +31,8 @@ implementation.
 
 ## Phase 2: Foundational Security and IPC
 
+**Status**: ✅ Complete
+
 **Purpose**: The path containment boundary, atomic writes, and the IPC contract
 must be in place before any renderer code touches the filesystem.
 
@@ -38,29 +40,29 @@ must be in place before any renderer code touches the filesystem.
 
 ### Tests
 
-- [ ] T009 [P] Adversarial path containment tests in `tests/main/paths.test.ts`: `..`, encoded traversal, absolute paths, sibling prefixes, symlinks/junctions outside root, Windows device names, trailing dots/spaces, alternate data streams, non-strings, empty paths
-- [ ] T010 [P] Atomic write tests in `tests/main/write.test.ts`: happy path, interrupted by process crash, target locked, disk full, temp file left after failure, no write when content unchanged
-- [ ] T011 [P] Mutation tests in `tests/main/mutate.test.ts`: rename, move, conflict, move into own descendant, create folder, create file, create invalid name, move symlink to outside
-- [ ] T012 [P] Trash tests in `tests/main/mutate.test.ts`: item goes to OS trash, fallback path when trash unavailable, warning about hidden folder contents
-- [ ] T013 [P] Watcher tests in `tests/main/watch.test.ts`: external change reported, own write suppressed, debounce, rename pairs, symlink loops ignored
-- [ ] T014 [P] IPC contract tests in `tests/main/ipc.test.ts`: every channel validates shape, returns typed errors, never leaks absolute paths, rejects paths outside root
+- [X] T009 [P] Adversarial path containment tests in `tests/main/paths.test.ts`: `..`, encoded traversal, absolute paths, sibling prefixes, symlinks/junctions outside root, Windows device names, trailing dots/spaces, alternate data streams, non-strings, empty paths
+- [X] T010 [P] Atomic write tests in `tests/main/write.test.ts`: happy path, interrupted by process crash, target locked, disk full, temp file left after failure, no write when content unchanged
+- [X] T011 [P] Mutation tests in `tests/main/mutate.test.ts`: rename, move, conflict, move into own descendant, create folder, create file, create invalid name, move symlink to outside
+- [X] T012 [P] Trash tests in `tests/main/mutate.test.ts`: item goes to OS trash, fallback path when trash unavailable, warning about hidden folder contents
+- [X] T013 [P] Watcher tests in `tests/main/watch.test.ts`: external change reported, own write suppressed, debounce, rename pairs, symlink loops ignored
+- [X] T014 [P] IPC contract tests in `tests/main/ipc.test.ts`: every channel validates shape, returns typed errors, never leaks absolute paths, rejects paths outside root
 
 ### Implementation
 
-- [ ] T015 [P] Implement `src/main/fs/paths.ts`: `resolveWithinRoot(root, candidate)` with `fs.realpath` and containment using `path.relative`, exported adversarial suite helpers
-- [ ] T016 [P] Implement `src/main/fs/read.ts`: `readDir`, `readFile`, `isMarkdown`, UTF-8 validation
-- [ ] T017 [P] Implement `src/main/fs/write.ts`: atomic `writeFile` with temp file in target directory, `fsync`, `fs.rename`, cleanup on failure
-- [ ] T018 [P] Implement `src/main/fs/mutate.ts`: `mkdir`, `rename`, `trash` using `shell.trashItem` with permanent fallback
-- [ ] T019 [P] Implement `src/main/fs/watch.ts`: chokidar wrapper with self-write suppression set and debounce, dropped to filtered markdown/directory events
-- [ ] T020 [P] Implement `src/main/settings.ts`: read/write JSON in `userData`, fallback to defaults
-- [ ] T021 [P] Implement `src/main/ipc/handlers.ts`: 11 handler functions, one per channel, each validates shape then calls path/fs layer
-- [ ] T022 [P] Implement `src/main/ipc/register.ts`: wire handlers to `ipcMain.handle` with typed channel names
-- [ ] T023 [P] Implement `src/main/workspace.ts`: open/close folder, real-root caching, unavailable state
-- [ ] T024 [P] Implement `src/main/menu.ts`: native File menu and accelerators, emits `menu:command` to renderer
-- [ ] T025 [P] Implement `src/main/index.ts`: `BrowserWindow` with `contextIsolation`, `nodeIntegration: false`, `sandbox: true`, preload path, before-quit flow
-- [ ] T026 [P] Implement `src/preload/index.ts`: `contextBridge.exposeInMainWorld('api', ...)` with the exact surface from `contracts/preload-api.md`
-- [ ] T027 [P] Implement `src/shared/ipc-contract.ts`: TypeScript request/response types shared by main and renderer
-- [ ] T028 [P] Implement `src/shared/errors.ts`: closed `ErrorCode` union
+- [X] T015 [P] Implement `src/main/fs/paths.ts`: `resolveWithinRoot(root, candidate)` with `fs.realpath` and containment using `path.relative`, exported adversarial suite helpers
+- [X] T016 [P] Implement `src/main/fs/read.ts`: `readDir`, `readFile`, `isMarkdown`, UTF-8 validation
+- [X] T017 [P] Implement `src/main/fs/write.ts`: atomic `writeFile` with temp file in target directory, `fsync`, `fs.rename`, cleanup on failure
+- [X] T018 [P] Implement `src/main/fs/mutate.ts`: `mkdir`, `rename`, `trash` using `shell.trashItem` with permanent fallback
+- [X] T019 [P] Implement `src/main/fs/watch.ts`: chokidar wrapper with self-write suppression set and debounce, dropped to filtered markdown/directory events
+- [X] T020 [P] Implement `src/main/settings.ts`: read/write JSON in `userData`, fallback to defaults
+- [X] T021 [P] Implement `src/main/ipc/handlers.ts`: 11 handler functions, one per channel, each validates shape then calls path/fs layer
+- [X] T022 [P] Implement `src/main/ipc/register.ts`: wire handlers to `ipcMain.handle` with typed channel names
+- [X] T023 [P] Implement `src/main/workspace.ts`: open/close folder, real-root caching, unavailable state
+- [X] T024 [P] Implement `src/main/menu.ts`: native File menu and accelerators, emits `menu:command` to renderer
+- [X] T025 [P] Implement `src/main/index.ts`: `BrowserWindow` with `contextIsolation`, `nodeIntegration: false`, `sandbox: true`, preload path, before-quit flow
+- [X] T026 [P] Implement `src/preload/index.ts`: `contextBridge.exposeInMainWorld('api', ...)` with the exact surface from `contracts/preload-api.md`
+- [X] T027 [P] Implement `src/shared/ipc-contract.ts`: TypeScript request/response types shared by main and renderer
+- [X] T028 [P] Implement `src/shared/errors.ts`: closed `ErrorCode` union
 
 **Checkpoint**: `npm run test` passes all main-project tests; `npm run typecheck` passes across main, preload, and shared.
 
@@ -96,6 +98,8 @@ must be in place before any renderer code touches the filesystem.
 
 ## Phase 4: User Story 2 — Browse a Folder (P2)
 
+**Status**: ✅ Complete (2026-08-01)
+
 **Goal**: Resizable sidebar showing a folder tree; opening a file loads it into the editor.
 
 **Independent Test**: Quickstart smoke test 1 plus open a file from the tree.
@@ -116,7 +120,7 @@ must be in place before any renderer code touches the filesystem.
 - [X] T070 [P] Perf: lazy watch set — chokidar `depth: 0` at open, `addPath` on expand/read (research.md R16); fixes multi-second freeze opening large folders
 - [X] T071 [P] Playwright e2e suite in `tests/e2e/`: launch, open folder, tree filters non-markdown, open file from tree, expand/collapse (`npm run test:e2e`)
 
-**Checkpoint**: Open a folder; tree shows only markdown files and folders; selecting one opens it; sidebar width persists.
+**Checkpoint**: ✅ PASSED — open a folder; tree shows only markdown files and folders; selecting one opens it; sidebar width persists. Verified by `npm run test:e2e` (5 Playwright tests) alongside lint, typecheck, and vitest.
 
 ---
 
