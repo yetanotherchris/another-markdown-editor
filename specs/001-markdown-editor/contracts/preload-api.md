@@ -27,6 +27,7 @@ interface DesktopApi {
   createEntry(parentRelativePath: string, name: string, kind: EntryKind): Promise<Result<DirEntry>>
   moveEntry(fromRelativePath: string, toRelativePath: string): Promise<Result<DirEntry>>
   trashEntry(relativePath: string, permanent?: boolean): Promise<Result<TrashReceipt>>
+  describeEntry(relativePath: string): Promise<Result<EntryInfo>>
 
   // Settings
   getSettings(): Promise<Result<Settings>>
@@ -83,6 +84,12 @@ interface OpenedFile {
 interface WriteReceipt { mtimeMs: number; size: number }
 
 interface TrashReceipt { trashed: boolean }  // false = permanently deleted
+
+interface EntryInfo {
+  kind: EntryKind
+  isEmpty: boolean            // directory only: no entries at all
+  hasHiddenFiles: boolean     // directory only: subtree contains files the tree hides (FR-029b)
+}
 
 interface WatchEvent {
   path: string

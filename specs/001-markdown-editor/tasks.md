@@ -183,20 +183,47 @@ must be in place before any renderer code touches the filesystem.
 
 ## Phase 6: User Story 4 — Reorganise Files and Folders (P3)
 
+**Status**: ✅ Complete (2026-08-02)
+
 **Goal**: Rename, delete, move, create files and folders from the tree.
 
 **Independent Test**: Quickstart smoke test 4.
 
 ### Implementation
 
-- [ ] T057 [P] Implement `src/renderer/explorer/operations.ts`: rename, move, create, delete flows with confirmation
-- [ ] T058 [P] Implement rename inline editing in `Tree.tsx`
-- [ ] T059 [P] Implement drag-and-drop move (optional) or explicit move dialog
-- [ ] T060 [P] Implement delete confirmation dialog with warning for non-empty folders and hidden files
-- [ ] T061 [P] Implement tree update on `workspace:changed` for application-originated mutations
-- [ ] T062 [P] Implement open-document path update on rename/move of its backing file (FR-028)
+- [X] T057 [P] Implement `src/renderer/explorer/operations.ts`: rename, move, create, delete flows with confirmation
+- [X] T058 [P] Implement rename inline editing in `Tree.tsx`
+- [X] T059 [P] Implement drag-and-drop move (chosen over an explicit move dialog — see plan.md Phase 6 decisions)
+- [X] T060 [P] Implement delete confirmation dialog with warning for non-empty folders and hidden files
+- [X] T061 [P] Implement tree update on `workspace:changed` for application-originated mutations
+- [X] T062 [P] Implement open-document path update on rename/move of its backing file (FR-028)
+- [X] T075 [P] Playwright e2e suite in `tests/e2e/organize.spec.ts` (14 tests)
 
-**Checkpoint**: Create, rename, move, and delete files/folders from the tree; open documents follow renames; delete goes to trash.
+### Deviations discovered during implementation
+
+- **`COLLAPSE` reducer action removed** (plan.md Phase 6 decisions):
+  react-arborist fires `onToggle` for internal auto-opens (scrollTo/openParents
+  during inline edit), which the Phase 4 handler misread as user collapses and
+  wiped the children of the folder being edited. Loaded children are now never
+  discarded; arborist's open/close state owns visibility. The workspace.test.ts
+  COLLAPSE test was replaced accordingly.
+- **`eslint.config.js` deleted**: it was a stale duplicate of
+  `eslint.config.mjs` (last updated Phase 3) and shadows it (ESLint resolves
+  `.js` first). The stale copy lacks the `tests/e2e` and config-file override
+  blocks, so `npm run lint` was failing on `main` for `tests/e2e/*.spec.ts`.
+  The `.mjs` version is canonical.
+- **Self-mutation watch suppression** (FR-037): `entry:create`/`entry:move`/
+  `entry:trash` now suppress their own watcher events (prefix-matched,
+  subtrees included); the renderer applies these mutations to its tree and
+  document state directly instead. Without this, in-app renames of open files
+  triggered the FR-038 "deleted on disk" prompt.
+- **`entry:describe` added** to the IPC surface (contracts updated): the
+  delete confirmation needs FR-029b hidden-file knowledge the filtered
+  `readDir` cannot provide.
+- **Dirty-delete refusal, .md-only file rename, placeholder cleanup on
+  cancel**: recorded as spec Clarifications 2026-08-02.
+
+**Checkpoint**: Create, rename, move, and delete files/folders from the tree; open documents follow renames; delete goes to trash. Verified by `npm run test:e2e` (35 Playwright tests) alongside lint, typecheck, and vitest (153 unit tests).
 
 ---
 

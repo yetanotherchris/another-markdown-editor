@@ -44,6 +44,14 @@ export interface TrashReceipt {
   trashed: boolean
 }
 
+export interface EntryInfo {
+  kind: EntryKind
+  /** Directory only: true when the folder contains no entries at all. */
+  isEmpty: boolean
+  /** Directory only: true when the subtree contains files the tree hides (FR-029b). */
+  hasHiddenFiles: boolean
+}
+
 export interface WatchEvent {
   path: string
   kind: 'added' | 'changed' | 'removed'
@@ -74,6 +82,7 @@ export interface DesktopApi {
   createEntry(parentRelativePath: string, name: string, kind: EntryKind): Promise<Result<DirEntry>>
   moveEntry(fromRelativePath: string, toRelativePath: string): Promise<Result<DirEntry>>
   trashEntry(relativePath: string, permanent?: boolean): Promise<Result<TrashReceipt>>
+  describeEntry(relativePath: string): Promise<Result<EntryInfo>>
   getSettings(): Promise<Result<Settings>>
   updateSettings(patch: Partial<Settings>): Promise<Result<Settings>>
   onWorkspaceChanged(cb: (e: WatchEvent) => void): () => void

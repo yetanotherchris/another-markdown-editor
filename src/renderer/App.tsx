@@ -1,6 +1,6 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
 import { Panel, Group, Separator } from 'react-resizable-panels'
-import type { MenuCommand } from '@shared/ipc-contract'
+import type { MenuCommand, EntryKind, EntryInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
   documentsReducer,
@@ -20,6 +20,14 @@ import EditorPanel from './editor/EditorPanel'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import ConfirmDialog from './dialogs/ConfirmDialog'
+import {
+  renameTargetPath,
+  moveTargetPath,
+  validateEntryName,
+  planDelete,
+  deleteDescription,
+  DeletePlan,
+} from './explorer/operations'
 import './App.css'
 
 const initialSession: EditingSession = {
@@ -37,9 +45,18 @@ export default function App() {
   const [quitDirtyDocs, setQuitDirtyDocs] = useState<DocumentState[] | null>(null)
   const [externalPrompt, setExternalPrompt] = useState<{ id: string; kind: 'changed' | 'removed' } | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
+  const [pendingEditId, setPendingEditId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ node: TreeNode; info: EntryInfo; plan: DeletePlan } | null>(null)
+  const [deleteRefused, setDeleteRefused] = useState<{ node: TreeNode; blockers: DocumentState[] } | null>(null)
+  const [permanentDelete, setPermanentDelete] = useState<{ node: TreeNode; plan: DeletePlan } | null>(null)
+  const [operationError, setOperationError] = useState<string | null>(null)
+  const pendingCreateRef = useRef(new Set<string>())
+  const createCounterRef = useRef(0)
   const activeDoc = getActiveDocument(session)
   const sessionRef = useRef(session)
   sessionRef.current = session
+  const workspaceRef = useRef(workspace)
+  workspaceRef.current = workspace
   const quitDirtyDocsRef = useRef(quitDirtyDocs)
   quitDirtyDocsRef.current = quitDirtyDocs
 
@@ -273,7 +290,12 @@ export default function App() {
 
   const handleTreeToggle = useCallback(async (id: string, isLoaded: boolean) => {
     if (isLoaded) {
-      dispatchWorkspace({ type: 'COLLAPSE', payload: { id } })
+      // arborist opened or closed a folder whose children we already have
+      // (user toggle, or an internal openParents/scrollTo during inline edit
+      // or keyboard navigation). Visibility is arborist's own state; the data
+      // stays put so a later open costs no refetch. Collapsing must NOT wipe
+      // the children here: arborist fires this for auto-opens too, and doing
+      // so would erase the node being edited right after it was created.
       return
     }
 
@@ -285,6 +307,148 @@ export default function App() {
       dispatchWorkspace({ type: 'EXPAND_ERROR', payload: { id, error: result.message } })
     }
   }, [])
+
+  const applyMove = useCallback(async (fromPath: string, toPath: string) => {
+    const result = await window.api.moveEntry(fromPath, toPath)
+    if (!result.ok) {
+      setOperationError(result.message)
+      return false
+    }
+    // The watcher event for this mutation is suppressed in main (FR-037), so
+    // the renderer applies the result to its own tree and document state.
+    dispatchWorkspace({ type: 'MOVE_ENTRY', payload: { fromPath, toPath, entry: result.value } })
+    dispatchWorkspace({ type: 'SELECT', payload: { id: toPath } })
+    dispatch({ type: 'REROUTE_PATHS', payload: { fromPath, toPath } })
+    return true
+  }, [])
+
+  // T058: inline rename commit from the tree (also used to name new entries).
+  const handleRename = useCallback(async (node: TreeNode, newName: string): Promise<boolean> => {
+    const error = validateEntryName(node.kind, node.name, newName)
+    if (error) {
+      setOperationError(error)
+      return false
+    }
+    const fromPath = node.id
+    const toPath = renameTargetPath(fromPath, newName.trim())
+    if (toPath === fromPath) return true
+    const applied = await applyMove(fromPath, toPath)
+    if (applied) {
+      pendingCreateRef.current.delete(fromPath)
+      setPendingEditId(null)
+    }
+    return applied
+  }, [applyMove])
+
+  const handleEditingCancelled = useCallback((id: string) => {
+    // A new entry the user declined to name: remove the placeholder.
+    if (!pendingCreateRef.current.has(id)) return
+    pendingCreateRef.current.delete(id)
+    setPendingEditId(null)
+    window.api.trashEntry(id).then((result) => {
+      if (result.ok) {
+        dispatchWorkspace({ type: 'REMOVE_ENTRY', payload: { id } })
+      }
+    })
+  }, [])
+
+  // T057: create a file or folder from the tree context menu, ready to be named.
+  const handleCreate = useCallback(async (parent: TreeNode | null, kind: EntryKind) => {
+    const parentNode = parent ? findNodeById(workspaceRef.current.nodes, parent.id) : null
+    if (parentNode && parentNode.kind === 'directory' && parentNode.loadState !== 'loaded') {
+      // The target folder is collapsed: expand it first so the new entry is
+      // visible and can be named inline.
+      dispatchWorkspace({ type: 'EXPAND_START', payload: { id: parentNode.id } })
+      const read = await window.api.readDir(parentNode.id)
+      if (!read.ok) {
+        dispatchWorkspace({ type: 'EXPAND_ERROR', payload: { id: parentNode.id, error: read.message } })
+        return
+      }
+      dispatchWorkspace({ type: 'EXPAND_SUCCESS', payload: { id: parentNode.id, entries: read.value } })
+    }
+
+    createCounterRef.current++
+    const placeholder = kind === 'file'
+      ? `new-file-${createCounterRef.current}.md`
+      : `new-folder-${createCounterRef.current}`
+    const result = await window.api.createEntry(parent ? parent.id : '.', placeholder, kind)
+    if (!result.ok) {
+      setOperationError(result.message)
+      return
+    }
+    const entry = result.value
+    pendingCreateRef.current.add(entry.path)
+    dispatchWorkspace({
+      type: 'INSERT_ENTRY',
+      payload: { parentPath: parent ? parent.id : '', entry }
+    })
+    dispatchWorkspace({ type: 'SELECT', payload: { id: entry.path } })
+    setPendingEditId(entry.path)
+  }, [])
+
+  const handleDeleteRequest = useCallback(async (node: TreeNode) => {
+    const result = await window.api.describeEntry(node.id)
+    if (!result.ok) {
+      setOperationError(result.message)
+      return
+    }
+    const plan = planDelete(sessionRef.current.documents, node.id, isDirtyLive)
+    if (plan.dirtyBlockers.length > 0) {
+      setDeleteRefused({ node, blockers: plan.dirtyBlockers })
+      return
+    }
+    setDeleteTarget({ node, info: result.value, plan })
+  }, [isDirtyLive])
+
+  const cleanupAfterDelete = useCallback((node: TreeNode, plan: DeletePlan) => {
+    for (const doc of plan.cleanToClose) {
+      doClose(doc.id)
+    }
+    dispatchWorkspace({ type: 'REMOVE_ENTRY', payload: { id: node.id } })
+    if (workspaceRef.current.selectedId === node.id) {
+      dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
+    }
+  }, [doClose])
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return
+    const { node, plan } = deleteTarget
+    const result = await window.api.trashEntry(node.id)
+    if (result.ok) {
+      cleanupAfterDelete(node, plan)
+      setDeleteTarget(null)
+      return
+    }
+    if (result.code === 'TRASH_UNAVAILABLE') {
+      // FR-029a: trash is not available — offer permanent deletion only as an
+      // explicit second confirmation.
+      setDeleteTarget(null)
+      setPermanentDelete({ node, plan })
+      return
+    }
+    setOperationError(result.message)
+    setDeleteTarget(null)
+  }, [deleteTarget, cleanupAfterDelete])
+
+  const handleDeletePermanent = useCallback(async () => {
+    if (!permanentDelete) return
+    const { node, plan } = permanentDelete
+    const result = await window.api.trashEntry(node.id, true)
+    if (result.ok) {
+      cleanupAfterDelete(node, plan)
+      setPermanentDelete(null)
+      return
+    }
+    setOperationError(result.message)
+    setPermanentDelete(null)
+  }, [permanentDelete, cleanupAfterDelete])
+
+  // T059: drag-and-drop move between folders.
+  const handleTreeMove = useCallback((id: string, targetParentId: string) => {
+    const target = moveTargetPath(id, targetParentId)
+    if (!target) return
+    applyMove(id, target)
+  }, [applyMove])
 
   const handleSidebarResize = useCallback((size: { asPercentage: number; inPixels: number }) => {
     updateSettings({ sidebarWidth: size.asPercentage })
@@ -443,6 +607,12 @@ export default function App() {
                     onSelect={handleTreeSelect}
                     onActivate={handleTreeActivate}
                     onToggle={handleTreeToggle}
+                    pendingEditId={pendingEditId}
+                    onRename={handleRename}
+                    onEditingCancelled={handleEditingCancelled}
+                    onDeleteRequest={handleDeleteRequest}
+                    onCreateRequest={handleCreate}
+                    onMove={handleTreeMove}
                   />
                 </div>
               </Panel>
@@ -540,7 +710,73 @@ export default function App() {
             </p>
           </ConfirmDialog>
         )
-      ) : null}
+        ) : deleteRefused ? (
+          <ConfirmDialog
+            title="Cannot delete"
+            onCancel={() => setDeleteRefused(null)}
+            buttons={[{ label: 'OK', kind: 'primary', onClick: () => setDeleteRefused(null) }]}
+          >
+            <p>
+              {deleteRefused.node.name} has unsaved changes in the editor. Save or close{' '}
+              {deleteRefused.blockers.length > 1 ? 'those documents' : 'the document'} before
+              deleting it.
+            </p>
+            <ul>
+              {deleteRefused.blockers.map((doc) => (
+                <li key={doc.id}>{doc.title}</li>
+              ))}
+            </ul>
+          </ConfirmDialog>
+        ) : deleteTarget ? (
+          <ConfirmDialog
+            title={`Delete ${deleteTarget.node.name}?`}
+            error={dialogError}
+            onCancel={() => setDeleteTarget(null)}
+            buttons={[
+              { label: 'Cancel', onClick: () => setDeleteTarget(null) },
+              { label: 'Delete', kind: 'danger', onClick: handleDeleteConfirm }
+            ]}
+          >
+            <p>{deleteDescription(deleteTarget.info)}</p>
+            {deleteTarget.plan.cleanToClose.length > 0 && (
+              <p>
+                The open document{deleteTarget.plan.cleanToClose.length > 1 ? 's' : ''}{' '}
+                {deleteTarget.plan.cleanToClose.map(d => d.title).join(', ')} will close.
+              </p>
+            )}
+            <p>It will be moved to the recycle bin or trash.</p>
+          </ConfirmDialog>
+        ) : permanentDelete ? (
+          <ConfirmDialog
+            title="Trash unavailable"
+            error={dialogError}
+            onCancel={() => setPermanentDelete(null)}
+            buttons={[
+              { label: 'Cancel', onClick: () => setPermanentDelete(null) },
+              { label: 'Delete Permanently', kind: 'danger', onClick: handleDeletePermanent }
+            ]}
+          >
+            <p>
+              {permanentDelete.node.name} could not be moved to the recycle bin or trash on this
+              system. Deleting it permanently cannot be undone.
+            </p>
+            {permanentDelete.plan.cleanToClose.length > 0 && (
+              <p>
+                The open document{permanentDelete.plan.cleanToClose.length > 1 ? 's' : ''}{' '}
+                {permanentDelete.plan.cleanToClose.map(d => d.title).join(', ')} will close.
+              </p>
+            )}
+            <p>Delete permanently anyway?</p>
+          </ConfirmDialog>
+        ) : operationError ? (
+          <ConfirmDialog
+            title="Operation failed"
+            onCancel={() => setOperationError(null)}
+            buttons={[{ label: 'OK', kind: 'primary', onClick: () => setOperationError(null) }]}
+          >
+            <p>{operationError}</p>
+          </ConfirmDialog>
+        ) : null}
     </div>
   )
 }

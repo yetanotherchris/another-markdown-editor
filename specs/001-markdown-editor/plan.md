@@ -167,6 +167,33 @@ workspace root at open; directories are added to the watch set when the tree
 expands them or a document inside them is opened. A full-tree scan made opening
 a 7,000-file folder take ~8 s on Windows.
 
+## Phase 6 design decisions (2026-08-02)
+
+**T059 — move via drag-and-drop** (react-arborist `onMove`), not a dialog.
+`disableDrop` rejects file targets and folder-into-own-descendant drops before
+they reach main; main's `moveEntry` remains the authoritative guard.
+
+**Self-mutations are suppressed and applied by the renderer** (FR-037): the
+`entry:create`/`entry:move`/`entry:trash` handlers suppress the watcher for
+their own paths (prefix-matched, including subtrees), and the renderer applies
+create/move/delete to its tree and document state directly. Without this, an
+in-app rename of an open file would be reported back as an external change and
+trigger the FR-038 "deleted on disk" prompt.
+
+**`entry:describe` added** (contracts/preload-api.md, ipc-channels.md): the
+delete confirmation needs to know whether a folder is empty and whether it
+contains files the tree hides (FR-029b). The renderer cannot learn this from
+`readDir` (filtered in main), so a named `describeEntry` operation scans the
+subtree without following symlinks. It is a fixed named operation, not an
+escape hatch — consistent with Principle I.
+
+**Collapse is arborist's visibility state only** (2026-08-02): the workspace
+reducer no longer has a `COLLAPSE` action. react-arborist fires `onToggle` for
+its own internal auto-opens (`scrollTo`/`openParents` during inline edit and
+keyboard navigation); treating those as user collapses wiped the loaded
+children of the folder being edited. The tree now never discards loaded
+children — re-opening a folder costs no refetch.
+
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
@@ -185,8 +212,8 @@ in research.md R2, which never evicts a dirty document.
 | Phase 2: Foundational Security and IPC | ✅ Complete |
 | Phase 3: US1 — Write and Save (P1) | ✅ Complete |
 | Phase 4: US2 — Browse a Folder (P2) | ✅ Complete (2026-08-01) |
-| Phase 5: US3 — Multiple Tabs (P2) | Pending |
-| Phase 6: US4 — Reorganise Files and Folders (P3) | Pending |
+| Phase 5: US3 — Multiple Tabs (P2) | ✅ Complete (2026-08-01) |
+| Phase 6: US4 — Reorganise Files and Folders (P3) | Complete (2026-08-02, awaiting merge) |
 | Phase 7: Cross-Cutting and Polish | Pending |
 
 ## Deferred to a later feature

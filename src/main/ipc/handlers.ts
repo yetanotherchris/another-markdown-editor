@@ -3,7 +3,7 @@ import * as path from 'path'
 import * as fs from 'fs'
 import * as crypto from 'crypto'
 import { resolveWithinRoot } from '../fs/paths'
-import { readDir, readFile } from '../fs/read'
+import { readDir, readFile, describeEntry } from '../fs/read'
 import { writeFile } from '../fs/write'
 import { mkdir, createFile, moveEntry, trashEntry } from '../fs/mutate'
 import { loadSettings, saveSettings } from '../settings'
@@ -11,7 +11,7 @@ import { WorkspaceState } from '../workspace'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, TrashReceipt, Settings, EntryKind, ErrorCode,
-  WatchEvent
+  WatchEvent, EntryInfo
 } from '../../shared/ipc-contract'
 
 let workspaceState: WorkspaceState | null = null
@@ -317,15 +317,19 @@ export function setupHandlers(window: BrowserWindow): void {
       ensureString(name, 'name')
       validateKind(kind)
 
-      if (name.includes('/') || name.includes('\\') || name === '..') {
+      if (name.length === 0 || name.includes('/') || name.includes('\\') || name === '..' || name === '.') {
         return err('IO', 'Invalid entry name')
       }
 
       return withWorkspace(() => {
-        if (kind === 'directory') {
-          return mkdir(workspaceRoot!, parentPath, name)
-        }
-        return createFile(workspaceRoot!, parentPath, name)
+        const entry = kind === 'directory'
+          ? mkdir(workspaceRoot!, parentPath, name)
+          : createFile(workspaceRoot!, parentPath, name)
+        // FR-037: the creation is ours — suppress the watcher so the tree is
+        // not double-fed the event (the renderer applies it directly).
+        const resolved = resolveWithinRoot(workspaceRoot!, entry.path)
+        workspaceState?.suppressWatch(resolved.resolved)
+        return entry
       })
     } catch (e: unknown) {
       const appErr = toAppError(e)
@@ -339,7 +343,16 @@ export function setupHandlers(window: BrowserWindow): void {
       const { fromPath, toPath } = args as { fromPath: string; toPath: string }
       ensureString(fromPath, 'fromPath')
       ensureString(toPath, 'toPath')
-      return withWorkspace(() => moveEntry(workspaceRoot!, fromPath, toPath))
+      return withWorkspace(() => {
+        // FR-037: suppress both endpoints (plus subtrees via prefix matching)
+        // so a move/rename the user performed in the app is not reported back
+        // as an external change to its own open documents.
+        const fromResolved = resolveWithinRoot(workspaceRoot!, fromPath)
+        const toResolved = resolveWithinRoot(workspaceRoot!, toPath)
+        workspaceState?.suppressWatch(fromResolved.resolved)
+        workspaceState?.suppressWatch(toResolved.resolved)
+        return moveEntry(workspaceRoot!, fromPath, toPath)
+      })
     } catch (e: unknown) {
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, workspaceRoot))
@@ -356,8 +369,23 @@ export function setupHandlers(window: BrowserWindow): void {
       }
 
       if (!workspaceRoot) return err('NO_WORKSPACE', 'No workspace is open')
+      const resolved = resolveWithinRoot(workspaceRoot, p)
+      // FR-037: the deletion is ours — do not report it back as external.
+      workspaceState?.suppressWatch(resolved.resolved)
       const receipt = await trashEntry(workspaceRoot, p, permanent as boolean | undefined)
       return ok(receipt)
+    } catch (e: unknown) {
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
+    }
+  })
+
+  ipcMain.handle('entry:describe', (_e, args: unknown): Result<EntryInfo> => {
+    try {
+      validateShape(args, ['path'])
+      const { path: p } = args as { path: string }
+      ensureString(p, 'path')
+      return withWorkspace(() => describeEntry(workspaceRoot!, p))
     } catch (e: unknown) {
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, workspaceRoot))

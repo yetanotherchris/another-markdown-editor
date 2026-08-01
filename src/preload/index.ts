@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   DesktopApi, Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, EntryKind, TrashReceipt, Settings,
-  WatchEvent, DocumentChangeEvent, MenuCommand
+  WatchEvent, DocumentChangeEvent, MenuCommand, EntryInfo
 } from '../shared/ipc-contract'
 
 const api: DesktopApi = {
@@ -15,6 +15,7 @@ const api: DesktopApi = {
   createEntry: (parentRelativePath: string, name: string, kind: EntryKind) => ipcRenderer.invoke('entry:create', { parentPath: parentRelativePath, name, kind }) as Promise<Result<DirEntry>>,
   moveEntry: (fromRelativePath: string, toRelativePath: string) => ipcRenderer.invoke('entry:move', { fromPath: fromRelativePath, toPath: toRelativePath }) as Promise<Result<DirEntry>>,
   trashEntry: (relativePath: string, permanent?: boolean) => ipcRenderer.invoke('entry:trash', { path: relativePath, permanent }) as Promise<Result<TrashReceipt>>,
+  describeEntry: (relativePath: string) => ipcRenderer.invoke('entry:describe', { path: relativePath }) as Promise<Result<EntryInfo>>,
   getSettings: () => ipcRenderer.invoke('settings:get') as Promise<Result<Settings>>,
   updateSettings: (patch: Partial<Settings>) => ipcRenderer.invoke('settings:update', patch) as Promise<Result<Settings>>,
 
