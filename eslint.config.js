@@ -47,6 +47,12 @@ export default tseslint.config(
     }
   },
   {
+    files: ['*.config.{ts,js}', 'vitest.workspace.ts'],
+    rules: {
+      'no-restricted-imports': 'off'
+    }
+  },
+  {
     ignores: ['out/', 'node_modules/', 'dist/']
   }
 )
