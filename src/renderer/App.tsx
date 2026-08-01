@@ -241,8 +241,8 @@ export default function App() {
             <>
               <Panel
                 defaultSize={String(sidebarWidth)}
-                minSize={15}
-                maxSize={50}
+                minSize="15"
+                maxSize="50"
                 className="sidebar-panel"
                 onResize={handleSidebarResize}
               >
