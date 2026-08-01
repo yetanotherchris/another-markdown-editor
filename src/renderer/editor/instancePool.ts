@@ -52,12 +52,10 @@ class InstancePool {
     }
   }
 
-  getCursorState(documentId: string): { cursorOffset: number; scrollTop: number } {
+  getMarkdown(documentId: string): string | null {
     const entry = this.instances.get(documentId)
-    return {
-      cursorOffset: entry?.cursorOffset ?? 0,
-      scrollTop: entry?.scrollTop ?? 0
-    }
+    if (!entry) return null
+    return entry.editor.getMarkdown()
   }
 
   evictLRU(dirtyDocuments: DocumentState[]): string | null {

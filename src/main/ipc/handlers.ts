@@ -1,4 +1,4 @@
-import { dialog, ipcMain, app } from 'electron'
+import { dialog, ipcMain, BrowserWindow } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as crypto from 'crypto'
@@ -10,12 +10,14 @@ import { loadSettings, saveSettings } from '../settings'
 import { WorkspaceState } from '../workspace'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
-  WriteReceipt, TrashReceipt, Settings, EntryKind, ErrorCode
+  WriteReceipt, TrashReceipt, Settings, EntryKind, ErrorCode,
+  WatchEvent
 } from '../../shared/ipc-contract'
 
 let workspaceState: WorkspaceState | null = null
 let workspaceRoot: string | null = null
 let workspaceName: string | null = null
+let allowClose = false
 
 function ok<T>(value: T): Result<T> {
   return { ok: true, value }
@@ -29,14 +31,34 @@ function sanitizeError(e: unknown, workspaceRootPath: string | null): string {
   if (!(e instanceof Error)) return 'Unknown error'
   let msg = e.message
   if (workspaceRootPath) {
-    msg = msg.replace(new RegExp(workspaceRootPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '<workspace>')
+    msg = msg.replace(
+      new RegExp(workspaceRootPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+      '<workspace>'
+    )
   }
   return msg
+}
+
+function toAppError(e: unknown): { code: ErrorCode; message: string } {
+  if (!(e instanceof Error)) return { code: 'IO', message: 'Unknown error' }
+  const errno = (e as NodeJS.ErrnoException).code
+  if (errno === 'ENOENT') return { code: 'NOT_FOUND', message: 'File or directory not found' }
+  if (errno === 'EACCES' || errno === 'EPERM') return { code: 'PERMISSION', message: 'Permission denied' }
+  if (errno === 'EEXIST') return { code: 'CONFLICT', message: 'Already exists' }
+  const appCode = (e as { code?: ErrorCode }).code
+  if (appCode) return { code: appCode, message: e.message }
+  return { code: 'IO', message: e.message }
 }
 
 function ensureString(val: unknown, name: string): asserts val is string {
   if (typeof val !== 'string') {
     throw Object.assign(new Error(`${name} must be a string`), { code: 'IO' as ErrorCode })
+  }
+}
+
+function validateKind(val: unknown): asserts val is EntryKind {
+  if (val !== 'file' && val !== 'directory') {
+    throw Object.assign(new Error('kind must be "file" or "directory"'), { code: 'IO' as ErrorCode })
   }
 }
 
@@ -47,11 +69,8 @@ function withWorkspace<T>(fn: () => T): Result<T> {
   try {
     return ok(fn())
   } catch (e: unknown) {
-    if (e instanceof Error) {
-      const code = (e as { code?: ErrorCode }).code
-      if (code) return err(code, sanitizeError(e, workspaceRoot))
-    }
-    return err('IO', e instanceof Error ? sanitizeError(e, workspaceRoot) : 'Unknown error')
+    const appErr = toAppError(e)
+    return err(appErr.code, sanitizeError(e, workspaceRoot))
   }
 }
 
@@ -98,6 +117,22 @@ function validateShape(obj: unknown, requiredKeys: string[]): void {
   }
 }
 
+function tryCloseWindow(): void {
+  allowClose = true
+  const windows = BrowserWindow.getAllWindows()
+  if (windows.length > 0) {
+    windows[0].close()
+  }
+}
+
+function setupWindowCloseHandler(window: BrowserWindow): void {
+  window.on('close', (e) => {
+    if (allowClose) return
+    e.preventDefault()
+    window.webContents.send('app:quitRequested')
+  })
+}
+
 export function getWorkspaceState(): WorkspaceState | null {
   return workspaceState
 }
@@ -106,7 +141,9 @@ export function getWorkspaceRoot(): string | null {
   return workspaceRoot
 }
 
-export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown[]) => void): void {
+export function setupHandlers(window: BrowserWindow): void {
+  setupWindowCloseHandler(window)
+
   ipcMain.handle('workspace:openDialog', async (): Promise<Result<WorkspaceInfo | null>> => {
     try {
       const result = await dialog.showOpenDialog({
@@ -123,21 +160,19 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
       workspaceRoot = realRootPath
       workspaceName = path.basename(realRootPath) || realRootPath
 
+      workspaceState?.close()
       workspaceState = new WorkspaceState(
-        (entries) => sendToRenderer('workspace:changed', entries),
-        (e) => sendToRenderer('document:externallyChanged', e)
+        (e: WatchEvent) => window.webContents.send('workspace:changed', e),
+        (e) => window.webContents.send('document:externallyChanged', e)
       )
       workspaceState.open(realRootPath)
 
-      const entries = readDir(realRootPath, '.')
-
-      return ok({
-        name: workspaceName,
-        entries
-      })
+      const entries = workspaceState.getEntries('.')
+      return ok({ name: workspaceName, entries })
     } catch (e: unknown) {
       workspaceRoot = null
       workspaceName = null
+      workspaceState?.close()
       workspaceState = null
       return err('IO', sanitizeError(e, null))
     }
@@ -149,8 +184,8 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
       ensureString((args as { path: unknown }).path, 'path')
       return withWorkspace(() => readDir(workspaceRoot!, (args as { path: string }).path))
     } catch (e: unknown) {
-      if (e instanceof Error && 'code' in e) return err((e as { code: ErrorCode }).code, e.message)
-      return err('IO', sanitizeError(e, workspaceRoot))
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
@@ -178,8 +213,7 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
       const buffer = fs.readFileSync(filePath)
 
       try {
-        const decoder = new TextDecoder('utf-8', { fatal: true })
-        decoder.decode(buffer)
+        new TextDecoder('utf-8', { fatal: true }).decode(buffer)
       } catch {
         return err('NOT_TEXT', 'File is not valid UTF-8 text')
       }
@@ -202,8 +236,8 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
       ensureString((args as { path: unknown }).path, 'path')
       return withWorkspace(() => readFile(workspaceRoot!, (args as { path: string }).path))
     } catch (e: unknown) {
-      if (e instanceof Error && 'code' in e) return err((e as { code: ErrorCode }).code, e.message)
-      return err('IO', sanitizeError(e, workspaceRoot))
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
@@ -221,8 +255,8 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
       const receipt = writeFile(workspaceRoot, (args as { path: string }).path, (args as { content: string }).content)
       return ok(receipt)
     } catch (e: unknown) {
-      if (e instanceof Error && 'code' in e) return err((e as { code: ErrorCode }).code, e.message)
-      return err('IO', sanitizeError(e, workspaceRoot))
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
@@ -263,7 +297,10 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
   ipcMain.handle('entry:create', (_e, args: unknown): Result<DirEntry> => {
     try {
       validateShape(args, ['parentPath', 'name', 'kind'])
-      const { parentPath, name, kind } = args as { parentPath: string; name: string; kind: EntryKind }
+      const { parentPath, name, kind } = args as { parentPath: string; name: string; kind: unknown }
+      ensureString(parentPath, 'parentPath')
+      ensureString(name, 'name')
+      validateKind(kind)
 
       if (name.includes('/') || name.includes('\\') || name === '..') {
         return err('IO', 'Invalid entry name')
@@ -276,39 +313,39 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
         return createFile(workspaceRoot!, parentPath, name)
       })
     } catch (e: unknown) {
-      if (e instanceof Error && 'code' in e) return err((e as { code: ErrorCode }).code, e.message)
-      return err('IO', sanitizeError(e, workspaceRoot))
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
   ipcMain.handle('entry:move', (_e, args: unknown): Result<DirEntry> => {
     try {
       validateShape(args, ['fromPath', 'toPath'])
-      return withWorkspace(() => moveEntry(workspaceRoot!, (args as { fromPath: string }).fromPath, (args as { toPath: string }).toPath))
+      const { fromPath, toPath } = args as { fromPath: string; toPath: string }
+      ensureString(fromPath, 'fromPath')
+      ensureString(toPath, 'toPath')
+      return withWorkspace(() => moveEntry(workspaceRoot!, fromPath, toPath))
     } catch (e: unknown) {
-      if (e instanceof Error && 'code' in e) return err((e as { code: ErrorCode }).code, e.message)
-      return err('IO', sanitizeError(e, workspaceRoot))
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
   ipcMain.handle('entry:trash', async (_e, args: unknown): Promise<Result<TrashReceipt>> => {
     try {
       validateShape(args, ['path'])
-      const { path: p, permanent } = args as { path: string; permanent?: boolean }
+      const { path: p, permanent } = args as { path: string; permanent?: unknown }
 
-      if (permanent === undefined) {
-        // Require explicit confirmation
+      if (typeof permanent === 'string') {
+        return err('IO', 'permanent must be a boolean')
       }
 
       if (!workspaceRoot) return err('NO_WORKSPACE', 'No workspace is open')
-      const receipt = await trashEntry(workspaceRoot, p, permanent)
+      const receipt = await trashEntry(workspaceRoot, p, permanent as boolean | undefined)
       return ok(receipt)
     } catch (e: unknown) {
-      if (e instanceof Error) {
-        const code = (e as { code?: ErrorCode }).code
-        if (code) return err(code, e.message)
-      }
-      return err('IO', sanitizeError(e, workspaceRoot))
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
@@ -323,7 +360,16 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
   ipcMain.handle('settings:update', (_e, patch: unknown): Result<Settings> => {
     try {
       const current = loadSettings()
-      const updated = { ...current, ...(patch as Partial<Settings>) }
+      if (!patch || typeof patch !== 'object') {
+        return err('IO', 'Settings must be an object')
+      }
+      const p = patch as Record<string, unknown>
+      const updated: Settings = {
+        sidebarWidth: typeof p.sidebarWidth === 'number' ? p.sidebarWidth : current.sidebarWidth,
+        themeOverride: p.themeOverride === 'light' || p.themeOverride === 'dark' || p.themeOverride === null
+          ? p.themeOverride as 'light' | 'dark' | null
+          : current.themeOverride
+      }
       saveSettings(updated)
       return ok(updated)
     } catch (e: unknown) {
@@ -334,7 +380,7 @@ export function setupHandlers(sendToRenderer: (channel: string, ...args: unknown
   ipcMain.handle('quit:respond', (_e, args: unknown) => {
     const decision = (args as { decision: string })?.decision
     if (decision === 'quit') {
-      app.exit(0)
+      tryCloseWindow()
     }
   })
 }

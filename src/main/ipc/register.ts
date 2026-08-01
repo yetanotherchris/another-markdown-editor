@@ -1,10 +1,11 @@
 import { BrowserWindow } from 'electron'
 import { setupHandlers } from './handlers'
 
+let registered = false
+
 export function registerIpcHandlers(window: BrowserWindow): void {
-  setupHandlers((channel: string, ...args: unknown[]) => {
-    if (!window.isDestroyed()) {
-      window.webContents.send(channel, ...args)
-    }
-  })
+  if (!registered) {
+    registered = true
+    setupHandlers(window)
+  }
 }

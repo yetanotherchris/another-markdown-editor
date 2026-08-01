@@ -1,9 +1,10 @@
-import { useReducer, useEffect, useCallback } from 'react'
+import { useReducer, useEffect, useCallback, useRef } from 'react'
 import type { MenuCommand } from '@shared/ipc-contract'
 import {
   EditingSession,
   documentsReducer,
   getActiveDocument,
+  hasDirtyDocuments,
 } from './state/documents'
 import { loadSettingsFromMain } from './state/settings'
 import { instancePool } from './editor/instancePool'
@@ -19,6 +20,8 @@ const initialState: EditingSession = {
 export default function App() {
   const [session, dispatch] = useReducer(documentsReducer, initialState)
   const activeDoc = getActiveDocument(session)
+  const sessionRef = useRef(session)
+  sessionRef.current = session
 
   useEffect(() => {
     loadSettingsFromMain()
@@ -32,6 +35,10 @@ export default function App() {
     dispatch({ type: 'CAPTURE_BASELINE', payload: { id, baseline } })
   }, [])
 
+  const getContentToSave = useCallback((docId: string, fallback: string): string => {
+    return instancePool.getMarkdown(docId) ?? fallback
+  }, [])
+
   useEffect(() => {
     const unsubMenu = window.api.onMenuCommand(async (command: MenuCommand) => {
       switch (command) {
@@ -42,20 +49,28 @@ export default function App() {
           }
           break
         }
+        case 'open-folder': {
+          const result = await window.api.openFolderDialog()
+          if (result.ok && result.value) {
+            // Phase 4: update workspace state
+          }
+          break
+        }
         case 'save': {
           if (!activeDoc) return
+          const content = getContentToSave(activeDoc.id, activeDoc.content)
           if (activeDoc.path) {
-            const result = await window.api.writeFile(activeDoc.path, activeDoc.content)
+            const result = await window.api.writeFile(activeDoc.path, content)
             if (result.ok) {
               dispatch({
                 type: 'SAVE_SUCCESS',
-                payload: { id: activeDoc.id, path: activeDoc.path, content: activeDoc.content }
+                payload: { id: activeDoc.id, path: activeDoc.path, content }
               })
             } else {
               dispatch({ type: 'SAVE_FAILED', payload: { id: activeDoc.id } })
             }
           } else {
-            const result = await window.api.saveFileDialog(activeDoc.title, activeDoc.content)
+            const result = await window.api.saveFileDialog(activeDoc.title, content)
             if (result.ok && result.value) {
               dispatch({
                 type: 'SAVE_SUCCESS',
@@ -67,7 +82,8 @@ export default function App() {
         }
         case 'save-as': {
           if (!activeDoc) return
-          const result = await window.api.saveFileDialog(activeDoc.title, activeDoc.content)
+          const content = getContentToSave(activeDoc.id, activeDoc.content)
+          const result = await window.api.saveFileDialog(activeDoc.title, content)
           if (result.ok && result.value) {
             dispatch({
               type: 'SAVE_SUCCESS',
@@ -79,7 +95,7 @@ export default function App() {
         case 'close-tab': {
           if (activeDoc) {
             if (activeDoc.dirty) {
-              // close-tab with dirty: handled in Phase 5
+              // close-tab with dirty save/discard/cancel dialog: Phase 5 (T053)
             } else {
               dispatch({ type: 'CLOSE', payload: { id: activeDoc.id } })
               instancePool.remove(activeDoc.id)
@@ -104,7 +120,7 @@ export default function App() {
     })
 
     const unsubQuit = window.api.onQuitRequested(() => {
-      const dirty = session.documents.some(d => d.dirty)
+      const dirty = hasDirtyDocuments(sessionRef.current)
       if (dirty) {
         window.api.confirmQuit('cancel')
         return

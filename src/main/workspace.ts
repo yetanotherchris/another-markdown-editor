@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import { readDir } from './fs/read'
 import { WorkspaceWatcher } from './fs/watch'
-import type { DirEntry } from '../shared/ipc-contract'
+import type { DirEntry, WatchEvent, DocumentChangeEvent } from '../shared/ipc-contract'
 
 export class WorkspaceState {
   rootPath: string | null = null
@@ -9,8 +9,8 @@ export class WorkspaceState {
   private watcher = new WorkspaceWatcher()
 
   constructor(
-    private onWorkspaceEvent: (entries: DirEntry[]) => void,
-    private onDocumentEvent: (e: { path: string; kind: 'changed' | 'removed' }) => void
+    private onWorkspaceEvent: (event: WatchEvent) => void,
+    private onDocumentEvent: (e: DocumentChangeEvent) => void
   ) {}
 
   open(root: string): void {
@@ -20,8 +20,7 @@ export class WorkspaceState {
     this.watcher.start(root, {
       onWorkspaceChanged: (e) => {
         if (e.kind === 'changed' && e.isDirectory) return
-        const entries = readDir(root, '')
-        this.onWorkspaceEvent(entries)
+        this.onWorkspaceEvent(e)
       },
       onDocumentChanged: (e) => {
         this.onDocumentEvent(e)
@@ -38,8 +37,8 @@ export class WorkspaceState {
     }
   }
 
-  suppressWatch(path: string): void {
-    this.watcher.suppress(path)
+  suppressWatch(absolutePath: string): void {
+    this.watcher.suppress(absolutePath)
   }
 
   close(): void {
