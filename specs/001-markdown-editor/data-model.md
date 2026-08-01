@@ -130,7 +130,7 @@ Rules:
 
 | Field | Type | Default |
 |-------|------|---------|
-| `sidebarWidth` | `number` (px) | `260` |
+| `sidebarWidth` | `number` (percentage of window width) | `30` |
 | `themeOverride` | `'light' \| 'dark' \| null` | `null` (follow OS, research.md R10) |
 | `lastWorkspacePath` | `string \| null` | `null` |
 

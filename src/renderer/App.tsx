@@ -84,8 +84,8 @@ export default function App() {
   }, [])
 
   const handleSidebarResize = useCallback((size: { asPercentage: number; inPixels: number }) => {
-    updateSettings({ sidebarWidth: size.inPixels })
-    window.api.updateSettings({ sidebarWidth: size.inPixels }).catch(() => { /* ignore */ })
+    updateSettings({ sidebarWidth: size.asPercentage })
+    window.api.updateSettings({ sidebarWidth: size.asPercentage }).catch(() => { /* ignore */ })
   }, [])
 
   useEffect(() => {
@@ -240,7 +240,7 @@ export default function App() {
           {hasWorkspace && (
             <>
               <Panel
-                defaultSize={sidebarWidth}
+                defaultSize={String(sidebarWidth)}
                 minSize={15}
                 maxSize={50}
                 className="sidebar-panel"

@@ -353,7 +353,7 @@ export function setupHandlers(window: BrowserWindow): void {
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 260, themeOverride: null })
+      return ok({ sidebarWidth: 30, themeOverride: null })
     }
   })
 
