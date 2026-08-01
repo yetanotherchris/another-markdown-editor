@@ -37,11 +37,9 @@ class InstancePool {
   }
 
   remove(documentId: string): void {
-    const entry = this.instances.get(documentId)
-    if (entry) {
-      entry.editor.destroy()
-      this.instances.delete(documentId)
-    }
+    // The owning CrepeHost destroys the editor on unmount; this only drops the
+    // bookkeeping entry. Destroying here would double-destroy the same editor.
+    this.instances.delete(documentId)
   }
 
   saveCursorState(documentId: string, cursorOffset: number, scrollTop: number): void {
@@ -58,11 +56,18 @@ class InstancePool {
     return entry.editor.getMarkdown()
   }
 
-  evictLRU(dirtyDocuments: DocumentState[]): string | null {
+  /**
+   * Returns the id of the oldest *clean* live instance to evict, or null when
+   * nothing may be evicted (every live instance is dirty, or the only clean
+   * one is the active document). The active document is never evicted — its
+   * editor would vanish while visible.
+   */
+  evictLRU(dirtyDocuments: DocumentState[], activeId: string | null): string | null {
     const dirtyIds = new Set(dirtyDocuments.map(d => d.id))
     let oldest: InstanceEntry | null = null
 
     for (const entry of this.instances.values()) {
+      if (entry.documentId === activeId) continue
       if (dirtyIds.has(entry.documentId)) continue
       if (!oldest || entry.lastActiveAt < oldest.lastActiveAt) {
         oldest = entry
@@ -72,10 +77,6 @@ class InstancePool {
     if (oldest) {
       this.remove(oldest.documentId)
       return oldest.documentId
-    }
-
-    if (this.instances.size >= MAX_INSTANCES) {
-      return null
     }
 
     return null

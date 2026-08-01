@@ -1,20 +1,23 @@
 import { useCallback } from 'react'
+import type { Crepe } from '@milkdown/crepe'
 import type { DocumentState } from '../state/documents'
 import { instancePool } from './instancePool'
-import CrepeHost from './CrepeHost'
+import CrepeHost, { type CursorState } from './CrepeHost'
 
 interface EditorPanelProps {
   document: DocumentState
   isActive: boolean
   onContentChange: (id: string, content: string) => void
   onBaselineCapture: (id: string, baseline: string) => void
+  onCursorState: (id: string, cursorOffset: number, scrollTop: number) => void
 }
 
 export default function EditorPanel({
   document,
   isActive,
   onContentChange,
-  onBaselineCapture
+  onBaselineCapture,
+  onCursorState
 }: EditorPanelProps) {
   const handleMarkdownUpdated = useCallback(
     (markdown: string) => {
@@ -30,46 +33,40 @@ export default function EditorPanel({
     [document.id, onBaselineCapture]
   )
 
+  const handleCursorState = useCallback(
+    (cursor: CursorState) => {
+      onCursorState(document.id, cursor.cursorOffset, cursor.scrollTop)
+    },
+    [document.id, onCursorState]
+  )
+
   const handleReady = useCallback(
-    (_crepe: unknown) => {
-      instancePool.register(document.id, _crepe as never)
+    (crepe: Crepe) => {
+      instancePool.register(document.id, crepe)
     },
     [document.id]
   )
 
-  if (!isActive && instancePool.has(document.id)) {
-    return (
-      <div style={{ visibility: 'hidden', position: 'absolute', width: '100%', height: '100%' }}>
-        <CrepeHost
-          defaultValue={document.content}
-          onMarkdownUpdated={handleMarkdownUpdated}
-          onReady={handleReady}
-          onBaselineCapture={handleBaselineCapture}
-        />
-      </div>
-    )
-  }
-
   if (document.editorState === 'evicted') {
-    return (
-      <div style={{ visibility: isActive ? 'visible' : 'hidden', position: 'absolute', width: '100%', height: '100%' }}>
-        <CrepeHost
-          defaultValue={document.content}
-          onMarkdownUpdated={handleMarkdownUpdated}
-          onReady={handleReady}
-          onBaselineCapture={handleBaselineCapture}
-        />
-      </div>
-    )
+    // Instance destroyed to free memory; content retained in the store.
+    // A fresh CrepeHost mounts when the document is reactivated.
+    return <div className="editor-host" />
   }
 
   return (
-    <div style={{ visibility: isActive ? 'visible' : 'hidden', position: 'absolute', width: '100%', height: '100%' }}>
+    <div
+      className="editor-host"
+      style={{ visibility: isActive ? 'visible' : 'hidden' }}
+    >
       <CrepeHost
+        key={`${document.id}-v${document.contentVersion}`}
         defaultValue={document.content}
+        active={isActive}
+        restoreCursor={{ cursorOffset: document.cursorOffset, scrollTop: document.scrollTop }}
         onMarkdownUpdated={handleMarkdownUpdated}
         onReady={handleReady}
         onBaselineCapture={handleBaselineCapture}
+        onCursorState={handleCursorState}
       />
     </div>
   )

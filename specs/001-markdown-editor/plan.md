@@ -22,7 +22,14 @@ files — see [research.md](./research.md) R1.
 
 **Language/Version**: TypeScript 5.x, `strict: true`, across main, preload, and renderer
 
-**Primary Dependencies**: Electron 43, React 19, `@milkdown/crepe` 7.21.3, `react-arborist` 3.16, `react-resizable-panels` 4.12, `chokidar` 5
+**Primary Dependencies**: Electron 43, React 19, `@milkdown/crepe` 7.21.3, `@milkdown/kit` 7.21.3, `react-arborist` 3.16, `react-resizable-panels` 4.12, `chokidar` 5
+
+> **Dependency note (Phase 5)**: `@milkdown/kit` added as a direct dependency.
+> Cursor/scroll capture (T056) needs the ProseMirror `EditorView`, reachable
+> only via `editorViewCtx` (`@milkdown/kit/core` re-export of `@milkdown/core`)
+> and `TextSelection`/`EditorView` types (`@milkdown/kit/prose/{state,view}`).
+> Version pinned to match `@milkdown/crepe`'s own exact pin (7.21.3) so the
+> three resolve to one copy. Evidence in research.md R17.
 
 **Storage**: The user's filesystem. Application settings (sidebar width, theme override) in Electron's `userData` directory as JSON. No database.
 
@@ -165,6 +172,7 @@ a 7,000-file folder take ~8 s on Windows.
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | Up to 8 concurrent editor instances rather than one | FR-017 requires each document to keep its own undo history, cursor, and scroll position across tab switches. Crepe accepts content only via `defaultValue` at construction and exposes no `setMarkdown` (research.md R1). | A single shared instance would require `replaceAll` on the underlying ProseMirror state, which shares one undo stack across all documents. Undo after a tab switch would then revert an edit in a *different file* — a direct breach of FR-017 and Principle IV. Reimplementing per-document history on top of a shared instance is more code and more risk than holding several instances. |
+| Dirty state is consulted live (beyond the reducer) at close/quit | The listener plugin debounces `markdownUpdated` by 200 ms, so the reducer's dirty flag lags keystrokes. Closing or quitting inside that window must still prompt or the edit is silently discarded (FR-023, Principle III). The guards read `getMarkdown()` from the live editor and flush it into the reducer (research.md R4). | Waiting for the debounce before deciding would add latency to a data-loss-critical decision; polling the editor on every keystroke to keep the reducer synchronised would serialize markdown per keystroke and breach SC-003. |
 
 No other principle is violated. The memory cost above is bounded by the LRU cap
 in research.md R2, which never evicts a dirty document.

@@ -81,12 +81,25 @@ read from or written to disk — and set `dirty = (current !== baseline)`.
 **Rationale**: Comparing against a baseline rather than setting a one-way flag
 means undoing back to the original state correctly clears the dirty marker.
 
-**Caveat to verify during implementation**: Crepe may normalise markdown on
-load, so the string it emits immediately after construction can differ from the
-bytes on disk even with no user edit. The baseline is therefore captured from
-Crepe's *first* `markdownUpdated` emission, not from the file bytes, otherwise
-every opened file would appear dirty at once. The file bytes are retained
-separately for the round-trip guarantee in R5.
+**Caveat verified in Phase 5 — the "first emission" does not exist**: the
+listener plugin (`@milkdown/plugin-listener`, inspected 2026-08-01) debounces
+`markdownUpdated` by 200 ms and only records transactions with
+`tr.docChanged`, and no doc-changing transaction fires on load. The first
+emission therefore occurs on the user's *first edit* — capturing the baseline
+from it would capture the edit itself, leaving the document permanently clean.
+The baseline is instead read from `crepe.getMarkdown()` immediately after
+`create()` resolves (the parsed, normalised content), and the `CAPTURE_BASELINE`
+reducer action adopts it as both `content` and `baseline`, so a freshly opened
+file is never falsely dirty. Verified end-to-end: every opened file previously
+showed a dirty marker (Phase 5 e2e probe).
+
+**Consequence — guarded actions must not trust the reducer alone**: because
+the reducer's dirty flag lags keystrokes by the 200 ms debounce, the close-tab
+and quit guards additionally read the live editor content
+(`instancePool.getMarkdown(doc.id) !== baseline`) before deciding, and flush it
+into the reducer. Without this, closing or quitting within 200 ms of the last
+keystroke would discard the edit with no prompt — a Principle III breach.
+Eviction likewise treats unflushed live content as dirty.
 
 ## R5. Markdown round-trip fidelity (FR-014, SC-006)
 
@@ -291,6 +304,24 @@ files via chokidar's `ignored` callback. readdirp still stats every entry
 | App id, product name, `.md` file association | Deferred — packaging, out of scope per spec Assumptions |
 | Auto-update from GitHub Releases | Deferred — needs code-signing decision first; `electron-updater` is painful unsigned on Windows and macOS |
 | electron-builder / GitHub Actions | Deferred to a later feature per the agreed phase scope |
+
+## R17. Editor scroll container (Phase 5)
+
+**Decision**: The app's `.editor-host` wrapper (absolute, full-size,
+`overflow: auto`) is the editor's scroll container and the cursor/scroll
+capture target.
+
+**Evidence**: prosemirror-view 1.42.2 (transitive via `@milkdown/kit`) has no
+`scrollDOM` API (added in a later minor). Crepe itself sets no `overflow` on
+its root — the container must be provided by the application, which R3 already
+implied.
+
+**Access**: the ProseMirror `EditorView` is obtained through
+`crepe.editor.action((ctx) => ctx.get(editorViewCtx))` with `editorViewCtx`
+imported from `@milkdown/kit/core` (re-export of `@milkdown/core`, same version
+as `@milkdown/crepe`). Cursor is `view.state.selection.anchor`; restore clamps
+to `doc.content.size` and uses `TextSelection` from `@milkdown/kit/prose/state`.
+`@milkdown/kit` was added as a direct dependency in Phase 5 for these imports.
 
 ## Version matrix
 

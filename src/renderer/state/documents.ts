@@ -11,6 +11,7 @@ export interface DocumentState {
   scrollTop: number
   lastActiveAt: number
   externalState: 'clean' | 'changedOnDisk' | 'deletedOnDisk'
+  contentVersion: number
 }
 
 export interface EditingSession {
@@ -36,7 +37,8 @@ export function createEmpty(): DocumentState {
     cursorOffset: 0,
     scrollTop: 0,
     lastActiveAt: Date.now(),
-    externalState: 'clean'
+    externalState: 'clean',
+    contentVersion: 0
   }
 }
 
@@ -61,7 +63,8 @@ export function openFile(opened: {
     cursorOffset: 0,
     scrollTop: 0,
     lastActiveAt: Date.now(),
-    externalState: 'clean'
+    externalState: 'clean',
+    contentVersion: 0
   }
 }
 
@@ -77,6 +80,8 @@ export interface DocumentsAction {
     | 'CLOSE'
     | 'EVICT'
     | 'REACTIVATE'
+    | 'CAPTURE_EDITOR_STATE'
+    | 'RELOAD'
     | 'UPDATE_PATH'
     | 'EXTERNAL_CHANGE'
     | 'SET_DIRTY'
@@ -142,7 +147,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
         ...state,
         documents: state.documents.map(d =>
           d.id === id
-            ? { ...d, baseline, dirty: d.content !== baseline }
+            ? { ...d, content: baseline, baseline, dirty: false }
             : d
         )
       }
@@ -210,6 +215,43 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
       }
     }
 
+    case 'CAPTURE_EDITOR_STATE': {
+      const { id, cursorOffset, scrollTop } = action.payload as {
+        id: string
+        cursorOffset: number
+        scrollTop: number
+      }
+      return {
+        ...state,
+        documents: state.documents.map(d =>
+          d.id === id
+            ? { ...d, cursorOffset, scrollTop, lastActiveAt: Date.now() }
+            : d
+        )
+      }
+    }
+
+    case 'RELOAD': {
+      const { id, content } = action.payload as { id: string; content: string }
+      return {
+        ...state,
+        documents: state.documents.map(d =>
+          d.id === id
+            ? {
+                ...d,
+                content,
+                baseline: content,
+                dirty: false,
+                externalState: 'clean',
+                cursorOffset: 0,
+                scrollTop: 0,
+                contentVersion: d.contentVersion + 1
+              }
+            : d
+        )
+      }
+    }
+
     case 'UPDATE_PATH': {
       const { id, path } = action.payload as { id: string; path: string }
       return {
@@ -262,4 +304,20 @@ export function hasDirtyDocuments(state: EditingSession): boolean {
 
 export function getDirtyDocuments(state: EditingSession): DocumentState[] {
   return state.documents.filter(d => d.dirty)
+}
+
+export type CloseDecision = 'prompt' | 'close'
+
+/** FR-023: closing a clean document needs no confirmation; a dirty one does. */
+export function planClose(state: EditingSession, id: string): CloseDecision {
+  const doc = state.documents.find(d => d.id === id)
+  if (!doc) return 'close'
+  return doc.dirty ? 'prompt' : 'close'
+}
+
+export type QuitDecision = 'prompt' | 'quit'
+
+/** FR-023: quitting with any dirty document prompts, naming the affected ones. */
+export function planQuit(state: EditingSession): QuitDecision {
+  return hasDirtyDocuments(state) ? 'prompt' : 'quit'
 }

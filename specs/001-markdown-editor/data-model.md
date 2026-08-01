@@ -66,6 +66,7 @@ An open piece of content. Backs one tab.
 | `scrollTop` | `number` | Restored on reactivation. |
 | `lastActiveAt` | `number` | LRU ordering key. |
 | `externalState` | `'clean' \| 'changedOnDisk' \| 'deletedOnDisk'` | Drives FR-035–FR-038 handling. |
+| `contentVersion` | `number` | Bumped on every `RELOAD`; keys the `CrepeHost` remount so external content actually replaces the live editor (Crepe accepts content only at construction, R1). |
 
 ### Identity rules
 
@@ -83,9 +84,16 @@ An open piece of content. Backs one tab.
 
 - `dirty` is always derived from `content !== baseline`, so undoing back to the
   original state clears the marker (research.md R4).
-- `baseline` is captured from Crepe's first `markdownUpdated` emission, not from
-  the file bytes, because Crepe normalises on parse and every file would
-  otherwise open dirty.
+- `baseline` is captured from `crepe.getMarkdown()` immediately after the
+  editor is created, not from the file bytes and not from a "first emission"
+  (which never fires — see research.md R4): Crepe normalises on parse and
+  every file would otherwise open dirty. `CAPTURE_BASELINE` adopts the
+  normalised value as both `content` and `baseline`.
+- The reducer's `dirty` lags keystrokes by the listener plugin's 200 ms
+  debounce. The close-tab and quit guards therefore also consult the **live**
+  editor content (`getMarkdown() !== baseline`) and flush it into the reducer
+  before deciding — closing within the debounce window must still prompt
+  (FR-023, research.md R4).
 - A failed save does **not** update `baseline` — the document stays dirty
   (FR-022, Principle III).
 - Saving a document where `dirty === false` writes nothing at all, which is what
@@ -108,8 +116,12 @@ An open piece of content. Backs one tab.
        dirty? confirm save/discard/cancel
 ```
 
-Only clean documents may be evicted. Eviction of a dirty document would put the
-only copy of the user's work nowhere, breaching Principle III.
+Only clean documents may be evicted (judged against live editor content, not
+just the debounced reducer flag — research.md R4). Eviction of a dirty document
+would put the only copy of the user's work nowhere, breaching Principle III.
+An evicted document renders as an empty container until reactivation, when a
+fresh editor instance is created and its retained cursor and scroll position
+are restored.
 
 ## EditingSession (renderer)
 

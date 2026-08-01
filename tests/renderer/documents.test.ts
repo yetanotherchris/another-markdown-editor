@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   documentsReducer,
   hasDirtyDocuments,
+  planClose,
   EditingSession,
 } from '../../src/renderer/state/documents'
 
@@ -252,6 +253,131 @@ describe('documents reducer', () => {
         payload: { id: docId, content: 'changed' }
       })
       expect(hasDirtyDocuments(s2)).toBe(true)
+    })
+  })
+
+  describe('tab lifecycle (Phase 5)', () => {
+    function openTwoFiles(): EditingSession {
+      const s1 = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 }
+      })
+      return documentsReducer(s1, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'b.md', name: 'b.md', content: 'beta', mtimeMs: 2, size: 4 }
+      })
+    }
+
+    it('open existing activates the already-open tab without duplicating', () => {
+      const s1 = openTwoFiles()
+      const s2 = documentsReducer(s1, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 }
+      })
+      expect(s2.documents).toHaveLength(2)
+      expect(s2.activeId).toBe(s1.documents[0].id)
+      expect(s2.documents[0].editorState).toBe('live')
+    })
+
+    it('switching tabs preserves content and dirty state (undo/scroll via mocked editor state)', () => {
+      let state = openTwoFiles()
+      const a = state.documents[0]
+      const b = state.documents[1]
+
+      // Edit b, then switch back to a, capturing the editor state of a
+      // (as the real CrepeHost does when it becomes inactive).
+      state = documentsReducer(state, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: b.id, content: 'beta edited' }
+      })
+      state = documentsReducer(state, { type: 'ACTIVATE', payload: { id: a.id } })
+      state = documentsReducer(state, {
+        type: 'CAPTURE_EDITOR_STATE',
+        payload: { id: a.id, cursorOffset: 42, scrollTop: 137 }
+      })
+
+      const aAfter = state.documents.find(d => d.id === a.id)!
+      expect(aAfter.cursorOffset).toBe(42)
+      expect(aAfter.scrollTop).toBe(137)
+      expect(aAfter.editorState).toBe('live')
+      expect(aAfter.content).toBe('alpha')
+
+      // The dirty tab keeps its state while hidden.
+      const bAfter = state.documents.find(d => d.id === b.id)!
+      expect(bAfter.dirty).toBe(true)
+      expect(bAfter.content).toBe('beta edited')
+
+      // Switching back to b restores its previous position.
+      state = documentsReducer(state, { type: 'ACTIVATE', payload: { id: b.id } })
+      expect(state.activeId).toBe(b.id)
+      expect(state.documents.find(d => d.id === b.id)!.dirty).toBe(true)
+    })
+
+    it('EVICT marks a clean document evicted without losing content', () => {
+      const s1 = openTwoFiles()
+      const doc = s1.documents[0]
+      const s2 = documentsReducer(s1, { type: 'EVICT', payload: { id: doc.id } })
+      const evicted = s2.documents.find(d => d.id === doc.id)!
+      expect(evicted.editorState).toBe('evicted')
+      expect(evicted.content).toBe('alpha')
+      expect(evicted.baseline).toBe('alpha')
+      expect(evicted.dirty).toBe(false)
+    })
+
+    it('REACTIVATE restores the instance and the retained cursor and scroll', () => {
+      const s1 = openTwoFiles()
+      const doc = s1.documents[0]
+      const s2 = documentsReducer(s1, { type: 'EVICT', payload: { id: doc.id } })
+      const s3 = documentsReducer(s2, {
+        type: 'REACTIVATE',
+        payload: { id: doc.id, cursorOffset: 42, scrollTop: 137 }
+      })
+      const restored = s3.documents.find(d => d.id === doc.id)!
+      expect(restored.editorState).toBe('live')
+      expect(restored.cursorOffset).toBe(42)
+      expect(restored.scrollTop).toBe(137)
+    })
+
+    it('RELOAD replaces content, clears dirty and external state, bumps content version', () => {
+      let state = openTwoFiles()
+      const doc = state.documents[0]
+      state = documentsReducer(state, {
+        type: 'EXTERNAL_CHANGE',
+        payload: { path: 'a.md', kind: 'changed' }
+      })
+      const before = state.documents.find(d => d.id === doc.id)!
+      expect(before.externalState).toBe('changedOnDisk')
+
+      state = documentsReducer(state, {
+        type: 'RELOAD',
+        payload: { id: doc.id, content: 'new content from disk' }
+      })
+      const after = state.documents.find(d => d.id === doc.id)!
+      expect(after.content).toBe('new content from disk')
+      expect(after.baseline).toBe('new content from disk')
+      expect(after.dirty).toBe(false)
+      expect(after.externalState).toBe('clean')
+      expect(after.contentVersion).toBe(before.contentVersion + 1)
+    })
+
+    it('CLOSE removes a clean tab without prompting plan-wise', () => {
+      const s1 = openTwoFiles()
+      const doc = s1.documents[0]
+      expect(planClose(s1, doc.id)).toBe('close')
+      const s2 = documentsReducer(s1, { type: 'CLOSE', payload: { id: doc.id } })
+      expect(s2.documents).toHaveLength(1)
+      expect(s2.documents.find(d => d.id === doc.id)).toBeUndefined()
+    })
+
+    it('planClose asks for confirmation for a dirty document', () => {
+      let state = openTwoFiles()
+      const doc = state.documents[0]
+      state = documentsReducer(state, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: doc.id, content: 'alpha edited' }
+      })
+      expect(planClose(state, doc.id)).toBe('prompt')
+      expect(planClose(state, 'unknown-id')).toBe('close')
     })
   })
 })
