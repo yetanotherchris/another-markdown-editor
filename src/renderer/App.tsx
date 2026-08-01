@@ -1,4 +1,5 @@
 import { useReducer, useEffect, useCallback, useRef } from 'react'
+import { Panel, Group, Separator } from 'react-resizable-panels'
 import type { MenuCommand } from '@shared/ipc-contract'
 import {
   EditingSession,
@@ -6,19 +7,26 @@ import {
   getActiveDocument,
   hasDirtyDocuments,
 } from './state/documents'
-import { loadSettingsFromMain } from './state/settings'
+import {
+  initialWorkspaceState,
+  workspaceReducer,
+  TreeNode
+} from './state/workspace'
+import { loadSettingsFromMain, updateSettings, getSettings } from './state/settings'
 import { instancePool } from './editor/instancePool'
 import EditorPanel from './editor/EditorPanel'
+import Tree from './explorer/Tree'
 import './App.css'
 
-const initialState: EditingSession = {
+const initialSession: EditingSession = {
   documents: [],
   activeId: null,
   untitledCounter: 0
 }
 
 export default function App() {
-  const [session, dispatch] = useReducer(documentsReducer, initialState)
+  const [session, dispatch] = useReducer(documentsReducer, initialSession)
+  const [workspace, dispatchWorkspace] = useReducer(workspaceReducer, initialWorkspaceState)
   const activeDoc = getActiveDocument(session)
   const sessionRef = useRef(session)
   sessionRef.current = session
@@ -39,6 +47,47 @@ export default function App() {
     return instancePool.getMarkdown(docId) ?? fallback
   }, [])
 
+  const handleTreeSelect = useCallback(async (id: string | null) => {
+    dispatchWorkspace({ type: 'SELECT', payload: { id } })
+    if (!id) return
+    const node = findNodeById(workspace.nodes, id)
+    if (!node || node.kind !== 'file') return
+    const result = await window.api.readFile(id)
+    if (result.ok) {
+      dispatch({ type: 'OPEN_EXISTING', payload: result.value })
+    }
+  }, [workspace.nodes])
+
+  const handleTreeActivate = useCallback(async (id: string) => {
+    const node = findNodeById(workspace.nodes, id)
+    if (!node || node.kind !== 'file') return
+
+    const result = await window.api.readFile(id)
+    if (result.ok) {
+      dispatch({ type: 'OPEN_EXISTING', payload: result.value })
+    }
+  }, [workspace.nodes])
+
+  const handleTreeToggle = useCallback(async (id: string, isLoaded: boolean) => {
+    if (isLoaded) {
+      dispatchWorkspace({ type: 'COLLAPSE', payload: { id } })
+      return
+    }
+
+    dispatchWorkspace({ type: 'EXPAND_START', payload: { id } })
+    const result = await window.api.readDir(id)
+    if (result.ok) {
+      dispatchWorkspace({ type: 'EXPAND_SUCCESS', payload: { id, entries: result.value } })
+    } else {
+      dispatchWorkspace({ type: 'EXPAND_ERROR', payload: { id, error: result.message } })
+    }
+  }, [])
+
+  const handleSidebarResize = useCallback((size: { asPercentage: number; inPixels: number }) => {
+    updateSettings({ sidebarWidth: size.inPixels })
+    window.api.updateSettings({ sidebarWidth: size.inPixels }).catch(() => { /* ignore */ })
+  }, [])
+
   useEffect(() => {
     const unsubMenu = window.api.onMenuCommand(async (command: MenuCommand) => {
       switch (command) {
@@ -52,7 +101,14 @@ export default function App() {
         case 'open-folder': {
           const result = await window.api.openFolderDialog()
           if (result.ok && result.value) {
-            // Phase 4: update workspace state
+            dispatchWorkspace({
+              type: 'REPLACE',
+              payload: {
+                name: result.value.name,
+                root: null,
+                entries: result.value.entries
+              }
+            })
           }
           break
         }
@@ -119,6 +175,10 @@ export default function App() {
       })
     })
 
+    const unsubWorkspace = window.api.onWorkspaceChanged((e) => {
+      dispatchWorkspace({ type: 'APPLY_WATCH_EVENT', payload: e })
+    })
+
     const unsubQuit = window.api.onQuitRequested(() => {
       const dirty = hasDirtyDocuments(sessionRef.current)
       if (dirty) {
@@ -131,6 +191,7 @@ export default function App() {
     return () => {
       unsubMenu()
       unsubDocument()
+      unsubWorkspace()
       unsubQuit()
     }
   }, [activeDoc])
@@ -143,33 +204,96 @@ export default function App() {
 
   const handleNew = () => dispatch({ type: 'OPEN_NEW' })
 
+  const handleOpenFolder = useCallback(async () => {
+    const result = await window.api.openFolderDialog()
+    if (result.ok && result.value) {
+      dispatchWorkspace({
+        type: 'REPLACE',
+        payload: {
+          name: result.value.name,
+          root: null,
+          entries: result.value.entries
+        }
+      })
+    }
+  }, [])
+
+  const sidebarWidth = getSettings().sidebarWidth
+  const hasWorkspace = workspace.name !== null
+
   return (
     <div className="app-container">
       <div className="toolbar">
         <button onClick={handleNew}>New</button>
+        <button onClick={handleOpenFolder}>Open Folder</button>
         {activeDoc && (
           <span className="document-title">
             {activeDoc.title}{activeDoc.dirty ? ' \u2022' : ''}
           </span>
         )}
-      </div>
-      <div className="editor-area">
-        {session.documents.length === 0 ? (
-          <div className="empty-state">
-            <p>Open a file or create a new document to get started.</p>
-          </div>
-        ) : (
-          session.documents.map((doc) => (
-            <EditorPanel
-              key={doc.id}
-              document={doc}
-              isActive={doc.id === session.activeId}
-              onContentChange={handleContentChange}
-              onBaselineCapture={handleBaselineCapture}
-            />
-          ))
+        {workspace.name && (
+          <span className="workspace-name">{workspace.name}</span>
         )}
+      </div>
+      <div className="main-area">
+        <Group orientation="horizontal" className="panel-group">
+          {hasWorkspace && (
+            <>
+              <Panel
+                defaultSize={sidebarWidth}
+                minSize={15}
+                maxSize={50}
+                className="sidebar-panel"
+                onResize={handleSidebarResize}
+              >
+                <div className="sidebar">
+                  <div className="sidebar-header">
+                    <span className="workspace-title">{workspace.name}</span>
+                  </div>
+                  <Tree
+                    data={workspace.nodes}
+                    selectedId={workspace.selectedId}
+                    onSelect={handleTreeSelect}
+                    onActivate={handleTreeActivate}
+                    onToggle={handleTreeToggle}
+                  />
+                </div>
+              </Panel>
+              <Separator className="resize-handle" />
+            </>
+          )}
+          <Panel className="editor-panel">
+            <div className="editor-area">
+              {session.documents.length === 0 ? (
+                <div className="empty-state">
+                  <p>Open a file or create a new document to get started.</p>
+                </div>
+              ) : (
+                session.documents.map((doc) => (
+                  <EditorPanel
+                    key={doc.id}
+                    document={doc}
+                    isActive={doc.id === session.activeId}
+                    onContentChange={handleContentChange}
+                    onBaselineCapture={handleBaselineCapture}
+                  />
+                ))
+              )}
+            </div>
+          </Panel>
+        </Group>
       </div>
     </div>
   )
+}
+
+function findNodeById(nodes: TreeNode[], id: string): TreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node
+    if (node.children) {
+      const found = findNodeById(node.children, id)
+      if (found) return found
+    }
+  }
+  return null
 }

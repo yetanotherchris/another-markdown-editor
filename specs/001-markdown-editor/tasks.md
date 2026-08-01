@@ -102,17 +102,17 @@ must be in place before any renderer code touches the filesystem.
 
 ### Tests
 
-- [ ] T041 [P] Tree state reducer tests in `tests/renderer/workspace.test.ts`: expand, collapse, load children, lazy load, replace workspace
+- [X] T041 [P] Tree state reducer tests in `tests/renderer/workspace.test.ts`: expand, collapse, load children, lazy load, replace workspace
 
 ### Implementation
 
-- [ ] T042 [P] Implement `src/renderer/state/workspace.ts`: tree node list, expansion state, loading flags, replace on folder open
-- [ ] T043 [P] Implement `src/renderer/explorer/Tree.tsx`: react-arborist with row renderer for files/folders
-- [ ] T044 [P] Implement `src/renderer/explorer/TreeActions.tsx`: context menu for rename, delete, move, create (new file/folder)
-- [ ] T045 [P] Implement `src/renderer/App.tsx` sidebar layout: `react-resizable-panels`, persisted width
-- [ ] T046 [P] Implement `src/renderer/App.tsx` open-folder dialog handler and workspace replacement
-- [ ] T047 [P] Implement tree update on `workspace:changed` events from main
-- [ ] T048 [P] Implement tree keyboard handling: expand/collapse, select, enter to open
+- [X] T042 [P] Implement `src/renderer/state/workspace.ts`: tree node list, expansion state, loading flags, replace on folder open
+- [X] T043 [P] Implement `src/renderer/explorer/Tree.tsx`: react-arborist with row renderer for files/folders
+- [ ] T044 [P] Implement `src/renderer/explorer/TreeActions.tsx`: context menu for rename, delete, move, create (new file/folder) — deferred to Phase 6 (US4 file operations)
+- [X] T045 [P] Implement `src/renderer/App.tsx` sidebar layout: `react-resizable-panels`, persisted width
+- [X] T046 [P] Implement `src/renderer/App.tsx` open-folder dialog handler and workspace replacement
+- [X] T047 [P] Implement tree update on `workspace:changed` events from main
+- [X] T048 [P] Implement tree keyboard handling: expand/collapse, select, enter to open
 
 **Checkpoint**: Open a folder; tree shows only markdown files and folders; selecting one opens it; sidebar width persists.
 

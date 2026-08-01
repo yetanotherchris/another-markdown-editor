@@ -35,7 +35,7 @@ go through IPC.
 | `id` | `string` | Workspace-relative POSIX-style path. Stable identity for `react-arborist`. |
 | `name` | `string` | Display name. |
 | `kind` | `'file' \| 'directory'` | |
-| `children` | `TreeNode[] \| null` | `null` = directory not yet loaded (lazy, research.md R14). `[]` = loaded and empty. |
+| `children` | `TreeNode[] \| null` | `[]` = directory not yet loaded or loaded and empty (lazy, research.md R14; `null` is used for files). |
 | `loadState` | `'unloaded' \| 'loading' \| 'loaded' \| 'error'` | Drives spinner and retry affordance. |
 
 Rules:
