@@ -36,7 +36,7 @@ describe('writeFile', () => {
 
   it('overwrites an existing file atomically', () => {
     fs.writeFileSync(path.join(root, 'test.md'), '# Old content')
-    const result = writeFile(root, 'test.md', '# New content')
+    writeFile(root, 'test.md', '# New content')
 
     const content = fs.readFileSync(path.join(root, 'test.md'), 'utf-8')
     expect(content).toBe('# New content')

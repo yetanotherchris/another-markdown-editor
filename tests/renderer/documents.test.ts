@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   documentsReducer,
-  createEmpty,
-  openFile,
-  getActiveDocument,
   hasDirtyDocuments,
-  getDirtyDocuments,
   EditingSession,
-  DocumentState
 } from '../../src/renderer/state/documents'
 
 function createSession(): EditingSession {
@@ -197,7 +192,6 @@ describe('documents reducer', () => {
       const s2 = documentsReducer(s1, { type: 'OPEN_NEW' })
       const s3 = documentsReducer(s2, { type: 'OPEN_NEW' })
 
-      const firstId = s3.documents[0].id
       const secondId = s3.documents[1].id
       const thirdId = s3.documents[2].id
 

@@ -2,7 +2,6 @@ import { useReducer, useEffect, useCallback } from 'react'
 import type { MenuCommand } from '@shared/ipc-contract'
 import {
   EditingSession,
-  DocumentState,
   documentsReducer,
   getActiveDocument,
 } from './state/documents'

@@ -19,6 +19,13 @@ function createWindow(): void {
 
   createApplicationMenu(mainWindow)
 
+  registerIpcHandlers(mainWindow)
+
+  mainWindow.on('close', (e) => {
+    e.preventDefault()
+    mainWindow?.webContents.send('app:quitRequested')
+  })
+
   if (process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL) {
     const url = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
     mainWindow.loadURL(url)
@@ -31,8 +38,6 @@ function createWindow(): void {
     mainWindow = null
   })
 }
-
-registerIpcHandlers()
 
 app.whenReady().then(createWindow)
 

@@ -5,9 +5,6 @@ import { resolveWithinRoot, resolveNonExistent } from './paths'
 import type { DirEntry, TrashReceipt } from '../../shared/ipc-contract'
 
 export function mkdir(root: string, parentRelativePath: string, name: string): DirEntry {
-  const { resolved: parentResolved } = resolveWithinRoot(root, parentRelativePath)
-
-  const newPath = path.join(parentResolved, name)
   const { resolved, relative } = resolveNonExistent(root, path.posix.join(parentRelativePath, name))
 
   if (fs.existsSync(resolved)) {
@@ -24,9 +21,6 @@ export function mkdir(root: string, parentRelativePath: string, name: string): D
 }
 
 export function createFile(root: string, parentRelativePath: string, name: string): DirEntry {
-  const { resolved: parentResolved } = resolveWithinRoot(root, parentRelativePath)
-
-  const newPath = path.join(parentResolved, name)
   const { resolved, relative } = resolveNonExistent(root, path.posix.join(parentRelativePath, name))
 
   if (fs.existsSync(resolved)) {

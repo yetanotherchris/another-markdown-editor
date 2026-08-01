@@ -5,7 +5,7 @@ import { resolveWithinRoot } from './paths'
 import type { WriteReceipt } from '../../shared/ipc-contract'
 
 export function writeFile(root: string, relativePath: string, content: string): WriteReceipt {
-  const { resolved, relative } = resolveWithinRoot(root, relativePath)
+  const { resolved } = resolveWithinRoot(root, relativePath)
 
   const targetDir = path.dirname(resolved)
   const targetName = path.basename(resolved)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { documentsReducer, openFile, createEmpty, getActiveDocument } from '../../src/renderer/state/documents'
+import { documentsReducer, openFile } from '../../src/renderer/state/documents'
 import * as fs from 'fs'
 import * as path from 'path'
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Crepe } from '@milkdown/crepe'
 
 interface CrepeHostProps {

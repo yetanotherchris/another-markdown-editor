@@ -27,7 +27,20 @@ export default tseslint.config(
     }
   },
   {
+    files: ['src/preload/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off'
+    }
+  },
+  {
     files: ['tests/main/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      'no-restricted-globals': 'off'
+    }
+  },
+  {
+    files: ['tests/renderer/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
       'no-restricted-globals': 'off'
