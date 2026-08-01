@@ -1,0 +1,27 @@
+import type { Settings } from '../../shared/ipc-contract'
+
+const defaults: Settings = {
+  sidebarWidth: 260,
+  themeOverride: null
+}
+
+let cached: Settings = { ...defaults }
+
+export function getSettings(): Settings {
+  return cached
+}
+
+export function setSettings(settings: Settings): void {
+  cached = { ...settings }
+}
+
+export function updateSettings(patch: Partial<Settings>): void {
+  cached = { ...cached, ...patch }
+}
+
+export async function loadSettingsFromMain(): Promise<void> {
+  const result = await window.api.getSettings()
+  if (result.ok) {
+    cached = { ...defaults, ...result.value }
+  }
+}

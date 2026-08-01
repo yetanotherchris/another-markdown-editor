@@ -232,3 +232,15 @@ AGENTS.md                         This file
   the end of the description.
 - Once merged, the next phase branch is created from the updated feature
   branch.
+
+## Current implementation status
+
+| Phase | Status | Branch | PR |
+|-------|--------|--------|----|
+| Phase 1: Setup | Complete | `phase-1-setup` | #2 |
+| Phase 2: Security & IPC | Complete | `phase-1-setup` | #2 |
+| Phase 3: US1 — Editor MVP | Complete | `phase-3-editor` | — |
+| Phase 4: US2 — Folder Browser | Pending | — | — |
+| Phase 5: US3 — Multiple Tabs | Pending | — | — |
+| Phase 6: US4 — File Operations | Pending | — | — |
+| Phase 7: Polish | Pending | — | — |

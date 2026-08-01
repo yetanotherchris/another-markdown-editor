@@ -74,21 +74,21 @@ must be in place before any renderer code touches the filesystem.
 
 ### Tests
 
-- [ ] T029 [P] Renderer document reducer tests in `tests/renderer/documents.test.ts`: dirty derived from content vs baseline, save success clears dirty, save failure keeps dirty, never-saved document gets a path on first save
-- [ ] T030 [P] Renderer dirty-tracking tests: undoing to baseline clears dirty, normalised baseline does not falsely mark a file dirty
-- [ ] T031 [P] End-to-end characterisation in `tests/renderer/roundtrip.test.ts`: load a markdown fixture, capture baseline, save if not dirty, assert disk bytes unchanged
+- [X] T029 [P] Renderer document reducer tests in `tests/renderer/documents.test.ts`: dirty derived from content vs baseline, save success clears dirty, save failure keeps dirty, never-saved document gets a path on first save
+- [X] T030 [P] Renderer dirty-tracking tests: undoing to baseline clears dirty, normalised baseline does not falsely mark a file dirty
+- [X] T031 [P] End-to-end characterisation in `tests/renderer/roundtrip.test.ts`: load a markdown fixture, capture baseline, save if not dirty, assert disk bytes unchanged
 
 ### Implementation
 
-- [ ] T032 [P] Implement `src/renderer/state/documents.ts`: document reducer, `createEmpty`, `openFile`, `updateContent`, `saveSuccess`, `markDirtyFromEditor`, `closeDocument`, `evict`, `reactivate`
-- [ ] T033 [P] Implement `src/renderer/state/settings.ts`: sidebar width, theme override
-- [ ] T034 [P] Implement `src/renderer/editor/CrepeHost.tsx`: mounts one Crepe instance, passes `defaultValue`, subscribes `markdownUpdated`, calls `getMarkdown`, isolates from React DOM
-- [ ] T035 [P] Implement `src/renderer/editor/instancePool.ts`: LRU cap of 8, eviction only for clean documents, reactivation restores cursor and scroll
-- [ ] T036 [P] Implement `src/renderer/main.tsx` and `src/renderer/App.tsx`: shell without sidebar, single active document, tabs if US3 is not yet present
-- [ ] T037 [P] Implement `src/renderer/editor/EditorPanel.tsx`: active editor, wires document state, `visibility: hidden` for inactive
-- [ ] T038 [P] Implement `src/renderer/App.tsx` menu command handlers: open-file dialog, save, save-as
-- [ ] T039 [P] Implement save-as flow: calls `saveFileDialog`, then `writeFile`, then updates document path
-- [ ] T040 [P] Implement `tests/renderer/roundtrip.test.ts` fixture corpus and assertions
+- [X] T032 [P] Implement `src/renderer/state/documents.ts`: document reducer, `createEmpty`, `openFile`, `updateContent`, `saveSuccess`, `markDirtyFromEditor`, `closeDocument`, `evict`, `reactivate`
+- [X] T033 [P] Implement `src/renderer/state/settings.ts`: sidebar width, theme override
+- [X] T034 [P] Implement `src/renderer/editor/CrepeHost.tsx`: mounts one Crepe instance, passes `defaultValue`, subscribes `markdownUpdated`, calls `getMarkdown`, isolates from React DOM
+- [X] T035 [P] Implement `src/renderer/editor/instancePool.ts`: LRU cap of 8, eviction only for clean documents, reactivation restores cursor and scroll
+- [X] T036 [P] Implement `src/renderer/main.tsx` and `src/renderer/App.tsx`: shell without sidebar, single active document, tabs if US3 is not yet present
+- [X] T037 [P] Implement `src/renderer/editor/EditorPanel.tsx`: active editor, wires document state, `visibility: hidden` for inactive
+- [X] T038 [P] Implement `src/renderer/App.tsx` menu command handlers: open-file dialog, save, save-as
+- [X] T039 [P] Implement save-as flow: calls `saveFileDialog`, then `writeFile`, then updates document path
+- [X] T040 [P] Implement `tests/renderer/roundtrip.test.ts` fixture corpus and assertions
 
 **Checkpoint**: A file can be opened, edited, saved, and the saved file is unchanged if opened and closed without edits.
 
