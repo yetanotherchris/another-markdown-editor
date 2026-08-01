@@ -188,3 +188,8 @@ AGENTS.md                         This file
 - Report honestly. If something is stubbed, partly done, or unverified, say so
   plainly. A confident wrong summary is worse than an uncertain accurate one.
 - Do not commit, push, or open PRs unless asked.
+- Every pull request description MUST end with a single line stating AI usage,
+  e.g. `AI usage: [tools or models used]`. Do not use a heading or section for
+  this; it is the last line of the description. List the actual models or agents
+  that contributed, including any that generated, reviewed, or edited the spec
+  or code.
