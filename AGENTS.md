@@ -1,0 +1,215 @@
+# AGENTS.md
+
+Guidance for AI agents working in this repository.
+
+This project is built **spec-first** using [Spec Kit](https://github.com/github/spec-kit).
+The specification is the source of truth, not the code. Read this file before
+making changes.
+
+## What this project is
+
+A desktop WYSIWYG markdown editor: Electron + React + TypeScript, with a folder
+explorer, tabbed documents, and file operations. The stack is fixed by
+`docs/DESIGN_DECISIONS.md` and is not open for re-litigation without a reason.
+
+## Authority order
+
+When guidance conflicts, higher wins:
+
+1. **`.specify/memory/constitution.md`** — non-negotiable principles
+2. **`specs/<feature>/spec.md`** — what to build and why
+3. **`specs/<feature>/plan.md`** + `research.md` — how to build it
+4. **`specs/<feature>/tasks.md`** — order of work
+5. This file — working practice
+6. Existing code — precedent, not authority
+
+Code that contradicts the spec is a bug in the code *or* a bug in the spec.
+Decide which. Never assume the code is right because it exists.
+
+## The workflow
+
+```text
+constitution → specify → clarify → plan → tasks → analyze → implement
+```
+
+### Running speckit inside OpenCode
+
+The commands below are OpenCode slash commands. Type them directly into the
+OpenCode chat, e.g. `/speckit.constitution`.
+
+They are defined as markdown files under `.opencode/commands/` and were
+installed when Spec Kit was initialized. If a command is missing, ensure the
+repo has been cloned and `.opencode/commands/` is present.
+
+| Command | Produces | Purpose |
+|---------|----------|---------|
+| `/speckit.constitution` | `.specify/memory/constitution.md` | Project principles. Rarely changes. |
+| `/speckit.specify` | `specs/<n>-<name>/spec.md` | WHAT and WHY. No technology. |
+| `/speckit.clarify` | `## Clarifications` in spec.md | Closes ambiguity by asking, before it becomes a guess. |
+| `/speckit.plan` | `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` | HOW. Technology lives here. |
+| `/speckit.tasks` | `tasks.md` | Ordered, independently verifiable work items. |
+| `/speckit.analyze` | report | Cross-artifact consistency check. Optional but cheap. |
+| `/speckit.implement` | code | Execute tasks. |
+
+Rules:
+
+- **Do not skip forward.** Writing code because the spec "is obvious" defeats
+  the entire method.
+- **`spec.md` contains no technology.** No framework, library, or API names. If
+  you are writing "Electron" into a spec, it belongs in the plan.
+- **`plan.md` contains no requirements.** If you are inventing user-visible
+  behaviour in the plan, it belongs in the spec.
+- Artifacts are living documents. Update them when reality changes.
+
+## When something isn't right
+
+It usually will be. **The default failure mode of an AI agent is to silently
+improvise around a gap and leave no trace.** Do not do this. Everything below
+exists to prevent it.
+
+### Step 1 — Diagnose the layer
+
+Do not start fixing until you know which artifact is actually wrong.
+
+| Symptom | Layer at fault | Fix there |
+|---------|----------------|-----------|
+| Spec is silent on a case you hit | spec (gap) | Add the detail to `spec.md` |
+| Spec sentence admits two readings | spec (ambiguity) | Clarify, then reword `spec.md` |
+| Two requirements contradict | spec (conflict) | Resolve in `spec.md` |
+| Spec violates the constitution | spec | Constitution wins; amend `spec.md` |
+| Requirement is fine, chosen approach fails | plan | Fix `plan.md`/`research.md` |
+| Library cannot do what the plan assumed | plan (and maybe spec) | Evidence, then re-decide |
+| Work item too large or badly ordered | tasks | Fix `tasks.md` |
+| Artifacts fine, code wrong | code | Just fix the code |
+
+The most common case by far is a **spec gap**: the spec is not wrong, it is
+incomplete. The correct response is to *add the missing detail to the spec* —
+not to encode the decision only in code where the next reader cannot find it.
+
+### Step 2 — Decide whether to ask or to proceed
+
+**Proceed, and record it**, when all of these hold:
+
+- A reasonable default clearly exists
+- The choice is not user-visible in a way that changes scope
+- It touches neither security nor data loss
+- It is cheap to reverse later
+
+Record it by adding to the spec's `## Assumptions` section (or the plan's
+decision log for technical choices), then continue. Mention it in your summary.
+
+**Stop and ask** when any of these hold:
+
+- Multiple reasonable answers with materially different outcomes
+- Scope changes — something moves in or out of the feature
+- Security or path-safety is involved
+- Data loss is possible
+- User-visible behaviour is being invented
+- The fix means contradicting an existing requirement
+- Cost is about to increase substantially
+
+When you ask, do not ask an open question. Present the options, each with its
+real consequence, and say which you would choose and why. Prefer offering 2–4
+concrete choices over "what would you like?".
+
+### Step 3 — Never do these
+
+- Silently widen path validation to make a test pass
+- Skip a confirmation prompt because it is inconvenient
+- Delete, weaken, or `skip` a test to get green
+- Catch an error and continue as if it succeeded
+- Implement something the spec forbids without saying so
+- Leave a deviation recorded only in a code comment
+- Claim a task is done when part of it is stubbed
+
+If a test covering path containment or data loss fails, the code is wrong until
+proven otherwise. Those tests encode Principles II and III and are not
+negotiable.
+
+### Step 4 — Record the deviation
+
+Every departure from the artifacts gets written down:
+
+- **Requirement changed or added** → edit `spec.md`; if it resolves an
+  ambiguity, add a bullet under `## Clarifications` with today's date
+- **Technical decision changed** → edit `plan.md`, with the evidence in
+  `research.md`
+- **Principle violated deliberately** → `plan.md` → `Complexity Tracking`,
+  stating the violation, why it is needed, and the simpler alternative rejected
+- **New work discovered** → add to `tasks.md` rather than quietly expanding an
+  existing task
+
+An undocumented deviation is a defect, even when the code is correct.
+
+### Worked example
+
+While planning, the Crepe editor API turned out to have no `setMarkdown`
+method, so content can only be set at construction. That broke the assumed
+"one editor instance, swap content per tab" approach.
+
+The right handling, and the pattern to follow:
+
+1. **Diagnose the layer** — the *plan* was wrong. The spec's requirement (tabs
+   preserve undo history) was still correct and desirable.
+2. **Get evidence** — read the published type definitions rather than guess.
+3. **Re-decide with cost stated** — one instance per tab, which costs memory,
+   and cap it.
+4. **Record it** — `research.md` R1/R2, with the rejected alternative and why.
+5. **Leave the spec alone** — no user-visible behaviour changed.
+
+Note what did *not* happen: the requirement was not quietly downgraded to "tabs
+may lose undo history" to fit the easier implementation. When implementation
+difficulty pushes back on a requirement, that is a decision for the user, not
+for the agent.
+
+## Non-negotiable invariants
+
+Restated from the constitution because these are the ones most easily lost:
+
+- Renderer gets **no** Node, **no** `fs`, **no** Electron module.
+  `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
+- The preload API is a **fixed list of named operations**. Never add a generic
+  `invoke(channel, ...args)` escape hatch.
+- Every path is validated in the **main process** against the resolved real
+  path of the workspace root. Renderer-side checks are never trusted.
+- Saves are **atomic** — temp file in the same directory, then rename.
+- A failed save leaves the document **dirty**.
+- Unsaved changes are never discarded without explicit confirmation.
+
+## Repository layout
+
+```text
+.specify/memory/constitution.md   Principles (authority 1)
+specs/001-markdown-editor/        Current feature's artifacts
+docs/DESIGN_DECISIONS.md          Fixed stack decisions, pre-dates the specs
+.opencode/commands/               Spec Kit slash commands
+AGENTS.md                         This file
+```
+
+## Working practice
+
+- Verify before asserting. Check the registry, read the type definitions, run
+  the command. Do not state version numbers or API shapes from memory.
+- Prefer reading an artifact over asking the user something already written
+  down.
+- Keep changes scoped to the task in hand. Note unrelated problems, do not
+  opportunistically fix them.
+- Report honestly. If something is stubbed, partly done, or unverified, say so
+  plainly. A confident wrong summary is worse than an uncertain accurate one.
+- Do not commit, push, or open PRs unless asked.
+- Every pull request description MUST end with a single line stating AI usage.
+  Do not use a heading or section for this; it is the last line of the
+  description. Use the form:
+
+  ```text
+  AI usage: [what was done] with assistance from [model/agent names].
+  ```
+
+  For example:
+
+  ```text
+  AI usage: Spec written with assistance from Claude Opus 5, Grok 4.5, and Kimi.
+  ```
+
+  List the actual models or agents that contributed, including any that
+  generated, reviewed, or edited the spec or code.
