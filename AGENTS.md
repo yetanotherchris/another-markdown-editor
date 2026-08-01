@@ -32,6 +32,15 @@ Decide which. Never assume the code is right because it exists.
 constitution → specify → clarify → plan → tasks → analyze → implement
 ```
 
+### Running speckit inside OpenCode
+
+The commands below are OpenCode slash commands. Type them directly into the
+OpenCode chat, e.g. `/speckit.constitution`.
+
+They are defined as markdown files under `.opencode/commands/` and were
+installed when Spec Kit was initialized. If a command is missing, ensure the
+repo has been cloned and `.opencode/commands/` is present.
+
 | Command | Produces | Purpose |
 |---------|----------|---------|
 | `/speckit.constitution` | `.specify/memory/constitution.md` | Project principles. Rarely changes. |
