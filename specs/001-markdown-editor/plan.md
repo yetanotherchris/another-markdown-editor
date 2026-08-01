@@ -1,6 +1,6 @@
 # Implementation Plan: Desktop Markdown Editor
 
-**Branch**: `001-markdown-editor` | **Date**: 2026-08-01 | **Spec**: [spec.md](./spec.md)
+**Branch**: retired (merged into `main`, PR #8); phase branches target `main` | **Date**: 2026-08-01 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-markdown-editor/spec.md`
 

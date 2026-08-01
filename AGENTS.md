@@ -228,18 +228,20 @@ AGENTS.md                         This file
 
 ## Branching and PR workflow
 
-- Implementation work is done on phase-specific branches created from the
-  feature branch (`001-markdown-editor`).
+- There is **no persistent feature branch**. Each phase gets its own branch
+  created from `main` and is merged straight back into `main`.
 - Branch naming: `phase-1-setup`, `phase-2-security`, `phase-3-editor`, etc.
-- Each phase branch is committed, pushed, and a PR is opened against the
-  feature branch before the next phase begins.
+- Each phase branch is committed, pushed, and a PR is opened against `main`
+  before the next phase begins.
 - After the PR is created, **before merging**, launch code review subagents to
   review the changes for correctness, security, and spec compliance.
 - Code review results are reported in the PR as a comment.
 - PR title format: `feat(phase-N): <description>` with the AI usage line at
   the end of the description.
-- Once merged, the next phase branch is created from the updated feature
-  branch.
+- Once merged, the next phase branch is created from the updated `main`.
+- The retired `001-markdown-editor` branch was the original feature branch;
+  it was merged into `main` (PR #8) and deleted. Do not recreate it or branch
+  from it.
 
 ## Current implementation status
 
@@ -249,6 +251,6 @@ AGENTS.md                         This file
 | Phase 2: Security & IPC | Complete | `phase-1-setup` | #2 |
 | Phase 3: US1 — Editor MVP | Complete | `phase-3-editor` | — |
 | Phase 4: US2 — Folder Browser | Complete | `phase-4-explorer` | #6 |
-| Phase 5: US3 — Multiple Tabs | Complete | `phase-5-tabs` | — |
+| Phase 5: US3 — Multiple Tabs | Complete | `phase-5-tabs` | #7 |
 | Phase 6: US4 — File Operations | Pending | — | — |
 | Phase 7: Polish | Pending | — | — |

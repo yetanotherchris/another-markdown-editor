@@ -1,6 +1,6 @@
 # Feature Specification: Desktop Markdown Editor
 
-**Feature Branch**: `001-markdown-editor`
+**Feature Branch**: retired — phases merged directly into `main` (PR #8); see AGENTS.md
 
 **Created**: 2026-08-01
 
