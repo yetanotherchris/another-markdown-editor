@@ -159,8 +159,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
                 path: path || d.path,
                 title: path ? path.split('/').pop() || d.title : d.title,
                 baseline: content,
-                content,
-                dirty: false,
+                dirty: d.content !== content,
                 externalState: 'clean'
               }
             : d

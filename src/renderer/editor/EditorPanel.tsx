@@ -23,6 +23,13 @@ export default function EditorPanel({
     [document.id, onContentChange]
   )
 
+  const handleBaselineCapture = useCallback(
+    (baseline: string) => {
+      onBaselineCapture(document.id, baseline)
+    },
+    [document.id, onBaselineCapture]
+  )
+
   const handleReady = useCallback(
     (_crepe: unknown) => {
       instancePool.register(document.id, _crepe as never)
@@ -37,6 +44,7 @@ export default function EditorPanel({
           defaultValue={document.content}
           onMarkdownUpdated={handleMarkdownUpdated}
           onReady={handleReady}
+          onBaselineCapture={handleBaselineCapture}
         />
       </div>
     )
@@ -49,6 +57,7 @@ export default function EditorPanel({
           defaultValue={document.content}
           onMarkdownUpdated={handleMarkdownUpdated}
           onReady={handleReady}
+          onBaselineCapture={handleBaselineCapture}
         />
       </div>
     )
@@ -60,6 +69,7 @@ export default function EditorPanel({
         defaultValue={document.content}
         onMarkdownUpdated={handleMarkdownUpdated}
         onReady={handleReady}
+        onBaselineCapture={handleBaselineCapture}
       />
     </div>
   )

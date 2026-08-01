@@ -105,6 +105,11 @@ export default function App() {
     })
 
     const unsubQuit = window.api.onQuitRequested(() => {
+      const dirty = session.documents.some(d => d.dirty)
+      if (dirty) {
+        window.api.confirmQuit('cancel')
+        return
+      }
       window.api.confirmQuit('quit')
     })
 

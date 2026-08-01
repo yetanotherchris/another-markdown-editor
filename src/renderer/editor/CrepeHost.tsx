@@ -1,15 +1,17 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import type { Crepe } from '@milkdown/crepe'
 
 interface CrepeHostProps {
   defaultValue: string
   onMarkdownUpdated: (markdown: string) => void
   onReady: (editor: Crepe) => void
+  onBaselineCapture: (markdown: string) => void
 }
 
-export default function CrepeHost({ defaultValue, onMarkdownUpdated, onReady }: CrepeHostProps) {
+export default function CrepeHost({ defaultValue, onMarkdownUpdated, onReady, onBaselineCapture }: CrepeHostProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<Crepe | null>(null)
+  const firstEmissionRef = useRef(true)
 
   useEffect(() => {
     let mounted = true
@@ -24,6 +26,10 @@ export default function CrepeHost({ defaultValue, onMarkdownUpdated, onReady }: 
       crepe.on((listener) => {
         listener.markdownUpdated((_ctx, markdown) => {
           if (mounted) {
+            if (firstEmissionRef.current) {
+              firstEmissionRef.current = false
+              onBaselineCapture(markdown)
+            }
             onMarkdownUpdated(markdown)
           }
         })
