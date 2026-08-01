@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, TrashReceipt, ErrorCode
-} from '../src/shared/ipc-contract'
+} from '../../src/shared/ipc-contract'
 
 describe('IPC contract types', () => {
   it('Result<T> has ok branch', () => {

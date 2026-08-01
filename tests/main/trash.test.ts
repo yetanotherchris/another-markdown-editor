@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { trashEntry } from '../src/main/fs/mutate'
+import { trashEntry } from '../../src/main/fs/mutate'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -42,15 +42,15 @@ describe('trashEntry', () => {
     expect(fs.existsSync(path.join(root, 'subdir'))).toBe(false)
   })
 
-  it('trash operation fails with TRASH_UNAVAILABLE when trash is unavailable', async () => {
+  it('trash operation surfaces TRASH_UNAVAILABLE or succeeds', async () => {
     fs.writeFileSync(path.join(root, 'test.md'), '# test')
     try {
-      await trashEntry(root, 'test.md')
+      const result = await trashEntry(root, 'test.md')
+      expect(result.trashed).toBe(true)
+      expect(fs.existsSync(path.join(root, 'test.md'))).toBe(false)
     } catch (e: unknown) {
       const err = e as { code?: string }
-      if (err.code === 'TRASH_UNAVAILABLE') {
-        expect(err.code).toBe('TRASH_UNAVAILABLE')
-      }
+      expect(err.code).toBe('TRASH_UNAVAILABLE')
     }
   })
 

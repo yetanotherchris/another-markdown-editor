@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdir, createFile, moveEntry } from '../src/main/fs/mutate'
+import { mkdir, createFile, moveEntry } from '../../src/main/fs/mutate'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'

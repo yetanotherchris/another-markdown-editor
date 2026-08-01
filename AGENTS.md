@@ -212,7 +212,11 @@ AGENTS.md                         This file
   ```
 
   List the actual models or agents that contributed, including any that
-  generated, reviewed, or edited the spec or code.
+  generated, reviewed, or edited the spec or code. Use the actual model name
+  (e.g. "DeepSeek V4 Pro"), NOT the tool name (e.g. "opencode").
+
+- **Never use `.bat` (batch) files.** On Windows use `.ps1` PowerShell scripts.
+  On Linux/macOS use `.sh` shell scripts. Batch is fragile and non-portable.
 
 ## Branching and PR workflow
 

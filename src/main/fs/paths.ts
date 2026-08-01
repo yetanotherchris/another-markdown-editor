@@ -39,22 +39,22 @@ export function resolveWithinRoot(root: string, candidate: string): ResolveResul
     throw Object.assign(new Error('Invalid path: contains NUL'), { code: 'OUTSIDE_WORKSPACE' })
   }
 
+  if (hasAlternateDataStream(candidate)) {
+    throw Object.assign(new Error('Invalid path: alternate data stream'), { code: 'OUTSIDE_WORKSPACE' })
+  }
+
   if (path.isAbsolute(candidate)) {
     throw Object.assign(new Error('Path must be workspace-relative'), { code: 'OUTSIDE_WORKSPACE' })
   }
 
-  const lastSegment = path.basename(candidate)
-
-  if (isReservedName(lastSegment)) {
-    throw Object.assign(new Error('Invalid filename: reserved name'), { code: 'OUTSIDE_WORKSPACE' })
-  }
-
-  if (hasTrailingDotOrSpace(lastSegment)) {
-    throw Object.assign(new Error('Invalid filename: trailing dot or space'), { code: 'OUTSIDE_WORKSPACE' })
-  }
-
-  if (hasAlternateDataStream(candidate)) {
-    throw Object.assign(new Error('Invalid path: alternate data stream'), { code: 'OUTSIDE_WORKSPACE' })
+  for (const segment of candidate.split(/[/\\]/)) {
+    if (segment.length === 0 || segment === '.' || segment === '..') continue
+    if (isReservedName(segment)) {
+      throw Object.assign(new Error('Invalid filename: reserved name'), { code: 'OUTSIDE_WORKSPACE' })
+    }
+    if (hasTrailingDotOrSpace(segment)) {
+      throw Object.assign(new Error('Invalid filename: trailing dot or space'), { code: 'OUTSIDE_WORKSPACE' })
+    }
   }
 
   const resolved = path.resolve(root, candidate)
@@ -73,7 +73,11 @@ export function resolveWithinRoot(root: string, candidate: string): ResolveResul
 
   const relative = path.relative(root, realTarget)
 
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+  const segments = relative.split(path.sep)
+  if (!relative && candidate !== '.' && candidate !== './') {
+    throw Object.assign(new Error('Path escapes workspace'), { code: 'OUTSIDE_WORKSPACE' })
+  }
+  if (segments[0] === '..' || path.isAbsolute(relative)) {
     throw Object.assign(new Error('Path escapes workspace'), { code: 'OUTSIDE_WORKSPACE' })
   }
 
@@ -87,8 +91,7 @@ function findExistingAncestor(p: string): string | null {
   while (current !== path.dirname(current)) {
     current = path.dirname(current)
     try {
-      fs.realpathSync(current)
-      return current
+      return fs.realpathSync(current)
     } catch {
       continue
     }

@@ -27,6 +27,13 @@ export default tseslint.config(
     }
   },
   {
+    files: ['tests/main/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      'no-restricted-globals': 'off'
+    }
+  },
+  {
     ignores: ['out/', 'node_modules/', 'dist/']
   }
 )

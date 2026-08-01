@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WorkspaceWatcher } from '../src/main/fs/watch'
+import { WorkspaceWatcher } from '../../src/main/fs/watch'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'

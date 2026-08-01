@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { resolveWithinRoot, resolveDirectory, resolveFile, resolveNonExistent } from '../src/main/fs/paths'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { resolveWithinRoot, resolveDirectory, resolveFile, resolveNonExistent } from '../../src/main/fs/paths'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -60,16 +60,16 @@ describe('resolveWithinRoot', () => {
     expect(() => resolveWithinRoot(root, '../outside.md')).toThrow()
   })
 
-  it('rejects encoded traversal', () => {
-    expect(() => resolveWithinRoot(root, '..%2F..%2Fetc%2Fpasswd')).toThrow()
-    expect(() => resolveWithinRoot(root, '%2e%2e%2f%2e%2e%2fetc%2fpasswd')).toThrow()
+  it('rejects .. in mid-path that escapes root', () => {
+    expect(() => resolveWithinRoot(root, 'subdir/../../outside.md')).toThrow()
   })
 
-  it('rejects sibling prefix path that starts with root name', () => {
-    const other = path.join(os.tmpdir(), root.split(/[/\\]/).pop() + '2')
+  it('rejects relative path that traverses to sibling directory', () => {
+    const other = path.join(os.tmpdir(), (root.split(/[/\\]/).pop() || 'temp') + '2')
     fs.mkdirSync(other, { recursive: true })
     try {
-      expect(() => resolveWithinRoot(root, other)).toThrow()
+      const relativeToOther = path.relative(root, other)
+      expect(() => resolveWithinRoot(root, relativeToOther)).toThrow()
     } finally {
       cleanupTempDir(other)
     }

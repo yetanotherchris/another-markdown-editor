@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { writeFile } from '../src/main/fs/write'
+import { writeFile } from '../../src/main/fs/write'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -54,7 +54,7 @@ describe('writeFile', () => {
     expect(() => writeFile(root, '../outside.md', 'content')).toThrow()
   })
 
-  it('creates parent directories if needed', () => {
+  it('rejects write to non-existent parent directory', () => {
     expect(() => writeFile(root, 'nonexistent/test.md', 'content')).toThrow()
   })
 
