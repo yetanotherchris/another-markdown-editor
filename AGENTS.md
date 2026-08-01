@@ -249,6 +249,6 @@ AGENTS.md                         This file
 | Phase 2: Security & IPC | Complete | `phase-1-setup` | #2 |
 | Phase 3: US1 — Editor MVP | Complete | `phase-3-editor` | — |
 | Phase 4: US2 — Folder Browser | Complete | `phase-4-explorer` | #6 |
-| Phase 5: US3 — Multiple Tabs | Pending | — | — |
+| Phase 5: US3 — Multiple Tabs | Complete | `phase-5-tabs` | — |
 | Phase 6: US4 — File Operations | Pending | — | — |
 | Phase 7: Polish | Pending | — | — |

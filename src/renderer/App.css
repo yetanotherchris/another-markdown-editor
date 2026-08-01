@@ -106,10 +106,167 @@ html, body, #root {
   min-width: 0;
 }
 
+.tab-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: #ececec;
+  border-bottom: 1px solid #e0e0e0;
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 30px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-right: 1px solid #e0e0e0;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  max-width: 220px;
+  min-width: 0;
+}
+
+.tab:hover {
+  background: #e2e2e2;
+}
+
+.tab.active {
+  background: #fff;
+  box-shadow: inset 0 2px 0 #4a90d9;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-dirty {
+  color: #4a90d9;
+  font-weight: 700;
+}
+
+.tab-warning {
+  color: #c00;
+  font-weight: 700;
+}
+
+.tab-close {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: #666;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.tab-close:hover {
+  background: #d0d0d0;
+  color: #000;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  min-width: 340px;
+  max-width: 480px;
+  padding: 16px;
+}
+
+.dialog-title {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.dialog-body {
+  font-size: 13px;
+  color: #333;
+}
+
+.dialog-body ul {
+  margin: 8px 0 0 18px;
+}
+
+.dialog-error {
+  color: #c00;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dialog-button {
+  padding: 5px 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dialog-button:hover {
+  background: #f0f0f0;
+}
+
+.dialog-button.primary {
+  background: #4a90d9;
+  border-color: #4a90d9;
+  color: #fff;
+}
+
+.dialog-button.primary:hover {
+  background: #3b7cc0;
+}
+
+.dialog-button.danger {
+  color: #c00;
+  border-color: #d9a0a0;
+}
+
+.dialog-button.danger:hover {
+  background: #fbeaea;
+}
+
 .editor-area {
   flex: 1;
   position: relative;
   overflow: hidden;
+}
+
+.editor-host {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.editor-host.evicted {
+  pointer-events: none;
 }
 
 .empty-state {

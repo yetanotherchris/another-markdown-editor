@@ -126,25 +126,58 @@ must be in place before any renderer code touches the filesystem.
 
 ## Phase 5: User Story 3 — Multiple Tabs (P2)
 
+**Status**: ✅ Complete (2026-08-01)
+
 **Goal**: Open several files, switch between them, close with unsaved confirmation.
 
 **Independent Test**: Quickstart smoke tests 3 and 5 (multiple tabs, close/quit guards).
 
 ### Tests
 
-- [ ] T049 [P] Tab reducer tests in `tests/renderer/documents.test.ts` (extend): open existing activates, close dirty prompts, close clean removes, undo/scroll preservation via mocked editor state
-- [ ] T050 [P] Quit guard tests: `beforeunload` / `app:quitRequested` flow; cancel keeps app open
+- [X] T049 [P] Tab reducer tests in `tests/renderer/documents.test.ts` (extend): open existing activates, close dirty prompts, close clean removes, undo/scroll preservation via mocked editor state
+- [X] T050 [P] Quit guard tests: `beforeunload` / `app:quitRequested` flow; cancel keeps app open
+- [X] T072 [P] Playwright e2e suite in `tests/e2e/tabs.spec.ts`: multi-tab open/switch/activate-existing, dirty dot, close clean (no prompt), close dirty (Cancel/Discard/Save), quit guard (Cancel keeps app open, Discard and Quit closes), external change auto-reload and keep-or-reload prompts
+- [X] T073 [P] Post-review fixes (PR #7 review, 2026-08-01): `enforcePoolCap(activeId)` — stale pre-batch activeId could evict the just-activated tab; `OPEN_EXISTING` reactivates evicted documents; `evictLRU` no longer removes internally (caller captures live content first); auto-reload re-checks for in-flight keystrokes while the explicit Reload-from-Disk prompt bypasses the check; evicted placeholder `pointer-events: none`; true LRU via `getMarkdown`; removed dead `has`/`get`/`saveCursorState`/`SET_DIRTY`
+- [X] T074 [P] Eviction e2e coverage: opening 8 files to the instance cap then switching to the oldest tab keeps its editor alive; reopening an evicted file from the tree brings the editor back (both in `tests/e2e/tabs.spec.ts`)
 
 ### Implementation
 
-- [ ] T051 [P] Implement `src/renderer/tabs/TabBar.tsx`: tab list, close buttons, dirty indicator, active highlight
-- [ ] T052 [P] Implement `src/renderer/App.tsx` tab switching logic
-- [ ] T053 [P] Implement close-tab confirmation dialog, wired to save/discard/cancel
-- [ ] T054 [P] Implement `app:quitRequested` handling: confirm once, list all dirty documents, save/discard/cancel per document
-- [ ] T055 [P] Implement `onDocumentChanged` handling: auto-reload when clean, prompt when dirty
-- [ ] T056 [P] Implement `editor/CrepeHost.tsx` per-instance cursor/scroll capture
+- [X] T051 [P] Implement `src/renderer/tabs/TabBar.tsx`: tab list, close buttons, dirty indicator, active highlight
+- [X] T052 [P] Implement `src/renderer/App.tsx` tab switching logic
+- [X] T053 [P] Implement close-tab confirmation dialog, wired to save/discard/cancel
+- [X] T054 [P] Implement `app:quitRequested` handling: confirm once, list all dirty documents, save/discard/cancel per document
+- [X] T055 [P] Implement `onDocumentChanged` handling: auto-reload when clean, prompt when dirty
+- [X] T056 [P] Implement `editor/CrepeHost.tsx` per-instance cursor/scroll capture
 
-**Checkpoint**: Open three files, switch, edit each, close with dirty prompts, quit with dirty prompts, cancel preserves everything.
+### Deviations discovered during implementation
+
+- **Baseline capture (research.md R4 correction)**: the listener plugin never
+  emits `markdownUpdated` on load — it is debounced 200 ms and only fires on a
+  document-changing transaction. The old "capture baseline from the first
+  emission" approach captured the *first edit* instead, so every document
+  opened clean and never turned dirty. Baseline is now read from
+  `crepe.getMarkdown()` immediately after `create()`, and `CAPTURE_BASELINE`
+  also adopts the normalized content (reducer sets `content = baseline`).
+  Recorded in research.md R4.
+- **Live-dirty guards (data-loss fix)**: because the reducer's dirty flag lags
+  keystrokes by the 200 ms listener debounce, the close-tab and quit guards
+  now also consult the live editor content (`isDirtyLive`), flushing it into
+  the reducer when they trigger. Without this, closing/quitting within 200 ms
+  of the last keystroke discarded the edit without a prompt (Principle III).
+- **Eviction wired and hardened**: `EVICT`/`REACTIVATE` are now actually
+  dispatched (pool cap enforcement after open/activate), the evicted document
+  renders an empty container until reactivation, and eviction refuses the
+  active document and treats live (unflushed) content as dirty. The instance
+  pool no longer destroys editors itself — the owning `CrepeHost` does on
+  unmount (double-destroy guard).
+- **Scroll container**: prosemirror-view 1.42 has no `scrollDOM`; the editor
+  host div (`.editor-host`, `overflow: auto`) is the scroll container for
+  cursor/scroll capture and restore. Research.md R3/R17.
+- **Dependency**: `@milkdown/kit` added as a direct dependency (editorViewCtx
+  re-export from `@milkdown/kit/core`, prose view/state types) — needed for
+  cursor/scroll access. Plan.md dependency list updated.
+
+**Checkpoint**: ✅ PASSED — Open three files, switch, edit each, close with dirty prompts, quit with dirty prompts, cancel preserves everything. Verified by `npm run test:e2e` (13 Playwright tests in `tests/e2e/tabs.spec.ts`) alongside lint, typecheck, and vitest (99 unit tests).
 
 ---
 
