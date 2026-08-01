@@ -279,6 +279,21 @@ describe('documents reducer', () => {
       expect(s2.documents[0].editorState).toBe('live')
     })
 
+    it('open existing reactivates an evicted document (no dead editor in the active tab)', () => {
+      let state = openTwoFiles()
+      const doc = state.documents[0]
+      state = documentsReducer(state, { type: 'EVICT', payload: { id: doc.id } })
+      expect(state.documents[0].editorState).toBe('evicted')
+
+      state = documentsReducer(state, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 }
+      })
+      expect(state.documents).toHaveLength(2)
+      expect(state.activeId).toBe(doc.id)
+      expect(state.documents[0].editorState).toBe('live')
+    })
+
     it('switching tabs preserves content and dirty state (undo/scroll via mocked editor state)', () => {
       let state = openTwoFiles()
       const a = state.documents[0]
@@ -307,10 +322,14 @@ describe('documents reducer', () => {
       expect(bAfter.dirty).toBe(true)
       expect(bAfter.content).toBe('beta edited')
 
-      // Switching back to b restores its previous position.
+      // Switching back to b keeps its content and dirty flag; the captured
+      // cursor/scroll values survive in the store, ready for the CrepeHost
+      // to restore when the editor becomes active again (REACTIVATE test).
       state = documentsReducer(state, { type: 'ACTIVATE', payload: { id: b.id } })
       expect(state.activeId).toBe(b.id)
       expect(state.documents.find(d => d.id === b.id)!.dirty).toBe(true)
+      expect(aAfter.cursorOffset).toBe(42)
+      expect(aAfter.scrollTop).toBe(137)
     })
 
     it('EVICT marks a clean document evicted without losing content', () => {

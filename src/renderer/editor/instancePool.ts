@@ -6,32 +6,16 @@ const MAX_INSTANCES = 8
 interface InstanceEntry {
   documentId: string
   editor: Crepe
-  cursorOffset: number
-  scrollTop: number
   lastActiveAt: number
 }
 
 class InstancePool {
   private instances = new Map<string, InstanceEntry>()
 
-  has(documentId: string): boolean {
-    return this.instances.has(documentId)
-  }
-
-  get(documentId: string): InstanceEntry | undefined {
-    const entry = this.instances.get(documentId)
-    if (entry) {
-      entry.lastActiveAt = Date.now()
-    }
-    return entry
-  }
-
   register(documentId: string, editor: Crepe): void {
     this.instances.set(documentId, {
       documentId,
       editor,
-      cursorOffset: 0,
-      scrollTop: 0,
       lastActiveAt: Date.now()
     })
   }
@@ -42,17 +26,11 @@ class InstancePool {
     this.instances.delete(documentId)
   }
 
-  saveCursorState(documentId: string, cursorOffset: number, scrollTop: number): void {
-    const entry = this.instances.get(documentId)
-    if (entry) {
-      entry.cursorOffset = cursorOffset
-      entry.scrollTop = scrollTop
-    }
-  }
-
   getMarkdown(documentId: string): string | null {
     const entry = this.instances.get(documentId)
     if (!entry) return null
+    // Reading the editor is a use: keep true LRU ordering for eviction.
+    entry.lastActiveAt = Date.now()
     return entry.editor.getMarkdown()
   }
 
@@ -60,7 +38,8 @@ class InstancePool {
    * Returns the id of the oldest *clean* live instance to evict, or null when
    * nothing may be evicted (every live instance is dirty, or the only clean
    * one is the active document). The active document is never evicted — its
-   * editor would vanish while visible.
+   * editor would vanish while visible. Does not remove the entry; the caller
+   * does that after capturing any state it needs.
    */
   evictLRU(dirtyDocuments: DocumentState[], activeId: string | null): string | null {
     const dirtyIds = new Set(dirtyDocuments.map(d => d.id))
@@ -74,12 +53,7 @@ class InstancePool {
       }
     }
 
-    if (oldest) {
-      this.remove(oldest.documentId)
-      return oldest.documentId
-    }
-
-    return null
+    return oldest ? oldest.documentId : null
   }
 
   get liveCount(): number {

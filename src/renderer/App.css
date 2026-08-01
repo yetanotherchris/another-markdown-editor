@@ -265,6 +265,10 @@ html, body, #root {
   overflow: auto;
 }
 
+.editor-host.evicted {
+  pointer-events: none;
+}
+
 .empty-state {
   display: flex;
   align-items: center;

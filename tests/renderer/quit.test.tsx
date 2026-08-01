@@ -75,7 +75,9 @@ describe('ConfirmDialog (close/quit prompt UI)', () => {
   })
 
   afterEach(() => {
-    root.unmount()
+    act(() => {
+      root.unmount()
+    })
     container.remove()
   })
 

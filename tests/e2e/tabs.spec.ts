@@ -11,6 +11,10 @@ test.beforeAll(async () => {
   testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-tabs-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
+  // Extra files to drive the 8-instance LRU eviction cap (T035/R2).
+  for (let i = 1; i <= 9; i++) {
+    fs.writeFileSync(path.join(testFolder, `f${String(i).padStart(2, '0')}.md`), `# File ${i}`)
+  }
 })
 
 test.beforeEach(async () => {
@@ -251,4 +255,32 @@ test('external change to a dirty document: Reload from Disk replaces the edit', 
   await expect(window.locator('.ProseMirror:visible')).not.toContainText('MYEDIT')
   await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toHaveCount(0)
   await expect(window.getByRole('dialog')).toHaveCount(0)
+})
+
+test('switching to the oldest tab at the instance cap keeps its editor alive', async () => {
+  await window.getByRole('button', { name: 'Open Folder' }).click()
+  // Fill the pool to the 8-instance cap.
+  for (let i = 1; i <= 8; i++) {
+    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
+  }
+  // Activate the oldest tab; eviction must not take the just-activated editor.
+  await window.getByRole('tab', { name: /f01\.md/ }).click()
+  await expect(window.locator('.document-title')).toContainText('f01.md')
+
+  await typeInEditor(' EDITABLE')
+  await expect(window.getByRole('tab', { name: /f01\.md/ }).locator('.tab-dirty')).toBeVisible()
+})
+
+test('reopening an evicted document from the tree brings its editor back', async () => {
+  await window.getByRole('button', { name: 'Open Folder' }).click()
+  // Open nine files so the oldest (f01) is evicted by the LRU cap.
+  for (let i = 1; i <= 9; i++) {
+    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
+  }
+  // Re-open the evicted file from the tree: the active tab must not be dead.
+  await window.getByRole('treeitem').getByText('f01.md').click()
+  await expect(window.locator('.document-title')).toContainText('f01.md')
+
+  await typeInEditor(' BACK')
+  await expect(window.getByRole('tab', { name: /f01\.md/ }).locator('.tab-dirty')).toBeVisible()
 })

@@ -84,7 +84,6 @@ export interface DocumentsAction {
     | 'RELOAD'
     | 'UPDATE_PATH'
     | 'EXTERNAL_CHANGE'
-    | 'SET_DIRTY'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload?: any
 }
@@ -104,7 +103,17 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
       const p = action.payload as { path: string | null; name: string; content: string; mtimeMs: number; size: number }
       const existing = state.documents.find(d => d.path === p.path && p.path !== null)
       if (existing) {
-        return { ...state, activeId: existing.id }
+        // Reopening an evicted document must bring its editor back — the
+        // active tab would otherwise render the empty evicted container.
+        return {
+          ...state,
+          activeId: existing.id,
+          documents: state.documents.map(d =>
+            d.id === existing.id && d.editorState === 'evicted'
+              ? { ...d, editorState: 'live' }
+              : d
+          )
+        }
       }
       const doc = openFile(p)
       return {
@@ -275,16 +284,6 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
                 externalState: kind === 'removed' ? 'deletedOnDisk' : 'changedOnDisk'
               }
             : d
-        )
-      }
-    }
-
-    case 'SET_DIRTY': {
-      const { id, dirty } = action.payload as { id: string; dirty: boolean }
-      return {
-        ...state,
-        documents: state.documents.map(d =>
-          d.id === id ? { ...d, dirty } : d
         )
       }
     }

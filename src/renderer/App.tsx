@@ -87,16 +87,19 @@ export default function App() {
     }
   }, [getLiveContent])
 
-  const enforcePoolCap = useCallback(() => {
+  const enforcePoolCap = useCallback((activeId: string | null) => {
     if (instancePool.hasSpace()) return
     const current = sessionRef.current
     const evictId = instancePool.evictLRU(
       current.documents.filter(d => isDirtyLive(d)),
-      current.activeId
+      activeId
     )
     if (evictId) {
+      // Capture the live content before dropping the pool entry — evictLRU
+      // only finds the candidate; getMarkdown must still see it.
       const evictDoc = current.documents.find(d => d.id === evictId)
       const live = evictDoc ? getLiveContent(evictDoc) : null
+      instancePool.remove(evictId)
       if (live !== null) {
         dispatch({ type: 'UPDATE_CONTENT', payload: { id: evictId, content: live } })
       }
@@ -166,13 +169,19 @@ export default function App() {
     }
   }, [pendingCloseId, saveDocument, doClose])
 
-  const reloadDocument = useCallback(async (doc: DocumentState) => {
+  const reloadDocument = useCallback(async (doc: DocumentState, force = false) => {
     if (!doc.path) return
     const result = await window.api.readFile(doc.path)
     if (!result.ok) return
+    if (!force) {
+      // Auto-reload path only: a keystroke landing while the read was in
+      // flight must not be silently discarded by the reload.
+      const fresh = sessionRef.current.documents.find(d => d.id === doc.id)
+      if (!fresh || fresh.dirty || isDirtyLive(fresh)) return
+    }
     instancePool.remove(doc.id)
     dispatch({ type: 'RELOAD', payload: { id: doc.id, content: result.value.content } })
-  }, [])
+  }, [isDirtyLive])
 
   const handleQuitDecision = useCallback(async (decision: 'save-all' | 'discard' | 'cancel') => {
     if (decision === 'cancel') {
@@ -202,7 +211,9 @@ export default function App() {
     setExternalPrompt(null)
     if (!doc) return
     if (decision === 'reload') {
-      await reloadDocument(doc)
+      // The user explicitly chose to replace their version with the disk
+      // version, so the pre-existing dirty state must not block the reload.
+      await reloadDocument(doc, true)
     } else if (decision === 'save-as') {
       const result = await saveDocument(doc, true)
       if (result === 'failed' && prompt.kind === 'removed') {
@@ -223,12 +234,16 @@ export default function App() {
       })
     }
     dispatch({ type: 'ACTIVATE', payload: { id } })
-    enforcePoolCap()
+    // Pass the target id explicitly: sessionRef.current.activeId is still the
+    // pre-batch value, so reading it here could evict the tab just clicked.
+    enforcePoolCap(id)
   }, [enforcePoolCap])
 
   const handleNew = useCallback(() => {
     dispatch({ type: 'OPEN_NEW' })
-    enforcePoolCap()
+    // The new untitled document is not in the pool yet; skip the currently
+    // visible document so its editor is not evicted mid-render.
+    enforcePoolCap(sessionRef.current.activeId)
   }, [enforcePoolCap])
 
   const handleTreeSelect = useCallback(async (id: string | null) => {
@@ -239,7 +254,9 @@ export default function App() {
     const result = await window.api.readFile(id)
     if (result.ok) {
       dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-      enforcePoolCap()
+      // Keep the previously visible document safe; the newly opened one is
+      // the newest pool entry and will not be the eviction candidate.
+      enforcePoolCap(sessionRef.current.activeId)
     }
   }, [workspace.nodes, enforcePoolCap])
 
@@ -250,7 +267,7 @@ export default function App() {
     const result = await window.api.readFile(id)
     if (result.ok) {
       dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-      enforcePoolCap()
+      enforcePoolCap(sessionRef.current.activeId)
     }
   }, [workspace.nodes, enforcePoolCap])
 
@@ -282,7 +299,7 @@ export default function App() {
           window.api.openFileDialog().then((result) => {
             if (result.ok && result.value) {
               dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-              enforcePoolCap()
+              enforcePoolCap(sessionRef.current.activeId)
             }
           })
           break

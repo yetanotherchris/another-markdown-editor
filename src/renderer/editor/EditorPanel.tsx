@@ -49,8 +49,10 @@ export default function EditorPanel({
 
   if (document.editorState === 'evicted') {
     // Instance destroyed to free memory; content retained in the store.
-    // A fresh CrepeHost mounts when the document is reactivated.
-    return <div className="editor-host" />
+    // A fresh CrepeHost mounts when the document is reactivated. The
+    // placeholder must not swallow pointer events meant for the visible
+    // editor below it.
+    return <div className="editor-host evicted" />
   }
 
   return (
