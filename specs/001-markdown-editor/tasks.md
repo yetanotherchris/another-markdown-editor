@@ -137,6 +137,8 @@ must be in place before any renderer code touches the filesystem.
 - [X] T049 [P] Tab reducer tests in `tests/renderer/documents.test.ts` (extend): open existing activates, close dirty prompts, close clean removes, undo/scroll preservation via mocked editor state
 - [X] T050 [P] Quit guard tests: `beforeunload` / `app:quitRequested` flow; cancel keeps app open
 - [X] T072 [P] Playwright e2e suite in `tests/e2e/tabs.spec.ts`: multi-tab open/switch/activate-existing, dirty dot, close clean (no prompt), close dirty (Cancel/Discard/Save), quit guard (Cancel keeps app open, Discard and Quit closes), external change auto-reload and keep-or-reload prompts
+- [X] T073 [P] Post-review fixes (PR #7 review, 2026-08-01): `enforcePoolCap(activeId)` — stale pre-batch activeId could evict the just-activated tab; `OPEN_EXISTING` reactivates evicted documents; `evictLRU` no longer removes internally (caller captures live content first); auto-reload re-checks for in-flight keystrokes while the explicit Reload-from-Disk prompt bypasses the check; evicted placeholder `pointer-events: none`; true LRU via `getMarkdown`; removed dead `has`/`get`/`saveCursorState`/`SET_DIRTY`
+- [X] T074 [P] Eviction e2e coverage: opening 8 files to the instance cap then switching to the oldest tab keeps its editor alive; reopening an evicted file from the tree brings the editor back (both in `tests/e2e/tabs.spec.ts`)
 
 ### Implementation
 
