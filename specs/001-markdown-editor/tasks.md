@@ -113,6 +113,8 @@ must be in place before any renderer code touches the filesystem.
 - [X] T046 [P] Implement `src/renderer/App.tsx` open-folder dialog handler and workspace replacement
 - [X] T047 [P] Implement tree update on `workspace:changed` events from main
 - [X] T048 [P] Implement tree keyboard handling: expand/collapse, select, enter to open
+- [X] T070 [P] Perf: lazy watch set — chokidar `depth: 0` at open, `addPath` on expand/read (research.md R16); fixes multi-second freeze opening large folders
+- [X] T071 [P] Playwright e2e suite in `tests/e2e/`: launch, open folder, tree filters non-markdown, open file from tree, expand/collapse (`npm run test:e2e`)
 
 **Checkpoint**: Open a folder; tree shows only markdown files and folders; selecting one opens it; sidebar width persists.
 

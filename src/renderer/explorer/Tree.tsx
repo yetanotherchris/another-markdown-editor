@@ -31,6 +31,19 @@ function TreeNode({ node, style, dragHandle }: TreeNodeProps) {
       aria-expanded={isDir ? node.isOpen : undefined}
       aria-selected={node.isSelected}
     >
+      {isDir && (
+        <span
+          className="tree-node-toggle"
+          role="button"
+          aria-label={node.isOpen ? 'Collapse' : 'Expand'}
+          onClick={(e) => {
+            e.stopPropagation()
+            node.toggle()
+          }}
+        >
+          {node.isOpen ? '\u25BE' : '\u25B8'}
+        </span>
+      )}
       <span className="tree-node-icon">{isDir ? (node.isOpen ? '📂' : '📁') : '📄'}</span>
       <span className="tree-node-name">{node.data.name}</span>
     </div>

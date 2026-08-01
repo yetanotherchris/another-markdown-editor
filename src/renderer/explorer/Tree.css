@@ -31,6 +31,22 @@
   background: rgba(0, 0, 0, 0.08);
 }
 
+.tree-node-toggle {
+  width: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #888;
+  font-size: 10px;
+  user-select: none;
+}
+
+.tree-node-toggle:hover {
+  color: #333;
+}
+
 .tree-node-icon {
   font-size: 14px;
   line-height: 1;

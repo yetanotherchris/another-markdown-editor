@@ -155,6 +155,11 @@ renderer means the renderer is never told that hidden files exist.
 **Document identity** is the resolved workspace-relative path for saved
 documents, and a generated id for never-saved ones — see `data-model.md`.
 
+**Watch scope is lazy** (2026-08-01, research.md R16): chokidar scans only the
+workspace root at open; directories are added to the watch set when the tree
+expands them or a document inside them is opened. A full-tree scan made opening
+a 7,000-file folder take ~8 s on Windows.
+
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |

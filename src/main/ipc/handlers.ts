@@ -182,7 +182,11 @@ export function setupHandlers(window: BrowserWindow): void {
     try {
       validateShape(args, ['path'])
       ensureString((args as { path: unknown }).path, 'path')
-      return withWorkspace(() => readDir(workspaceRoot!, (args as { path: string }).path))
+      return withWorkspace(() => {
+        const entries = readDir(workspaceRoot!, (args as { path: string }).path)
+        workspaceState?.watchDir((args as { path: string }).path)
+        return entries
+      })
     } catch (e: unknown) {
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, workspaceRoot))
@@ -206,6 +210,10 @@ export function setupHandlers(window: BrowserWindow): void {
         const relativePath = resolveAbsolutePath(workspaceRoot, filePath)
         if (relativePath) {
           const opened = readFile(workspaceRoot, relativePath)
+          const parent = relativePath.includes('/')
+            ? relativePath.split('/').slice(0, -1).join('/')
+            : '.'
+          workspaceState?.watchDir(parent)
           return ok(opened)
         }
       }
@@ -234,7 +242,14 @@ export function setupHandlers(window: BrowserWindow): void {
     try {
       validateShape(args, ['path'])
       ensureString((args as { path: unknown }).path, 'path')
-      return withWorkspace(() => readFile(workspaceRoot!, (args as { path: string }).path))
+      return withWorkspace(() => {
+        const opened = readFile(workspaceRoot!, (args as { path: string }).path)
+        const parent = (args as { path: string }).path.includes('/')
+          ? (args as { path: string }).path.split('/').slice(0, -1).join('/')
+          : '.'
+        workspaceState?.watchDir(parent)
+        return opened
+      })
     } catch (e: unknown) {
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, workspaceRoot))
