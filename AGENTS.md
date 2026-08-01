@@ -213,3 +213,18 @@ AGENTS.md                         This file
 
   List the actual models or agents that contributed, including any that
   generated, reviewed, or edited the spec or code.
+
+## Branching and PR workflow
+
+- Implementation work is done on phase-specific branches created from the
+  feature branch (`001-markdown-editor`).
+- Branch naming: `phase-1-setup`, `phase-2-security`, `phase-3-editor`, etc.
+- Each phase branch is committed, pushed, and a PR is opened against the
+  feature branch before the next phase begins.
+- After the PR is created, **before merging**, launch code review subagents to
+  review the changes for correctness, security, and spec compliance.
+- Code review results are reported in the PR as a comment.
+- PR title format: `feat(phase-N): <description>` with the AI usage line at
+  the end of the description.
+- Once merged, the next phase branch is created from the updated feature
+  branch.

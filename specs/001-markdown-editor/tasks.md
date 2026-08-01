@@ -16,14 +16,14 @@ implementation.
 
 **Purpose**: Toolchain, scaffolding, linting, and three-target electron-vite build.
 
-- [ ] T001 [P] Scaffold electron-vite TypeScript project with `src/main`, `src/preload`, `src/renderer`, `tests/main`, `tests/renderer` (Vite 5 + React 19 + Electron 43)
-- [ ] T002 [P] Install runtime dependencies: `react`, `react-dom`, `@milkdown/crepe`, `react-arborist`, `react-resizable-panels`, `chokidar`
-- [ ] T003 [P] Install dev dependencies: `typescript`, `vitest`, `jsdom`, `@vitejs/plugin-react`, `electron-vite`, `@types/node`, `@types/react`, `@types/react-dom`, `eslint`, `prettier`
-- [ ] T004 [P] Configure `tsconfig.json` with `strict: true` for each of main, preload, renderer, and shared types
-- [ ] T005 [P] Configure `vitest.workspace.ts` with a `node` project for `tests/main` and a `jsdom` project for `tests/renderer`
-- [ ] T006 Configure npm scripts: `npm run dev`, `npm run build`, `npm run test`, `npm run lint`, `npm run typecheck`
-- [ ] T007 Add ESLint rule forbidding `import ... from 'fs'` or `require('fs')` outside `src/main/`
-- [ ] T008 Add a smoke script verifying `electron-vite dev` starts without crashing
+- [X] T001 [P] Scaffold electron-vite TypeScript project with `src/main`, `src/preload`, `src/renderer`, `tests/main`, `tests/renderer` (Vite 5 + React 19 + Electron 43)
+- [X] T002 [P] Install runtime dependencies: `react`, `react-dom`, `@milkdown/crepe`, `react-arborist`, `react-resizable-panels`, `chokidar`
+- [X] T003 [P] Install dev dependencies: `typescript`, `vitest`, `jsdom`, `@vitejs/plugin-react`, `electron-vite`, `@types/node`, `@types/react`, `@types/react-dom`, `eslint`, `prettier`
+- [X] T004 [P] Configure `tsconfig.json` with `strict: true` for each of main, preload, renderer, and shared types
+- [X] T005 [P] Configure `vitest.workspace.ts` with a `node` project for `tests/main` and a `jsdom` project for `tests/renderer`
+- [X] T006 Configure npm scripts: `npm run dev`, `npm run build`, `npm run test`, `npm run lint`, `npm run typecheck`
+- [X] T007 Add ESLint rule forbidding `import ... from 'fs'` or `require('fs')` outside `src/main/`
+- [X] T008 Add a smoke script verifying `electron-vite dev` starts without crashing
 
 **Checkpoint**: `npm run dev` boots, `npm run test` runs both Vitest projects, and `npm run typecheck` passes.
 
