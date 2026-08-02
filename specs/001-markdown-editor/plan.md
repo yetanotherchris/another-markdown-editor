@@ -222,6 +222,18 @@ Step 4; the code-level rationale for each is in `research.md`):
 - **`describeEntry` scans are early-exit**: the delete confirmation needs only
   `isEmpty`/`hasHiddenFiles`, so the walk stops at the first non-markdown file
   and reports unreadable subfolders as non-empty (conservative warning).
+- **Top-bar icons are declipped via CSS** (2026-08-02): Crepe's top-bar icon
+  SVGs reference a `<defs><clipPath>` by a generated global id
+  (`url(#clip0_977_...)`). Every editor instance emits the same ids, and SVG
+  fragment references resolve document-wide to the FIRST match — so on the
+  second/third open document. the browser paints against the clipPath that
+  sits in a hidden editor host and the icon silently never draws. The clip
+  path is a full-view-box rect (a visual no-op), so `clip-path: none` on the
+  top-bar `g` elements restores all icons with zero visual change. Verified
+  by pixel-ink measurement in the e2e probe (`webContents.capturePage` +
+  `nativeImage.toBitmap`); keep the rule in `App.css` — a DOM-only test cannot
+  see this because the buttons exist in every host either way. Evidence in
+  research.md R22.
 
 ## Complexity Tracking
 

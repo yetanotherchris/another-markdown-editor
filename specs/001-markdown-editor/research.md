@@ -419,6 +419,37 @@ folder), re-run on every delete attempt. The confirmation needs only
 non-markdown file, and an unreadable subfolder is reported as non-empty
 (conservative warning) instead of silently understating the delete (T079).
 
+## R22. Missing top-bar icon glyphs on second/third document (Phase 6)
+
+**Symptom**: on the second/third open document, the Code, bullet-list,
+ordered-list, image, table, quote, and horizontal-rule buttons show no icon.
+The buttons exist in the DOM in every host — a DOM-only e2e assertion cannot
+see the defect.
+
+**Mechanism (verified empirically, win32/Electron)**: the TopBar icon SVGs are
+inline SVG strings wrapping each path in `<g clip-path="url(#clip0_977_XXXX)">`
+with a matching `<defs><clipPath id="clip0_977_XXXX">`. The id is generated
+and duplicated identically by every editor instance mounted in the document.
+SVG `url(#...)` fragment references resolve document-wide to the **first**
+matching id, not "nearest svg": on the second/third editor the browser clips
+against the first editor's clipPath element, which is in a `visibility:
+hidden` host (inactive tabs are hidden, not unmounted — R3), and the glyph
+silently never paints. `clip-path` resolution against a hidden-subtree target
+in Chromium yields empty — hence zero ink on the later documents while the
+first always renders.
+
+**Evidence**: a throwaway e2e probe measured per-button painted ink using
+`webContents.capturePage()` + `nativeImage.toBitmap()` (no screenshot
+viewing). Doc 1: all 15 buttons ≥ ~30 ink px; doc 2/3: the seven clip-path
+icons exactly zero. Injecting `{ clip-path: none; }` over the icons restored
+full ink on doc 3, byte-for-byte matching doc 1's readout.
+
+**Fix**: CSS rule in `App.css` — `.milkdown-top-bar svg g[clip-path]`.
+The clip path is a full-view-box rect, so `clip-path: none` is a visual no-op;
+the glyphs are identical with or without it. This sidesteps the broken
+document-wide id lookup instead of renaming ids (which would require patching
+library output). Kept out of the spec: no user-visible requirement changed.
+
 ## Version matrix
 
 | Package | Version | Role |

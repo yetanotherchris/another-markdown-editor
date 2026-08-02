@@ -284,3 +284,24 @@ test('reopening an evicted document from the tree brings its editor back', async
   await typeInEditor(' BACK')
   await expect(window.getByRole('tab', { name: /f01\.md/ }).locator('.tab-dirty')).toBeVisible()
 })
+
+// Crepe's top-bar icons clip via a document-global url(#clip...) fragment id;
+// with several editor hosts in the DOM the later editors' icons would resolve
+// against the first host's (hidden) clipPath and never paint. App.css sets
+// clip-path: none on those groups (research.md R22); assume the active tab's
+// top bar still has the rules applied.
+test('top-bar clip-path groups are neutralised so icons paint on any tab', async () => {
+  await openFolderAndFile('alpha.md')
+  await openSecondFile('beta.md')
+
+  const clipped = window.locator(
+    '.editor-host:visible .milkdown-top-bar svg g[clip-path]'
+  )
+  await expect(clipped).toHaveCount(7)
+  const clipValues = await clipped.evaluateAll((els) =>
+    els.map((el) => getComputedStyle(el).clipPath)
+  )
+  for (const value of clipValues) {
+    expect(value).toBe('none')
+  }
+})
