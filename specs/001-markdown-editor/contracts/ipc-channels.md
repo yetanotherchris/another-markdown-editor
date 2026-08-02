@@ -19,6 +19,7 @@ Generic handlers are prohibited by Constitution Principle I.
 | `entry:create` | `{ parentPath: string, name: string, kind: EntryKind }` | `Result<DirEntry>` | New file or folder. |
 | `entry:move` | `{ fromPath: string, toPath: string }` | `Result<DirEntry>` | Rename or move. |
 | `entry:trash` | `{ path: string, permanent?: boolean }` | `Result<TrashReceipt>` | OS trash by default. |
+| `entry:describe` | `{ path: string }` | `Result<EntryInfo>` | Delete-confirmation info: kind, emptiness, hidden files in subtree. |
 | `settings:get` | `void` | `Result<Settings>` | Reads from `userData`. |
 | `settings:update` | `Partial<Settings>` | `Result<Settings>` | Debounced write. |
 | `quit:respond` | `{ decision: 'quit' \| 'cancel' }` | `void` | Renderer answers quit prompt. |
@@ -31,6 +32,14 @@ Generic handlers are prohibited by Constitution Principle I.
 | `document:externallyChanged` | `DocumentChangeEvent` | chokidar reports the backing file changed or removed. |
 | `menu:command` | `MenuCommand` | User selects a native menu item. |
 | `app:quitRequested` | `void` | Before-quit fired and at least one document is dirty. |
+
+## Self-write suppression (FR-037)
+
+`file:write` suppresses the target path before writing. `entry:create`,
+`entry:move` (both endpoints), and `entry:trash` suppress their paths too:
+a mutation the user performed in the app must not be reported back to the
+renderer as an external change — the renderer applies the result directly to
+its own tree and document state.
 
 ## Argument validation
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdir, createFile, moveEntry } from '../../src/main/fs/mutate'
+import { mkdir, createFile, moveEntry, trashEntry } from '../../src/main/fs/mutate'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -77,6 +77,11 @@ describe('createFile', () => {
     expect(() => createFile(root, '.', 'exists.md')).toThrow()
   })
 
+  it('rejects non-markdown file names (FR-010, main-side)', () => {
+    expect(() => createFile(root, '.', 'notes.txt')).toThrow()
+    expect(() => createFile(root, '.', 'notes')).toThrow()
+  })
+
   it('rejects file outside root', () => {
     expect(() => createFile(root, '..', 'outside.md')).toThrow()
   })
@@ -125,5 +130,69 @@ describe('moveEntry', () => {
   it('rejects move outside root', () => {
     fs.writeFileSync(path.join(root, 'a.md'), 'a')
     expect(() => moveEntry(root, 'a.md', '../outside.md')).toThrow()
+  })
+
+  it('rejects renaming a file to a non-markdown name (FR-010, main-side)', () => {
+    fs.writeFileSync(path.join(root, 'a.md'), 'a')
+    expect(() => moveEntry(root, 'a.md', 'a.txt')).toThrow()
+    expect(() => moveEntry(root, 'a.md', 'b')).toThrow()
+    // The file is untouched.
+    expect(fs.existsSync(path.join(root, 'a.md'))).toBe(true)
+  })
+
+  it('allows renaming directories to any name', () => {
+    fs.mkdirSync(path.join(root, 'olddir'))
+    const result = moveEntry(root, 'olddir', 'newdir.txt')
+    expect(result.name).toBe('newdir.txt')
+    expect(fs.existsSync(path.join(root, 'newdir.txt'))).toBe(true)
+  })
+
+  it('is a no-op for an identical target path', () => {
+    fs.writeFileSync(path.join(root, 'a.md'), 'a')
+    const result = moveEntry(root, 'a.md', 'a.md')
+    expect(result.path).toBe('a.md')
+    expect(fs.readFileSync(path.join(root, 'a.md'), 'utf-8')).toBe('a')
+  })
+
+  it('allows a case-only rename (alpha.md → ALPHA.md)', () => {
+    // On case-insensitive filesystems the target exists (it is the same
+    // file) and must not be reported as a conflict. On case-sensitive ones
+    // the target simply does not exist. Both must succeed.
+    fs.writeFileSync(path.join(root, 'alpha.md'), '# alpha')
+    const result = moveEntry(root, 'alpha.md', 'ALPHA.md')
+    expect(result.path).toBe('ALPHA.md')
+    expect(fs.readFileSync(path.join(root, 'ALPHA.md'), 'utf-8')).toBe('# alpha')
+  })
+})
+
+describe('trashEntry', () => {
+  let root: string
+
+  beforeEach(() => {
+    root = createTempDir()
+  })
+
+  afterEach(() => {
+    cleanupTempDir(root)
+  })
+
+  it('permanently deletes a file when requested', async () => {
+    fs.writeFileSync(path.join(root, 'a.md'), 'a')
+    const receipt = await trashEntry(root, 'a.md', true)
+    expect(receipt.trashed).toBe(false)
+    expect(fs.existsSync(path.join(root, 'a.md'))).toBe(false)
+  })
+
+  it('permanently deletes a folder recursively when requested', async () => {
+    fs.mkdirSync(path.join(root, 'dir'))
+    fs.writeFileSync(path.join(root, 'dir', 'a.md'), 'a')
+    fs.writeFileSync(path.join(root, 'dir', 'nested.txt'), 'x')
+    const receipt = await trashEntry(root, 'dir', true)
+    expect(receipt.trashed).toBe(false)
+    expect(fs.existsSync(path.join(root, 'dir'))).toBe(false)
+  })
+
+  it('rejects a path outside the workspace', async () => {
+    await expect(trashEntry(root, '../outside.md', true)).rejects.toThrow()
   })
 })

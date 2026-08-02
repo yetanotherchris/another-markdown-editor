@@ -25,6 +25,40 @@
   to keep their version or load the external one when it does. The application's
   own writes must not trigger this.
 
+### Session 2026-08-02 (Phase 6 implementation)
+
+- Q: May a user delete a file or folder that backs a document with unsaved
+  changes? → A: No — the delete is refused with an explanation naming the
+  affected documents (Principle III). The user must save or close them first.
+  A delete that affects only clean open documents closes their tabs.
+- Q: May a file be renamed to a non-markdown name? → A: No — files renamed
+  from the tree must keep the `.md` or `.markdown` extension, because FR-010
+  hides other extensions and the renamed file would silently vanish from the
+  tree. Folders are unrestricted. The rule is enforced in the main process as
+  well as in the renderer.
+- Q: What happens when the user cancels the inline naming of a just-created
+  file or folder? → A: The empty placeholder is removed (to the trash) without
+  a further confirmation — the user's cancel is the confirmation, and the
+  placeholder holds no content. If the removal fails, the user is told the
+  placeholder is still on disk and can retry via the normal confirmed delete.
+- Q: May a rename change only the letter case of a name (`alpha.md` →
+  `Alpha.md`)? → A: Yes — on case-insensitive filesystems (Windows, macOS
+  default) the target is the same file, so it must not be refused as a
+  conflict.
+- Q: What editor chrome does the document view have? → A: A persistent menu
+  bar (headings and formatting buttons) at the top of the editor replaces the
+  floating selection toolbar and the per-line block-edit handle. Satisfies
+  FR-011/FR-012 without the transient popups.
+- Q: What happens when the user tries to move a folder into its own
+  descendant? → A: The move is refused silently — the drop does not land and
+  nothing is moved. (Spec scenario 6 below is reworded to match: the original
+  "with an explanation" would require a toast; the silent refusal is
+  deliberate and e2e-asserted.)
+- Q: Do confirmation dialogs stay active while a delete is in flight? → A: No
+  — while the trash operation runs, the dialog's buttons are disabled and
+  Escape is ignored, so a double-click cannot fire a second delete and Escape
+  cannot close the dialog while the delete still executes.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Write and save a markdown document (Priority: P1)
@@ -147,8 +181,8 @@ file and a folder, and confirm each change is reflected on disk and in the tree.
    exists, **When** the conflict is detected, **Then** the operation is refused
    with an explanation and nothing is overwritten.
 6. **Given** the user attempts to move a folder into its own descendant,
-   **When** the operation is attempted, **Then** it is refused with an
-   explanation.
+   **When** the operation is attempted, **Then** it is refused — the drop does
+   not land — and nothing is moved (see Clarifications 2026-08-02).
 7. **Given** a folder tree is displayed, **When** the user creates a new file or
    folder, **Then** it appears on disk and in the tree, ready to be named.
 
@@ -368,6 +402,9 @@ file and a folder, and confirm each change is reflected on disk and in the tree.
   invisible in the application and cannot be renamed, moved, or deleted from it,
   even though a folder deletion will still remove them. Recognised markdown
   extensions are `.md` and `.markdown`.
+- **Rename keeps the markdown extension**: Renaming a file from the tree to a
+  name without a recognised markdown extension is refused (see Clarifications
+  2026-08-02). Moving a file between folders never changes its name.
 - **Markdown flavour**: CommonMark plus GitHub Flavored Markdown tables, task
   lists, and strikethrough is the target. Arbitrary extension syntaxes are
   preserved where possible but not rendered specially.

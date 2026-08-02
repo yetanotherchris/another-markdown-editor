@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { resolveDirectory, resolveFile } from './paths'
-import type { DirEntry, OpenedFile } from '../../shared/ipc-contract'
+import { resolveDirectory, resolveFile, resolveWithinRoot } from './paths'
+import type { DirEntry, OpenedFile, EntryInfo } from '../../shared/ipc-contract'
 
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown'])
 
@@ -63,5 +63,57 @@ export function readFile(root: string, relativePath: string): OpenedFile {
     content,
     mtimeMs: stat.mtimeMs,
     size: stat.size
+  }
+}
+
+/**
+ * FR-025/FR-029b: describe an entry for a delete confirmation. For folders,
+ * scans the subtree for non-markdown files without following symlinks, so the
+ * confirmation can warn about contents the tree never shows.
+ */
+export function describeEntry(root: string, relativePath: string): EntryInfo {
+  const { resolved } = resolveWithinRoot(root, relativePath)
+  const stat = fs.statSync(resolved)
+
+  if (!stat.isDirectory()) {
+    return { kind: 'file', isEmpty: false, hasHiddenFiles: false }
+  }
+
+  // Early-exit scan: the confirmation needs only `isEmpty` and
+  // `hasHiddenFiles`. Stop at the first non-markdown file; only an
+  // all-markdown deep tree forces a full walk. An unreadable subfolder is
+  // treated as non-empty (conservative: the FR-025 warning must not understate
+  // what a delete will remove).
+  const scan = (dirPath: string, state: { any: boolean; hidden: boolean; error: boolean }): boolean => {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    } catch {
+      state.error = true
+      return false
+    }
+    for (const entry of entries) {
+      state.any = true
+      if (entry.isDirectory()) {
+        // Real directories only: symlinked directories are never shown in the
+        // tree (readDir filters them out) and are not recursed, so an external
+        // target or a symlink loop cannot be scanned.
+        if (scan(path.join(dirPath, entry.name), state)) return true
+      } else if (!(entry.isFile() && isMarkdown(entry.name))) {
+        // Anything the tree does not show: non-markdown files, symlinks,
+        // sockets, hidden dotfiles.
+        state.hidden = true
+        return true
+      }
+    }
+    return false
+  }
+
+  const state = { any: false, hidden: false, error: false }
+  scan(resolved, state)
+  return {
+    kind: 'directory',
+    isEmpty: !state.any && !state.error,
+    hasHiddenFiles: state.hidden
   }
 }

@@ -230,6 +230,10 @@ AGENTS.md                         This file
 
 - There is **no persistent feature branch**. Each phase gets its own branch
   created from `main` and is merged straight back into `main`.
+- **The phase branch MUST be created before any implementation work begins** —
+  `git checkout -b phase-<N>-<name>` from a clean `main` is the first step of
+  every phase. Implementing on `main` is a workflow violation: commits that
+  land on `main` directly bypass the PR review gate.
 - Branch naming: `phase-1-setup`, `phase-2-security`, `phase-3-editor`, etc.
 - Each phase branch is committed, pushed, and a PR is opened against `main`
   before the next phase begins.

@@ -398,5 +398,80 @@ describe('documents reducer', () => {
       expect(planClose(state, doc.id)).toBe('prompt')
       expect(planClose(state, 'unknown-id')).toBe('close')
     })
+
+    describe('REROUTE_PATHS (FR-028)', () => {
+      it('updates the path and title of a renamed open document, keeping its id', () => {
+        const s1 = openTwoFiles()
+        const doc = s1.documents[0]
+        expect(doc.id).toBe('a.md')
+        const s2 = documentsReducer(s1, {
+          type: 'REROUTE_PATHS',
+          payload: { fromPath: 'a.md', toPath: 'renamed.md' }
+        })
+        const moved = s2.documents.find(d => d.id === doc.id)!
+        expect(moved).toBeDefined()
+        expect(moved.path).toBe('renamed.md')
+        expect(moved.title).toBe('renamed.md')
+        expect(moved.content).toBe(doc.content)
+        expect(moved.baseline).toBe(doc.baseline)
+        expect(moved.dirty).toBe(false)
+      })
+
+      it('reroutes every open document inside a moved folder', () => {
+        let state = createSession()
+        for (const [path, name] of [['notes/a.md', 'a.md'], ['notes/sub/b.md', 'b.md'], ['other/c.md', 'c.md']] as const) {
+          state = documentsReducer(state, {
+            type: 'OPEN_EXISTING',
+            payload: { path, name, content: name, mtimeMs: 1, size: 1 }
+          })
+        }
+        state = documentsReducer(state, {
+          type: 'REROUTE_PATHS',
+          payload: { fromPath: 'notes', toPath: 'archive/notes' }
+        })
+        const paths = state.documents.map(d => d.path)
+        expect(paths).toContain('archive/notes/a.md')
+        expect(paths).toContain('archive/notes/sub/b.md')
+        expect(paths).toContain('other/c.md')
+      })
+
+      it('rerouting a file to a path that is already open leaves both documents distinct', () => {
+        const s1 = openTwoFiles()
+        const s2 = documentsReducer(s1, {
+          type: 'REROUTE_PATHS',
+          payload: { fromPath: 'a.md', toPath: 'b.md' }
+        })
+        expect(s2.documents).toHaveLength(2)
+        expect(s2.documents.find(d => d.path === 'b.md')).toBeDefined()
+        // The rerouted document keeps its identity (id), so tabs never merge.
+        expect(s2.documents.find(d => d.id === 'a.md')?.path).toBe('b.md')
+      })
+
+      it('ignores documents without a path and non-matching paths', () => {
+        let state = documentsReducer(createSession(), { type: 'OPEN_NEW' })
+        state = documentsReducer(state, {
+          type: 'REROUTE_PATHS',
+          payload: { fromPath: 'a.md', toPath: 'b.md' }
+        })
+        expect(state.documents[0].path).toBeNull()
+        expect(state.documents[0].title).toMatch(/Untitled/)
+      })
+
+      it('keeps a dirty document dirty across a reroute', () => {
+        const s1 = openTwoFiles()
+        let s2 = documentsReducer(s1, {
+          type: 'UPDATE_CONTENT',
+          payload: { id: 'a.md', content: 'edited' }
+        })
+        s2 = documentsReducer(s2, {
+          type: 'REROUTE_PATHS',
+          payload: { fromPath: 'a.md', toPath: 'renamed.md' }
+        })
+        const moved = s2.documents.find(d => d.id === 'a.md')!
+        expect(moved.path).toBe('renamed.md')
+        expect(moved.content).toBe('edited')
+        expect(moved.dirty).toBe(true)
+      })
+    })
   })
 })

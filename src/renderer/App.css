@@ -265,6 +265,22 @@ html, body, #root {
   overflow: auto;
 }
 
+/* Milkdown's Crepe theme defaults the canvas to padding: 60px 120px
+   (reset.css), which is oversized for a desktop editor. Tighten it. */
+.editor-host .milkdown .ProseMirror {
+  padding: 32px 48px;
+}
+
+/* Crepe's top-bar icons are inline SVGs whose clip-path references a
+   `<defs><clipPath>` with a generated id. Every editor instance duplicates
+   the same ids, and `url(#clip0_977_...)` is a document-global lookup — the
+   browser paints the FIRST match, which on the second/third document sits in
+   a hidden editor host, so those icons silently never paint. The clip path
+   is a full-view-box rect (a visual no-op), so disabling it is a pure fix. */
+.milkdown-top-bar svg g[clip-path] {
+  clip-path: none;
+}
+
 .editor-host.evicted {
   pointer-events: none;
 }

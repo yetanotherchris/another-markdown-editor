@@ -1,3 +1,5 @@
+import { isWithinOrEqual } from './workspace'
+
 export interface DocumentState {
   id: string
   path: string | null
@@ -83,6 +85,7 @@ export interface DocumentsAction {
     | 'CAPTURE_EDITOR_STATE'
     | 'RELOAD'
     | 'UPDATE_PATH'
+    | 'REROUTE_PATHS'
     | 'EXTERNAL_CHANGE'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload?: any
@@ -270,6 +273,23 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
             ? { ...d, path, title: path.split('/').pop() || d.title }
             : d
         )
+      }
+    }
+
+    case 'REROUTE_PATHS': {
+      // FR-028: a file or folder was renamed/moved within the app. Every open
+      // document whose path sits at or under the old location follows it. The
+      // document id is retained so tabs do not close and reopen.
+      const { fromPath, toPath } = action.payload as { fromPath: string; toPath: string }
+      return {
+        ...state,
+        documents: state.documents.map(d => {
+          if (!d.path) return d
+          if (!isWithinOrEqual(d.path, fromPath)) return d
+          const suffix = d.path.slice(fromPath.length)
+          const newPath = toPath + suffix
+          return { ...d, path: newPath, title: newPath.split('/').pop() || d.title }
+        })
       }
     }
 

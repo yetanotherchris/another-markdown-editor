@@ -84,15 +84,29 @@ export class WorkspaceWatcher {
     }
   }
 
+  /**
+   * FR-037: is this event one of our own mutations? The suppression window is
+   * sliding — each matching event refreshes the timestamp — so a large move or
+   * delete whose events keep arriving past the initial 2 s stays suppressed
+   * instead of being re-reported as an external change (which would flood the
+   * renderer with per-file tree updates and could trigger the FR-038 prompt
+   * for open documents under the moved path). On case-insensitive filesystems
+   * the comparison is case-insensitive: a case-only rename can be reported by
+   * chokidar under any spelling of the path.
+   */
   private isSuppressed(filePath: string): boolean {
     const now = Date.now()
-    for (const [suppressed, timestamp] of this.suppressedPaths.entries()) {
+    const norm = (p: string): string => process.platform === 'win32' ? p.toLowerCase() : p
+    const key = norm(filePath)
+    for (const [suppressedRaw, timestamp] of this.suppressedPaths.entries()) {
       if (now - timestamp > 2000) {
-        this.suppressedPaths.delete(suppressed)
+        this.suppressedPaths.delete(suppressedRaw)
         continue
       }
-      if (filePath === suppressed || filePath.startsWith(suppressed + '/') ||
-          filePath.startsWith(suppressed + '\\')) {
+      const suppressed = norm(suppressedRaw)
+      if (key === suppressed || key.startsWith(suppressed + '/') ||
+          key.startsWith(suppressed + '\\')) {
+        this.suppressedPaths.set(suppressedRaw, now)
         return true
       }
     }
@@ -105,6 +119,7 @@ export class WorkspaceWatcher {
       this.watcher = null
     }
     this.watchedDirs.clear()
+    this.suppressedPaths.clear()
     this.callback = null
   }
 }

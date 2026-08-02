@@ -32,9 +32,11 @@ export interface WorkspaceAction {
     | 'EXPAND_START'
     | 'EXPAND_SUCCESS'
     | 'EXPAND_ERROR'
-    | 'COLLAPSE'
     | 'SELECT'
     | 'APPLY_WATCH_EVENT'
+    | 'INSERT_ENTRY'
+    | 'REMOVE_ENTRY'
+    | 'MOVE_ENTRY'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload?: any
 }
@@ -88,11 +90,12 @@ function removeNode(nodes: TreeNode[], id: string): TreeNode[] {
     })
 }
 
-function findNode(nodes: TreeNode[], id: string): TreeNode | null {
+/** Depth-first search for a node by id (its workspace-relative path). */
+export function findNodeById(nodes: TreeNode[], id: string): TreeNode | null {
   for (const node of nodes) {
     if (node.id === id) return node
     if (node.kind === 'directory' && node.children) {
-      const found = findNode(node.children, id)
+      const found = findNodeById(node.children, id)
       if (found) return found
     }
   }
@@ -109,10 +112,16 @@ function updateNode(nodes: TreeNode[], id: string, updater: (node: TreeNode) => 
   })
 }
 
-function parentPathOf(id: string): string | null {
+/** Parent of a workspace-relative path, or `''` for a top-level entry. */
+export function parentPathOf(id: string): string {
   const lastSlash = id.lastIndexOf('/')
-  if (lastSlash <= 0) return null
+  if (lastSlash <= 0) return ''
   return id.slice(0, lastSlash)
+}
+
+/** True when `path` is at or under `prefix` (folder moves, deletes, reroutes). */
+export function isWithinOrEqual(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(prefix + '/')
 }
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
@@ -161,14 +170,6 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       }
     }
 
-    case 'COLLAPSE': {
-      const { id } = action.payload as { id: string }
-      return {
-        ...state,
-        nodes: updateNode(state.nodes, id, n => ({ ...n, loadState: 'unloaded', children: [] }))
-      }
-    }
-
     case 'SELECT': {
       const { id } = action.payload as { id: string | null }
       return { ...state, selectedId: id }
@@ -179,8 +180,91 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return applyWatchEvent(state, event)
     }
 
+    case 'INSERT_ENTRY': {
+      // Application-originated create (the watcher event for it is suppressed
+      // in main, so the renderer applies it directly — T061).
+      const { parentPath, entry } = action.payload as { parentPath: string; entry: DirEntry }
+      return insertEntry(state, normalizeParent(parentPath), entry)
+    }
+
+    case 'REMOVE_ENTRY': {
+      const { id } = action.payload as { id: string }
+      return {
+        ...state,
+        nodes: removeNode(state.nodes, id),
+        selectedId: state.selectedId === id ? null : state.selectedId
+      }
+    }
+
+    case 'MOVE_ENTRY': {
+      // Application-originated rename/move. The relocated node is removed from
+      // its old position; it is inserted into the target parent only when that
+      // parent is currently loaded (otherwise it appears when the parent is
+      // expanded and read from disk). A moved directory resets to unloaded so
+      // its path-derived child ids are not left stale.
+      const { fromPath, toPath, entry } = action.payload as {
+        fromPath: string
+        toPath: string
+        entry: DirEntry
+      }
+      const nodesWithout = removeNode(state.nodes, fromPath)
+      const parent = parentPathOf(toPath)
+      if (parent === '') {
+        const moved = entryToNode(entry)
+        const normalized: TreeNode = entry.kind === 'directory'
+          ? { ...moved, loadState: 'unloaded', children: [] }
+          : moved
+        if (findNodeById(nodesWithout, normalized.id)) return { ...state, nodes: nodesWithout }
+        return {
+          ...state,
+          nodes: insertSorted(nodesWithout, normalized)
+        }
+      }
+      const found = findParentAndIndex(nodesWithout, parent)
+      if (!found || !found.parent || found.parent.loadState !== 'loaded') {
+        return { ...state, nodes: nodesWithout }
+      }
+      const moved = entryToNode(entry)
+      const normalized: TreeNode = entry.kind === 'directory'
+        ? { ...moved, loadState: 'unloaded', children: [] }
+        : moved
+      if (findNodeById(found.parent.children ?? [], normalized.id)) return { ...state, nodes: nodesWithout }
+      return {
+        ...state,
+        nodes: updateNode(nodesWithout, parent, n => ({
+          ...n,
+          children: insertSorted(n.children ?? [], normalized)
+        }))
+      }
+    }
+
     default:
       return state
+  }
+}
+
+function normalizeParent(parentPath: string): string {
+  // entry:create reports the root parent as '.', while tree ids use ''.
+  return parentPath === '.' ? '' : parentPath
+}
+
+function insertEntry(state: WorkspaceState, parentPath: string, entry: DirEntry): WorkspaceState {
+  if (parentPath === '') {
+    if (findNodeById(state.nodes, entry.path)) return state
+    return {
+      ...state,
+      nodes: insertSorted(state.nodes, entryToNode(entry))
+    }
+  }
+  const found = findParentAndIndex(state.nodes, parentPath)
+  if (!found || !found.parent || found.parent.loadState !== 'loaded') return state
+  if (findNodeById(found.parent.children ?? [], entry.path)) return state
+  return {
+    ...state,
+    nodes: updateNode(state.nodes, parentPath, n => ({
+      ...n,
+      children: insertSorted(n.children ?? [], entryToNode(entry))
+    }))
   }
 }
 
@@ -197,9 +281,9 @@ function applyWatchEvent(state: WorkspaceState, event: WatchEvent): WorkspaceSta
 
   if (kind === 'added') {
     const parent = parentPathOf(path)
-    if (parent === null) {
+    if (parent === '') {
       // Top-level add
-      if (findNode(state.nodes, path)) return state
+      if (findNodeById(state.nodes, path)) return state
       const newNode: TreeNode = {
         id: path,
         name: path.split('/').pop() || path,
@@ -216,7 +300,7 @@ function applyWatchEvent(state: WorkspaceState, event: WatchEvent): WorkspaceSta
     const found = findParentAndIndex(state.nodes, parent)
     if (!found || !found.parent || found.parent.loadState !== 'loaded') return state
 
-    if (findNode(found.parent.children ?? [], path)) return state
+    if (findNodeById(found.parent.children ?? [], path)) return state
 
     const newNode: TreeNode = {
       id: path,
@@ -236,7 +320,7 @@ function applyWatchEvent(state: WorkspaceState, event: WatchEvent): WorkspaceSta
   }
 
   // kind === 'changed'
-  const existing = findNode(state.nodes, path)
+  const existing = findNodeById(state.nodes, path)
   if (!existing) return state
   return {
     ...state,

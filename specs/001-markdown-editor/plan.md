@@ -8,7 +8,7 @@
 
 A single-window Electron desktop application presenting a resizable
 sidebar-and-editor split. The main process owns all filesystem access and
-exposes a fixed set of seven named operations across a `contextBridge` preload
+exposes a fixed set of eight named operations across a `contextBridge` preload
 API; the renderer is a sandboxed React application with no Node access.
 
 Every path crosses one central `resolveWithinRoot` guard that resolves real
@@ -51,7 +51,7 @@ files — see [research.md](./research.md) R1.
 
 | Principle | Gate | Status |
 |-----------|------|--------|
-| I. Process Isolation Is Absolute | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; preload exposes a fixed operation list with no generic `invoke` | **PASS** — see `contracts/preload-api.md`; the contract is a closed union of 7 operations |
+| I. Process Isolation Is Absolute | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; preload exposes a fixed operation list with no generic `invoke` | **PASS** — see `contracts/preload-api.md`; the contract is a closed union of 8 operations |
 | II. Every Path Is Untrusted | All paths validated in main against the resolved real root | **PASS** — single `resolveWithinRoot` chokepoint, research.md R6 |
 | III. Never Lose The User's Words | Atomic writes; failed save stays dirty; confirmation before discard | **PASS** — research.md R7; FR-021/022/023; dirty documents never evicted (R2) |
 | IV. Calm, Predictable Editing | No sync disk work on keystroke path; tab switch preserves undo/cursor/scroll | **PASS** — per-tab instances (R1), hidden not unmounted (R3) |
@@ -143,12 +143,12 @@ directory split makes Principle I auditable by inspection: any `import ... from
 
 ## Phase 1 design decisions
 
-**IPC surface** (see `contracts/ipc-channels.md`): seven operations —
+**IPC surface** (see `contracts/ipc-channels.md`): eight operations —
 `openFolder`, `readDir`, `readFile`, `writeFile`, `createEntry`, `moveEntry`,
-`trashEntry` — plus two main→renderer events, `workspace:changed` and
-`document:externallyChanged`. Every response is a discriminated union of
-`{ ok: true, ... }` or `{ ok: false, code, message }`; handlers never throw
-across the boundary.
+`trashEntry`, `describeEntry` — plus two main→renderer events,
+`workspace:changed` and `document:externallyChanged`. Every response is a
+discriminated union of `{ ok: true, ... }` or `{ ok: false, code, message }`;
+handlers never throw across the boundary.
 
 **Error codes** are a closed set (`OUTSIDE_WORKSPACE`, `NOT_FOUND`, `CONFLICT`,
 `PERMISSION`, `LOCKED`, `TOO_LARGE`, `NOT_TEXT`, `TRASH_UNAVAILABLE`, `IO`) so
@@ -166,6 +166,74 @@ documents, and a generated id for never-saved ones — see `data-model.md`.
 workspace root at open; directories are added to the watch set when the tree
 expands them or a document inside them is opened. A full-tree scan made opening
 a 7,000-file folder take ~8 s on Windows.
+
+## Phase 6 design decisions (2026-08-02)
+
+**T059 — move via drag-and-drop** (react-arborist `onMove`), not a dialog.
+`disableDrop` rejects file targets and folder-into-own-descendant drops before
+they reach main; main's `moveEntry` remains the authoritative guard.
+
+**Self-mutations are suppressed and applied by the renderer** (FR-037): the
+`entry:create`/`entry:move`/`entry:trash` handlers suppress the watcher for
+their own paths (prefix-matched, including subtrees), and the renderer applies
+create/move/delete to its tree and document state directly. Without this, an
+in-app rename of an open file would be reported back as an external change and
+trigger the FR-038 "deleted on disk" prompt.
+
+**`entry:describe` added** (contracts/preload-api.md, ipc-channels.md): the
+delete confirmation needs to know whether a folder is empty and whether it
+contains files the tree hides (FR-029b). The renderer cannot learn this from
+`readDir` (filtered in main), so a named `describeEntry` operation scans the
+subtree without following symlinks. It is a fixed named operation, not an
+escape hatch — consistent with Principle I.
+
+**Collapse is arborist's visibility state only** (2026-08-02): the workspace
+reducer no longer has a `COLLAPSE` action. react-arborist fires `onToggle` for
+its own internal auto-opens (`scrollTo`/`openParents` during inline edit and
+keyboard navigation); treating those as user collapses wiped the loaded
+children of the folder being edited. The tree now never discards loaded
+children — re-opening a folder costs no refetch.
+
+**Phase 6 post-review decisions** (PR #9, 2026-08-02 — recorded per AGENTS.md
+Step 4; the code-level rationale for each is in `research.md`):
+
+- **Inline-rename exit is Enter/Escape only.** Blur never ends an edit: focus
+  leaving the input (clicking another row, a toolbar, a dialog) keeps the edit
+  open, and only focus returning *inside* the tree reclaims the input. A
+  blur-commit would race the row's refocus and lose typed text. User-visible
+  consequence: you cannot dismiss a rename by clicking away.
+- **A reroute onto an already-open path leaves two tabs pointing at the same
+  file** (deliberate): the rerouted document keeps its id so tabs never merge.
+- **Deletes disable their dialog while in flight**: buttons disabled, Escape
+  ignored, second confirmations guarded — a double-click cannot fire two
+  trashes and Escape cannot cancel a delete that is already executing.
+- **`.md`-only names are enforced in main** (`createFile`/`moveEntry`), not
+  just the renderer: renderer-side checks are never trusted (Principle II).
+- **Case-only renames are allowed**: `existsSync` cannot distinguish a
+  case-only rename from a real conflict on case-insensitive filesystems.
+- **Watcher suppression is a sliding window**: each suppressed event refreshes
+  the 2 s timestamp, so large moves/deletes (slow/AV-scanned disks) stay
+  suppressed instead of re-surfacing as external changes after 2 s.
+- **Tree rows are keyboard-reachable for rename/delete/menu** (F2, Delete,
+  Shift+F10/Menu on the focused row). Moving between folders remains
+  drag-and-drop only; a keyboard "Move to…" command is deferred (tasks.md
+  T077). Accessibility blockers (dialog focus trap/return, focus-visible
+  indicator) are also deferred to tasks.md T078.
+- **`describeEntry` scans are early-exit**: the delete confirmation needs only
+  `isEmpty`/`hasHiddenFiles`, so the walk stops at the first non-markdown file
+  and reports unreadable subfolders as non-empty (conservative warning).
+- **Top-bar icons are declipped via CSS** (2026-08-02): Crepe's top-bar icon
+  SVGs reference a `<defs><clipPath>` by a generated global id
+  (`url(#clip0_977_...)`). Every editor instance emits the same ids, and SVG
+  fragment references resolve document-wide to the FIRST match — so on the
+  second/third open document. the browser paints against the clipPath that
+  sits in a hidden editor host and the icon silently never draws. The clip
+  path is a full-view-box rect (a visual no-op), so `clip-path: none` on the
+  top-bar `g` elements restores all icons with zero visual change. Verified
+  by pixel-ink measurement in the e2e probe (`webContents.capturePage` +
+  `nativeImage.toBitmap`); keep the rule in `App.css` — a DOM-only test cannot
+  see this because the buttons exist in every host either way. Evidence in
+  research.md R22.
 
 ## Complexity Tracking
 
@@ -185,8 +253,8 @@ in research.md R2, which never evicts a dirty document.
 | Phase 2: Foundational Security and IPC | ✅ Complete |
 | Phase 3: US1 — Write and Save (P1) | ✅ Complete |
 | Phase 4: US2 — Browse a Folder (P2) | ✅ Complete (2026-08-01) |
-| Phase 5: US3 — Multiple Tabs (P2) | Pending |
-| Phase 6: US4 — Reorganise Files and Folders (P3) | Pending |
+| Phase 5: US3 — Multiple Tabs (P2) | ✅ Complete (2026-08-01) |
+| Phase 6: US4 — Reorganise Files and Folders (P3) | ✅ Complete (2026-08-02) |
 | Phase 7: Cross-Cutting and Polish | Pending |
 
 ## Deferred to a later feature
