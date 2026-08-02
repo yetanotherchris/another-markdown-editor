@@ -4,6 +4,8 @@ import { CrepeFeature } from '@milkdown/crepe'
 import { editorViewCtx } from '@milkdown/kit/core'
 import { TextSelection } from '@milkdown/kit/prose/state'
 import type { EditorView } from '@milkdown/kit/prose/view'
+import { applyToolbarLabels } from './toolbarLabels'
+import { planTaskBackspace } from './taskBackspace'
 
 export interface CursorState {
   cursorOffset: number
@@ -13,27 +15,57 @@ export interface CursorState {
 interface CrepeHostProps {
   defaultValue: string
   active: boolean
+  /** True while this tab shows the source overlay. Editor-originated
+   *  markdownUpdated emissions are suppressed (their 200 ms debounce could
+   *  otherwise clobber raw source edits) and the covered editor is made
+   *  inert so it leaves the keyboard and accessibility tree (FR-009). */
+  locked: boolean
   restoreCursor?: CursorState
   onMarkdownUpdated: (markdown: string) => void
   onReady: (editor: Crepe) => void
   onBaselineCapture: (markdown: string) => void
   onCursorState: (cursor: CursorState) => void
+  onRequestViewSource: () => void
 }
+
+const VIEW_SOURCE_ICON = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+    <path d="M9.4 16.6 4.8 12l4.6-4.6 1.4 1.4-3.2 3.2 3.2 3.2Zm5.2 0L19.2 12l-4.6-4.6-1.4 1.4 3.2 3.2-3.2 3.2Z" />
+  </svg>
+`
 
 export default function CrepeHost({
   defaultValue,
   active,
+  locked,
   restoreCursor,
   onMarkdownUpdated,
   onReady,
   onBaselineCapture,
-  onCursorState
+  onCursorState,
+  onRequestViewSource
 }: CrepeHostProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<Crepe | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const scrollElementRef = useRef<HTMLElement | null>(null)
   const wasActiveRef = useRef(active)
+  const onViewSourceRef = useRef(onRequestViewSource)
+  onViewSourceRef.current = onRequestViewSource
+  const lockedRef = useRef(locked)
+  lockedRef.current = locked
+
+  // While the source overlay covers this editor, make the ProseMirror
+  // contenteditable and the Crepe top bar non-focusable (inert) so Tab/AT
+  // users do not walk through invisible, covered controls behind it (FR-009).
+  // The source textarea is NOT inside this path and stays fully interactive.
+  function applyInert() {
+    const onInert = lockedRef.current
+    const view = viewRef.current
+    if (view) view.dom.toggleAttribute('inert', onInert)
+    containerRef.current?.querySelectorAll('.milkdown-top-bar')
+      .forEach((bar) => bar.toggleAttribute('inert', onInert))
+  }
 
   function applyCursorState(view: EditorView | null) {
     if (!view || !restoreCursor) return
@@ -71,12 +103,34 @@ export default function CrepeHost({
           [CrepeFeature.Toolbar]: false,
           [CrepeFeature.BlockEdit]: false,
           [CrepeFeature.TopBar]: true
+        },
+        featureConfigs: {
+          [CrepeFeature.TopBar]: {
+            // Spec 002: a "View source" button appended to the top bar. Crepe
+            // invokes buildTopBar after composing its default groups, so the
+            // extra group renders last (research.md R7).
+            buildTopBar(builder) {
+              builder
+                .addGroup('view', 'View')
+                .addItem('view-source', {
+                  icon: VIEW_SOURCE_ICON,
+                  active: () => false,
+                  onRun: () => {
+                    onViewSourceRef.current()
+                  }
+                })
+            }
+          }
         }
       })
 
       crepe.on((listener) => {
         listener.markdownUpdated((_ctx, markdown) => {
-          if (mounted) {
+          // Drop emissions while the tab is in source view: the listener's
+          // 200 ms debounce-outstanding changes is not the store's state, so a
+          // late emission from a superseded edit must not overwrite the raw
+          // text the user is typing (research R3, 2026-08-02 data-loss fix).
+          if (mounted && !lockedRef.current) {
             onMarkdownUpdated(markdown)
           }
         })
@@ -92,12 +146,33 @@ export default function CrepeHost({
       viewRef.current = view
       scrollElementRef.current = view.dom.closest('.editor-host') ?? view.dom.parentElement
       onReady(crepe)
+      // Spec 002, US5 (FR-016/017): Backspace at the start of an empty task
+      // item removes it. Bound on `view.dom` in the CAPTURE phase so this runs
+      // before ProseMirror's own keydown handler registers the key (the editor
+      // attaches its listener during crepe.create(), earlier than this one);
+      // when the keystroke is handled, stopImmediatePropagation ensures the
+      // editor never produces its own join transaction. Everything else falls
+      // through (FR-018).
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== 'Backspace') return
+        const tr = planTaskBackspace(view.state)
+        if (!tr) return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        view.dispatch(tr)
+      }
+      view.dom.addEventListener('keydown', onKeyDown, true)
+      // Spec 002: Crepe's TopBar renders controls with no title/aria-label;
+      // assign them by DOM order now that the tree exists (toolbarLabels.ts).
+      const topBar = containerRef.current?.querySelector<HTMLElement>('.milkdown-top-bar')
+      if (topBar) applyToolbarLabels(topBar)
       // The listener plugin only emits markdownUpdated on the first *edit*
       // (its handler is debounced by 200 ms and no doc-changing transaction
       // fires on load), so the baseline cannot come from the first emission.
       // Reading the freshly parsed content directly is the reliable source
       // (research.md R4, verified in Phase 5).
       onBaselineCapture(crepe.getMarkdown())
+      applyInert()
       if (active) {
         applyCursorState(view)
         view.focus()
@@ -114,6 +189,12 @@ export default function CrepeHost({
       scrollElementRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    // Reflect view switches (formatted → source / source → formatted) onto the
+    // cover-locked elements without remounting the editor.
+    applyInert()
+  }, [locked])
 
   useEffect(() => {
     const view = viewRef.current

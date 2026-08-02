@@ -265,6 +265,12 @@ html, body, #root {
   overflow: auto;
 }
 
+/* While the source overlay is visible, the host must not scroll the crepe
+   content underneath it (FR-009: one editing view at a time). */
+.editor-host.has-source {
+  overflow: hidden;
+}
+
 /* Milkdown's Crepe theme defaults the canvas to padding: 60px 120px
    (reset.css), which is oversized for a desktop editor. Tighten it. */
 .editor-host .milkdown .ProseMirror {
@@ -283,6 +289,82 @@ html, body, #root {
 
 .editor-host.evicted {
   pointer-events: none;
+}
+
+/* Spec 002: the source view is an opaque overlay inside the editor host,
+   sliding in from the right to replace the formatted editor (FR-003, FR-009).
+   The Crepe host stays mounted underneath but is covered while source shows. */
+.source-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  animation: source-slide-in 160ms ease-out;
+  z-index: 20;
+}
+
+.source-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border, #ddd);
+  background: var(--surface, #fafafa);
+  flex-shrink: 0;
+}
+
+.source-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.source-return:hover {
+  background: var(--surface, #f4f4f4);
+}
+
+.source-textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 32px 48px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  background: #fff;
+  color: #222;
+}
+
+/* outline: none is offset by a visible keyboard focus indicator (WCAG 2.4.11). */
+.source-textarea:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+}
+
+@keyframes source-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .source-view {
+    animation: none;
+  }
 }
 
 .empty-state {

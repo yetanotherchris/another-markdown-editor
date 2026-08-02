@@ -30,7 +30,7 @@ describe('roundtrip characterization', () => {
       expect(doc.path).toBe(fixture)
     })
 
-    it(`captures baseline correctly: ${fixture}`, () => {
+    it(`raw content/baseline untouched by editor normalization: ${fixture}`, () => {
       const content = fs.readFileSync(path.join(FIXTURES_DIR, fixture), 'utf-8')
       const state = createSession()
       const s1 = documentsReducer(state, {
@@ -46,55 +46,22 @@ describe('roundtrip characterization', () => {
 
       const docId = s1.documents[0].id
 
-      // Simulate Crepe emitting its first normalized markdown
-      const normalized = content.replace(/\r\n/g, '\n')
+      // Crepe's first emission is its normalized serialization (raw bytes +
+      // always-appended trailing newline). The raw-bytes policy (spec 002) is
+      // enforced in the store: CAPTURE_BASELINE only stores the emission in
+      // the separate editorBaseline field, so the disk bytes remain
+      // authoritative and a file without a trailing newline never gains one,
+      // even though the editor normalized it in-memory.
+      const normalized = `${content.replace(/\r\n/g, '\n')}\n`
       const s2 = documentsReducer(s1, {
-        type: 'UPDATE_CONTENT',
-        payload: { id: docId, content: normalized }
-      })
-
-      // Now capture it as the baseline
-      const s3 = documentsReducer(s2, {
         type: 'CAPTURE_BASELINE',
         payload: { id: docId, baseline: normalized }
       })
 
-      expect(s3.documents[0].baseline).toBe(normalized)
-      expect(s3.documents[0].content).toBe(normalized)
-      expect(s3.documents[0].dirty).toBe(false)
-    })
-
-    it(`save without edit should not dirty: ${fixture}`, () => {
-      const content = fs.readFileSync(path.join(FIXTURES_DIR, fixture), 'utf-8')
-      const state = createSession()
-      const s1 = documentsReducer(state, {
-        type: 'OPEN_EXISTING',
-        payload: {
-          path: fixture,
-          name: fixture,
-          content,
-          mtimeMs: Date.now(),
-          size: Buffer.byteLength(content)
-        }
-      })
-
-      const docId = s1.documents[0].id
-
-      // Crepe normalises on load
-      const normalized = content.replace(/\r\n/g, '\n')
-      const s2 = documentsReducer(s1, {
-        type: 'UPDATE_CONTENT',
-        payload: { id: docId, content: normalized }
-      })
-
-      // Capture Crepe's first emission as baseline
-      const s3 = documentsReducer(s2, {
-        type: 'CAPTURE_BASELINE',
-        payload: { id: docId, baseline: normalized }
-      })
-
-      // User makes no edits; content matches baseline
-      expect(s3.documents[0].dirty).toBe(false)
+      expect(s2.documents[0].content).toBe(content)
+      expect(s2.documents[0].baseline).toBe(content)
+      expect(s2.documents[0].dirty).toBe(false)
+      expect(s2.documents[0].editorBaseline).toBe(normalized)
     })
   }
 })

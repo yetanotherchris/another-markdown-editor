@@ -1,10 +1,50 @@
 import { isWithinOrEqual } from './workspace'
 
+/**
+ * Trailing-newline / EOL-tolerant equality for comparing text that came from
+ * disk (raw bytes) with text serialized by Crepe. The editor always appends a
+ * single trailing newline (verified 2026-07-02 probe), so two documents that
+ * differ only by that newline (or CRLF vs LF) are the same content. Used where
+ * the app must not treat Crepe's normalization as a user edit (spec 002: files
+ * without a trailing newline must round-trip without gratuitous changes).
+ */
+export function markdownSame(a: string, b: string): boolean {
+  const normalize = (s: string) => s.replace(/\r\n/g, '\n')
+  const A = normalize(a)
+  const B = normalize(b)
+  return A === B || A === `${B}\n` || B === `${A}\n`
+}
+
+/**
+ * Editor-vs-store equality for the return-to-formatted remount decision (spec
+ * 002, data-model.md R3). Crepe's serialization always appends exactly one
+ * trailing newline, so a live serialization equal to the stored content or that
+ * content plus ONE trailing newline is "unchanged" (no remount — undo, cursor
+ * and scroll survive). Unlike `markdownSame`, this is directional and strict:
+ * a stored content that ends in an EXTRA blank line (`...\n\n`) is NOT equal to
+ * a live `...\n`, so a blank line added at EOF in source view is neither
+ * dropped nor mistaken for pure editor normalization.
+ */
+export function editorMatchesContent(live: string, content: string): boolean {
+  const L = live.replace(/\r\n/g, '\n')
+  const C = content.replace(/\r\n/g, '\n')
+  return L === C || L === `${C}\n`
+}
+
 export interface DocumentState {
   id: string
   path: string | null
   title: string
   baseline: string
+  /** The editor's serialization of the content it last parsed, captured right
+   *  after a (re)mount (CAPTURE_BASELINE) and after a save. Unlike `baseline`
+   *  it is NOT the on-disk bytes: Crepe normalizes markdown, so for a pristine
+   *  file the editor baseline differs from the raw text (autolinks, loose
+   *  pipes, entities). It is the reference for the live-dirty check
+   *  (isDirtyLive): the editor has uncommitted drift only when its current
+   *  serialization differs from this baseline, never merely because it
+   *  normalized a pristine document. */
+  editorBaseline: string
   content: string
   dirty: boolean
   diskBytes: string | null
@@ -14,6 +54,8 @@ export interface DocumentState {
   lastActiveAt: number
   externalState: 'clean' | 'changedOnDisk' | 'deletedOnDisk'
   contentVersion: number
+  /** The editing presentation active in this tab (spec 002, data-model.md). */
+  view: 'formatted' | 'source'
 }
 
 export interface EditingSession {
@@ -32,6 +74,7 @@ export function createEmpty(): DocumentState {
     path: null,
     title: `Untitled-${untitledCounter}`,
     baseline: '',
+    editorBaseline: '',
     content: '',
     dirty: false,
     diskBytes: null,
@@ -40,7 +83,8 @@ export function createEmpty(): DocumentState {
     scrollTop: 0,
     lastActiveAt: Date.now(),
     externalState: 'clean',
-    contentVersion: 0
+    contentVersion: 0,
+    view: 'formatted'
   }
 }
 
@@ -50,6 +94,7 @@ export function openFile(opened: {
   content: string
   mtimeMs: number
   size: number
+  view?: 'formatted' | 'source'
 }): DocumentState {
   const path = opened.path
   const id = path || `file-${Date.now()}`
@@ -58,6 +103,7 @@ export function openFile(opened: {
     path,
     title: opened.name,
     baseline: opened.content,
+    editorBaseline: opened.content,
     content: opened.content,
     dirty: false,
     diskBytes: null,
@@ -66,7 +112,8 @@ export function openFile(opened: {
     scrollTop: 0,
     lastActiveAt: Date.now(),
     externalState: 'clean',
-    contentVersion: 0
+    contentVersion: 0,
+    view: opened.view ?? 'formatted'
   }
 }
 
@@ -87,6 +134,8 @@ export interface DocumentsAction {
     | 'UPDATE_PATH'
     | 'REROUTE_PATHS'
     | 'EXTERNAL_CHANGE'
+    | 'SET_VIEW'
+    | 'REFRESH_FROM_SOURCE'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload?: any
 }
@@ -103,11 +152,31 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
     }
 
     case 'OPEN_EXISTING': {
-      const p = action.payload as { path: string | null; name: string; content: string; mtimeMs: number; size: number }
+      const p = action.payload as {
+        path: string | null
+        name: string
+        content: string
+        mtimeMs: number
+        size: number
+        view?: 'formatted' | 'source'
+      }
       const existing = state.documents.find(d => d.path === p.path && p.path !== null)
       if (existing) {
         // Reopening an evicted document must bring its editor back — the
         // active tab would otherwise render the empty evicted container.
+        // FR-06: View source from the explorer reactivates the existing tab
+        // without duplicating it; the requested view (if given) is applied.
+        if (p.view && existing.view !== p.view) {
+          return {
+            ...state,
+            activeId: existing.id,
+            documents: state.documents.map(d =>
+              d.id === existing.id
+                ? { ...d, view: p.view!, editorState: d.editorState === 'evicted' ? 'live' : d.editorState }
+                : d
+            )
+          }
+        }
         return {
           ...state,
           activeId: existing.id,
@@ -154,13 +223,18 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
     }
 
     case 'CAPTURE_BASELINE': {
+      // Raw-bytes policy (spec 002): content/baseline remain the on-disk bytes
+      // read by the main process (openFile, RELOAD) or the last saved bytes
+      // (SAVE_SUCCESS) — Crepe's serialization must NOT rewrite the raw content
+      // of a pristine document (a file without a trailing newline would gain
+      // one). The payload is stored in the separate `editorBaseline` field, the
+      // reference the live-dirty check uses to tell "the editor normalized the
+      // document" (clean) from "the user typed" (dirty).
       const { id, baseline } = action.payload as { id: string; baseline: string }
       return {
         ...state,
         documents: state.documents.map(d =>
-          d.id === id
-            ? { ...d, content: baseline, baseline, dirty: false }
-            : d
+          d.id === id ? { ...d, editorBaseline: baseline } : d
         )
       }
     }
@@ -176,6 +250,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
                 path: path || d.path,
                 title: path ? path.split('/').pop() || d.title : d.title,
                 baseline: content,
+                editorBaseline: content,
                 dirty: d.content !== content,
                 externalState: 'clean'
               }
@@ -253,6 +328,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
                 ...d,
                 content,
                 baseline: content,
+                editorBaseline: content,
                 dirty: false,
                 externalState: 'clean',
                 cursorOffset: 0,
@@ -302,6 +378,43 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
             ? {
                 ...d,
                 externalState: kind === 'removed' ? 'deletedOnDisk' : 'changedOnDisk'
+              }
+            : d
+        )
+      }
+    }
+
+    case 'SET_VIEW': {
+      // Spec 002: switch this document's editing presentation without touching
+      // content or dirty state. Only a real flip re-renders the tab.
+      const { id, view } = action.payload as { id: string; view: 'formatted' | 'source' }
+      const target = state.documents.find(d => d.id === id)
+      if (!target || target.view === view) return state
+      return {
+        ...state,
+        documents: state.documents.map(d =>
+          d.id === id ? { ...d, view } : d
+        )
+      }
+    }
+
+    case 'REFRESH_FROM_SOURCE': {
+      // Spec 002, data-model.md: source→formatted return when the raw text
+      // differs from the live editor. The new text takes the content slot and
+      // bumps contentVersion so the CrepeHost remounts with the source bytes;
+      // baseline/dirty are untouched so the document stays unsaved.
+      const { id, content } = action.payload as { id: string; content: string }
+      return {
+        ...state,
+        documents: state.documents.map(d =>
+          d.id === id
+            ? {
+                ...d,
+                content,
+                editorBaseline: content,
+                cursorOffset: 0,
+                scrollTop: 0,
+                contentVersion: d.contentVersion + 1
               }
             : d
         )

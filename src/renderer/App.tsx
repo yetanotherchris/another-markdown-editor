@@ -1,5 +1,6 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
 import { Panel, Group, Separator } from 'react-resizable-panels'
+import type { TreeApi } from 'react-arborist'
 import type { MenuCommand, EntryKind, EntryInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
@@ -8,6 +9,8 @@ import {
   getDirtyDocuments,
   planClose,
   DocumentState,
+  markdownSame,
+  editorMatchesContent,
 } from './state/documents'
 import {
   initialWorkspaceState,
@@ -38,6 +41,13 @@ const initialSession: EditingSession = {
   untitledCounter: 0
 }
 
+/** True when `path` is a workspace-relative path. Absolute paths come from the
+ *  OS file dialog (e.g. `C:\...` or `/...`) and are not under the workspace. */
+function isWorkspaceRelative(path: string): boolean {
+  if (path.startsWith('/') || path.startsWith('\\')) return false
+  return !/^[a-zA-Z]:[\\/]/.test(path)
+}
+
 type SaveResult = 'saved' | 'cancelled' | 'failed'
 
 export default function App() {
@@ -55,6 +65,7 @@ export default function App() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const pendingCreateRef = useRef(new Set<string>())
   const createCounterRef = useRef(0)
+  const treeApiRef = useRef<TreeApi<TreeNode> | null>(null)
   const activeDoc = getActiveDocument(session)
   const sessionRef = useRef(session)
   sessionRef.current = session
@@ -71,16 +82,16 @@ export default function App() {
     dispatch({ type: 'UPDATE_CONTENT', payload: { id, content } })
   }, [])
 
+  // The editor's serialization right after it parses content is the reference
+  // for the live-dirty check (see isDirtyLive). It lives in the store's
+  // `editorBaseline` field; content/baseline stay the raw disk bytes
+  // (raw-bytes policy, spec 002).
   const handleBaselineCapture = useCallback((id: string, baseline: string) => {
     dispatch({ type: 'CAPTURE_BASELINE', payload: { id, baseline } })
   }, [])
 
   const handleCursorState = useCallback((id: string, cursorOffset: number, scrollTop: number) => {
     dispatch({ type: 'CAPTURE_EDITOR_STATE', payload: { id, cursorOffset, scrollTop } })
-  }, [])
-
-  const getContentToSave = useCallback((docId: string, fallback: string): string => {
-    return instancePool.getMarkdown(docId) ?? fallback
   }, [])
 
   // The listener plugin's markdownUpdated is debounced by 200 ms, so the
@@ -94,16 +105,50 @@ export default function App() {
 
   const isDirtyLive = useCallback((doc: DocumentState): boolean => {
     if (doc.dirty) return true
+    // A source-view document's text lives in the store (each keystroke
+    // dispatches UPDATE_CONTENT synchronously), and its mounted editor
+    // serializes the stale pre-source-edit content, so the editor comparison
+    // below would be meaningless. doc.dirty is the complete signal.
+    if (doc.view === 'source') return false
     const live = getLiveContent(doc)
-    return live !== null && live !== doc.baseline
+    if (live === null) return false
+    // Raw-bytes policy (spec 002): compare against the editor's OWN baseline —
+    // its serialization of the content it last parsed — not the raw disk
+    // bytes. Crepe normalizes markdown (autolinks, loose pipes, entities), so
+    // a pristine normalizing file must not count as having unsaved changes;
+    // only drift from that baseline means the user typed.
+    return !markdownSame(live, doc.editorBaseline)
   }, [getLiveContent])
+
+  // Spec 002, save model (data-model.md): the source view writes the raw bytes
+  // the user sees (document.content) so saving never re-adds normalization
+  // (e.g. a trailing newline) to an untouched file. A formatted document that
+  // is clean in the live-dirty sense is written from the stored raw bytes too
+  // (a no-edit open/save stays byte-identical, SC-006); only a document with
+  // real drift writes the Crepe serialization so the edits are kept.
+  const getContentToSave = useCallback((doc: DocumentState): string => {
+    if (doc.view === 'source') return doc.content
+    if (isDirtyLive(doc)) return instancePool.getMarkdown(doc.id) ?? doc.content
+    return doc.content
+  }, [isDirtyLive])
 
   const flushLiveContent = useCallback(() => {
     for (const doc of sessionRef.current.documents) {
+      // A source-view document's text lives in the store (raw bytes); its
+      // mounted editor serializes the stale pre-source-edit content, so
+      // flushing it would clobber the edits the user made in source.
+      if (doc.view === 'source') continue
       const live = getLiveContent(doc)
-      if (live !== null && live !== doc.content) {
-        dispatch({ type: 'UPDATE_CONTENT', payload: { id: doc.id, content: live } })
-      }
+      if (live === null || markdownSame(live, doc.content)) continue
+      // Raw-bytes policy (spec 002): the serialization of a PRISTINE document
+      // must never replace the stored disk bytes — Crepe's output can differ
+      // from raw text beyond the tolerated trailing newline (loose pipes,
+      // entities, autolinks) and would mark an unedited file dirty. Only adopt
+      // the live text when the reducer already knows the document was edited
+      // (the debounced emission set `dirty`; a sub-200 ms keystroke window is
+      // rare enough to leave to the next change).
+      if (!doc.dirty) continue
+      dispatch({ type: 'UPDATE_CONTENT', payload: { id: doc.id, content: live } })
     }
   }, [getLiveContent])
 
@@ -115,20 +160,16 @@ export default function App() {
       activeId
     )
     if (evictId) {
-      // Capture the live content before dropping the pool entry — evictLRU
-      // only finds the candidate; getMarkdown must still see it.
-      const evictDoc = current.documents.find(d => d.id === evictId)
-      const live = evictDoc ? getLiveContent(evictDoc) : null
+      // evictLRU only returns clean documents, so the store already holds the
+      // authoritative content — nothing to capture. Drop the entry and mark the
+      // document evicted; the next activate remounts from the stored bytes.
       instancePool.remove(evictId)
-      if (live !== null) {
-        dispatch({ type: 'UPDATE_CONTENT', payload: { id: evictId, content: live } })
-      }
       dispatch({ type: 'EVICT', payload: { id: evictId } })
     }
   }, [getLiveContent, isDirtyLive])
 
   const saveDocument = useCallback(async (doc: DocumentState, forceDialog = false): Promise<SaveResult> => {
-    const content = getContentToSave(doc.id, doc.content)
+    const content = getContentToSave(doc)
     if (doc.path && !forceDialog) {
       const pathAtStart = doc.path
       const result = await window.api.writeFile(pathAtStart, content)
@@ -273,6 +314,112 @@ export default function App() {
     // pre-batch value, so reading it here could evict the tab just clicked.
     enforcePoolCap(id)
   }, [enforcePoolCap])
+
+  // Spec 002, US1: the formatted→source transition syncs the live editor text
+  // into the store first so the raw source reflects every keystroke, then
+  // flips the tab. The source textarea reads `document.content`.
+  const handleShowSource = useCallback(
+    (id: string) => {
+      flushLiveContent()
+      dispatch({ type: 'SET_VIEW', payload: { id, view: 'source' } })
+    },
+    [flushLiveContent]
+  )
+
+  // Spec 002, US3: returning to formatted editing. When the raw source text
+  // equals what Crepe already parsed, the editor can stay mounted and
+  // undo/scroll/cursor survive (research.md R3, no-edit round trip). When the
+  // source text changed (or the editor was evicted so nothing is live), the
+  // new text must become the editor's content — REFRESH_FROM_SOURCE bumps
+  // contentVersion so CrepeHost remounts with the source bytes.
+  const handleReturnToFormatted = useCallback(
+    (id: string) => {
+      const doc = sessionRef.current.documents.find(d => d.id === id)
+      if (!doc) return
+      const live = getLiveContent(doc)
+      // editorMatchesContent (not markdownSame) decides the no-op round trip:
+      // only the editor's single appended trailing newline is "unchanged", so a
+      // blank line typed at EOF in source is not silently dropped, while a
+      // pristine file that Crepe merely normalized still skips the remount.
+      if (live === null || !editorMatchesContent(live, doc.content)) {
+        dispatch({ type: 'REFRESH_FROM_SOURCE', payload: { id, content: doc.content } })
+      }
+      dispatch({ type: 'SET_VIEW', payload: { id, view: 'formatted' } })
+    },
+    [getLiveContent]
+  )
+
+  // Spec 002, US2: an explorer "View source" request routes to the open-tab
+  // fast path or reads the file into a new source-view tab. Called with the
+  // workspace path of the node (Tree passes node.id).
+  const openPathInSource = useCallback(
+    async (path: string): Promise<string | null> => {
+      const existing = sessionRef.current.documents.find(
+        d => d.path === path && d.editorState !== 'evicted'
+      )
+      if (existing) {
+        dispatch({ type: 'ACTIVATE', payload: { id: existing.id } })
+        if (existing.view !== 'source') {
+          flushLiveContent()
+          dispatch({ type: 'SET_VIEW', payload: { id: existing.id, view: 'source' } })
+        }
+        enforcePoolCap(existing.id)
+        return existing.id
+      }
+      const read = await window.api.readFile(path)
+      if (!read.ok) return null
+      dispatch({ type: 'OPEN_EXISTING', payload: { ...read.value, view: 'source' } })
+      // The freshly opened tab's editor registers on mount, so it is the newest
+      // LRU entry and cannot be evicted here. sessionRef.current.activeId is
+      // still the pre-dispatch document — passing it only protects the tab that
+      // is visible right now, which is the intent.
+      enforcePoolCap(sessionRef.current.activeId)
+      return read.value.path ?? read.value.name
+    },
+    [enforcePoolCap, flushLiveContent]
+  )
+
+  const handleViewSource = useCallback(
+    (path: string) => {
+      void openPathInSource(path)
+    },
+    [openPathInSource]
+  )
+
+  // Spec 002, US7: an explorer "Open" request is the visual counterpart of
+  // "View source". It activates an already-open tab without duplicating it;
+  // a tab stuck in source view returns to formatted editing via the same
+  // content-migration path as the source toolbar's return control. An unopened
+  // file is read into a new formatted tab.
+  const openPathInFormatted = useCallback(
+    async (path: string): Promise<void> => {
+      const existing = sessionRef.current.documents.find(
+        d => d.path === path && d.editorState !== 'evicted'
+      )
+      if (existing) {
+        dispatch({ type: 'ACTIVATE', payload: { id: existing.id } })
+        if (existing.view === 'source') {
+          handleReturnToFormatted(existing.id)
+        }
+        enforcePoolCap(existing.id)
+        return
+      }
+      const read = await window.api.readFile(path)
+      if (!read.ok) return
+      // view:'formatted' also flips a reopened evicted tab that had been in
+      // source view back to visual editing (OPEN_EXISTING applies the view).
+      dispatch({ type: 'OPEN_EXISTING', payload: { ...read.value, view: 'formatted' } })
+      enforcePoolCap(sessionRef.current.activeId)
+    },
+    [enforcePoolCap, handleReturnToFormatted]
+  )
+
+  const handleOpen = useCallback(
+    (path: string) => {
+      void openPathInFormatted(path)
+    },
+    [openPathInFormatted]
+  )
 
   const handleNew = useCallback(() => {
     dispatch({ type: 'OPEN_NEW' })
@@ -598,6 +745,32 @@ export default function App() {
     }
   }, [])
 
+  // Spec 002, US004: the explorer follows the active tab. When the active
+  // document maps to a workspace file, open its parent folders, reveal it, and
+  // select it; a document without a workspace path (untitled) or an absolute
+  // path (opened outside the workspace) clears the highlight so the explorer
+  // never shows a stale selection (FR-021).
+  const workspaceActiveId = session.activeId
+  useEffect(() => {
+    if (!workspace.name) return
+    const active = sessionRef.current.documents.find(d => d.id === workspaceActiveId)
+    const path = active?.path
+    if (!path || !isWorkspaceRelative(path)) {
+      dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
+      return
+    }
+    // The reveal may target a file inside a folder that has never been
+    // expanded. openParents lazily loads each ancestor through the existing
+    // onToggle; the effect re-runs when those loaded nodes land, completing the
+    // reveal (US6 acceptance 2, research R-Explorer).
+    dispatchWorkspace({ type: 'SELECT', payload: { id: path } })
+    const api = treeApiRef.current
+    if (api) {
+      api.openParents(path)
+      api.scrollTo(path)
+    }
+  }, [workspaceActiveId, workspace.name, workspace.nodes])
+
   const handleOpenFolder = useCallback(async () => {
     const result = await window.api.openFolderDialog()
     if (result.ok && result.value) {
@@ -663,6 +836,8 @@ export default function App() {
                     onDeleteRequest={handleDeleteRequest}
                     onCreateRequest={handleCreate}
                     onMove={handleTreeMove}
+                    onOpen={handleOpen}
+                    onViewSource={handleViewSource}
                   />
                 </div>
               </Panel>
@@ -690,6 +865,8 @@ export default function App() {
                     onContentChange={handleContentChange}
                     onBaselineCapture={handleBaselineCapture}
                     onCursorState={handleCursorState}
+                    onRequestViewSource={handleShowSource}
+                    onReturnToFormatted={handleReturnToFormatted}
                   />
                 ))
               )}

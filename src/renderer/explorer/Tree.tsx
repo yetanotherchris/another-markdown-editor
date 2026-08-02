@@ -24,6 +24,14 @@ interface TreeProps {
   onDeleteRequest: (node: TreeNode) => void
   onCreateRequest: (parent: TreeNode | null, kind: EntryKind) => void
   onMove: (id: string, targetParentId: string) => void
+  /** Spec 002 (US7): "Open" in a file's context menu — visual counterpart of
+   *  "View source" (FR-022). */
+  onOpen: (path: string) => void
+  /** Spec 002: "View source" in a file's context menu (FR-004). */
+  onViewSource: (path: string) => void
+  /** Spec 002 (US004): imperative handle the app uses to open parents and
+   *  scroll a node into view (explorer active-file highlight). */
+  apiRef?: React.MutableRefObject<TreeApi<TreeNode> | null> | null
 }
 
 interface ContextMenuState {
@@ -207,10 +215,14 @@ export default function Tree({
   onEditingCancelled,
   onDeleteRequest,
   onCreateRequest,
-  onMove
+  onMove,
+  onOpen,
+  onViewSource,
+  apiRef
 }: TreeProps) {
   const [containerRef, size] = useElementSize<HTMLDivElement>()
   const treeRef = useRef<TreeApi<TreeNode> | null>(null)
+  if (apiRef) apiRef.current = treeRef.current
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const editingIdRef = useRef(editingId)
@@ -422,6 +434,13 @@ export default function Tree({
       {contextMenu.node && (
         <>
           <div className="context-menu-separator" />
+          {contextMenu.node.kind === 'file' && (
+            <>
+              {menuItem('Open', () => onOpen(contextMenu.node!.id))}
+              {menuItem('View source', () => onViewSource(contextMenu.node!.id))}
+              <div className="context-menu-separator" />
+            </>
+          )}
           {menuItem('Rename', () => startEditing(contextMenu.node!.id))}
           {menuItem('Delete', () => onDeleteRequest(contextMenu.node!))}
         </>
