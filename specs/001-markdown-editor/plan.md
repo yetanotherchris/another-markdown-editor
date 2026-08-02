@@ -213,7 +213,7 @@ in research.md R2, which never evicts a dirty document.
 | Phase 3: US1 — Write and Save (P1) | ✅ Complete |
 | Phase 4: US2 — Browse a Folder (P2) | ✅ Complete (2026-08-01) |
 | Phase 5: US3 — Multiple Tabs (P2) | ✅ Complete (2026-08-01) |
-| Phase 6: US4 — Reorganise Files and Folders (P3) | Complete (2026-08-02, awaiting merge) |
+| Phase 6: US4 — Reorganise Files and Folders (P3) | ✅ Complete (2026-08-02) |
 | Phase 7: Cross-Cutting and Polish | Pending |
 
 ## Deferred to a later feature
