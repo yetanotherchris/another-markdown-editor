@@ -48,9 +48,10 @@ describe('roundtrip characterization', () => {
 
       // Crepe's first emission is its normalized serialization (raw bytes +
       // always-appended trailing newline). The raw-bytes policy (spec 002) is
-      // enforced in the store: CAPTURE_BASELINE adopts nothing, so the disk
-      // bytes remain authoritative and a file without a trailing newline never
-      // gains one, even though the editor normalized it in-memory.
+      // enforced in the store: CAPTURE_BASELINE only stores the emission in
+      // the separate editorBaseline field, so the disk bytes remain
+      // authoritative and a file without a trailing newline never gains one,
+      // even though the editor normalized it in-memory.
       const normalized = `${content.replace(/\r\n/g, '\n')}\n`
       const s2 = documentsReducer(s1, {
         type: 'CAPTURE_BASELINE',
@@ -60,6 +61,7 @@ describe('roundtrip characterization', () => {
       expect(s2.documents[0].content).toBe(content)
       expect(s2.documents[0].baseline).toBe(content)
       expect(s2.documents[0].dirty).toBe(false)
+      expect(s2.documents[0].editorBaseline).toBe(normalized)
     })
   }
 })

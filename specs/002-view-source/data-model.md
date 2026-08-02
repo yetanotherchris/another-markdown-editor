@@ -11,6 +11,7 @@ delta over the parent feature's `data-model.md`.
 | Field | Type | Notes |
 |-------|------|-------|
 | `view` | `'formatted' \| 'source'` | **new.** The editing presentation active in this tab. Defaults to `'formatted'`. Persisted per document across tab switches (per-document view assumption). |
+| `editorBaseline` | `string` | **new (late addition 2026-08-03).** The editor's serialization of the content it last parsed, captured by `CAPTURE_BASELINE` right after a (re)mount and set to the saved bytes by `SAVE_SUCCESS`/`RELOAD`/`REFRESH_FROM_SOURCE`. NOT the on-disk bytes (Crepe normalizes); it is the reference the live-dirty check uses to tell normalization from a real edit. |
 
 ### View rules
 
@@ -20,7 +21,8 @@ delta over the parent feature's `data-model.md`.
 | `content` is the single buffer (FR-10) | Both views feed `UPDATE_CONTENT`. WYSIWYG edits keep arriving debounced (Crepe listener); source edits dispatch `UPDATE_CONTENT` synchronously per keystroke with the textarea's raw value. `dirty = content !== baseline` is unchanged. |
 | formatted → source | First flush the live Crepe content into the store (`flushLiveContent` reading `instancePool.getMarkdown`, research R2/R3), then `SET_VIEW {view:'source'}`. The textarea seeds from `document.content`. |
 | source → formatted | Compare `instancePool.getMarkdown(id)` with `document.content`. Equal → pure `SET_VIEW` (undo/scroll/cursor preserved via the still-mounted editor). Different → `REFRESH_FROM_SOURCE` (below). |
-| Saving from source view | `getContentToSave(id, fallback, doc)` returns raw `document.content` when `doc.view === 'source'` so the written bytes equal what the user sees/edits. Formatted view keeps the `getMarkdown` path. |
+| Saving from source view | `getContentToSave(id, fallback, doc)` returns raw `document.content` when `doc.view === 'source'` so the written bytes equal what the user sees/edits. Formatted view returns `document.content` when the document is clean (no-edit open/save stays byte-identical, SC-010) and the editor serialization only when it is live-dirty (real edits kept). |
+| Live-dirty guard | `isDirtyLive(doc)` = `dirty` OR (formatted view AND the live `getMarkdown()` differs from `editorBaseline`). Source-view docs short-circuit to `dirty` (their content is always current; the mounted editor serializes stale pre-source text). A pristine normalising file is therefore clean. |
 | External change / reload | `RELOAD` already replaces content+baseline and bumps `contentVersion`; the source textarea re-seeds from the new `content`, so a reload is reflected in source view too. |
 
 ## Reducer actions
@@ -29,7 +31,9 @@ delta over the parent feature's `data-model.md`.
 |--------|-------------------------------|
 | `SET_VIEW` | `view = payload.view`. No content change. |
 | `OPEN_EXISTING` | payload gains optional `view`; a newly opened or reactivated document is created with `view` defaulting to `'formatted'` unless `'source'` is requested (explorer FR-05). |
-| `REFRESH_FROM_SOURCE` | `content = payload.content` (== current source text), `cursorOffset = scrollTop = 0`, `contentVersion++` (remounts Crepe). `baseline`/`dirty` untouched — a source edit remains dirty through the return (FR-4). |
+| `REFRESH_FROM_SOURCE` | `content = payload.content` (== current source text), `cursorOffset = scrollTop = 0`, `contentVersion++` (remounts Crepe). `baseline`/`dirty` untouched — a source edit remains dirty through the return (FR-4). `editorBaseline` is set to the new content as an intermediate value; the remount's `CAPTURE_BASELINE` overwrites it with the exact serialization. |
+| `CAPTURE_BASELINE` | `editorBaseline = payload.baseline` (the editor's serialization right after parsing content). `content`/`baseline`/`dirty` are NOT touched — raw-bytes policy. |
+| `SAVE_SUCCESS` | `baseline = content = saved bytes` (and `editorBaseline = content`) — the saved document is clean for both the raw-bytes and the live-dirty checks. |
 
 ## Workspace (renderer)
 

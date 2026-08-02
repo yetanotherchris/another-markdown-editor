@@ -24,6 +24,9 @@ interface TreeProps {
   onDeleteRequest: (node: TreeNode) => void
   onCreateRequest: (parent: TreeNode | null, kind: EntryKind) => void
   onMove: (id: string, targetParentId: string) => void
+  /** Spec 002 (US7): "Open" in a file's context menu — visual counterpart of
+   *  "View source" (FR-022). */
+  onOpen: (path: string) => void
   /** Spec 002: "View source" in a file's context menu (FR-004). */
   onViewSource: (path: string) => void
   /** Spec 002 (US004): imperative handle the app uses to open parents and
@@ -213,6 +216,7 @@ export default function Tree({
   onDeleteRequest,
   onCreateRequest,
   onMove,
+  onOpen,
   onViewSource,
   apiRef
 }: TreeProps) {
@@ -432,6 +436,7 @@ export default function Tree({
           <div className="context-menu-separator" />
           {contextMenu.node.kind === 'file' && (
             <>
+              {menuItem('Open', () => onOpen(contextMenu.node!.id))}
               {menuItem('View source', () => onViewSource(contextMenu.node!.id))}
               <div className="context-menu-separator" />
             </>

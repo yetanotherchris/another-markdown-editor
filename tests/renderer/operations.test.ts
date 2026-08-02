@@ -16,6 +16,7 @@ function makeDoc(patch: Partial<DocumentState> & { id: string; path: string | nu
   return {
     title: patch.path?.split('/').pop() || patch.id,
     baseline: '',
+    editorBaseline: '',
     content: '',
     dirty: false,
     diskBytes: null,

@@ -181,6 +181,44 @@ task-list item Backspace), plus the required e2e suite and final validation.
 
 ---
 
+## Late additions (2026-08-03) — explorer Open action, FR-12 banner removal, live-dirty fix
+
+**Purpose**: a late addition to the spec: the explorer context menu gains an
+"Open" action (US7/FR-022–024), the FR-12 "visual editor normalises" banner is
+removed and its explanation branch deferred, and a pristine normalising file is
+no longer treated as having unsaved changes (SC-010).
+
+- [X] T022 [US7] Add `onOpen` prop to `src/renderer/explorer/Tree.tsx` with an
+      **Open** menu item placed directly above **View source** for file nodes
+- [X] T023 [US7] `src/renderer/App.tsx` — `openPathInFormatted(path)`: activate
+      an already-open tab (no duplicate; a source-view tab returns to formatted
+      via the existing `handleReturnToFormatted`), else `readFile` →
+      `OPEN_EXISTING {view:'formatted'}` (also flips a reopened evicted tab)
+- [X] T024 [FR-12] Remove the norm-notice banner: the `normNotice` state, the
+      `normPendingRef` queue, the JSX, and the `.norm-notice` CSS are deleted;
+      FR-012's *explain in context* branch is marked deferred in spec.md
+- [X] T025 [SC-010] `DocumentState.editorBaseline` — the editor's serialization
+      of the content it last parsed, captured by `CAPTURE_BASELINE` and
+      `SAVE_SUCCESS`/`RELOAD`/`REFRESH_FROM_SOURCE`. `isDirtyLive` and
+      `getContentToSave` compare against it (source-view docs short-circuit to
+      `dirty`), so a pristine normalising file is clean and a no-edit
+      open/save stays byte-identical
+- [X] T026 [tests] Extend `tests/renderer/documents.test.ts` +
+      `roundtrip.test.ts` for `editorBaseline`; rewrite the FR-12 e2e test to
+      assert preservation (not the banner) and add US7 + SC-010 e2e tests in
+      `tests/e2e/source.spec.ts`
+- [X] T027 [infra] Run the Playwright suite with Chromium's `--headless`
+      switch (`tests/e2e/launch.ts`, `AME_E2E_HEADED=1` opts out) so e2e runs
+      never steal desktop focus
+- [X] T028 [gates] `npm run lint`, `npm run typecheck`, `npm run test`,
+      `npm run test:e2e` all green; update plan/research/data-model/contracts
+      for the late additions
+
+**Checkpoint**: `npm run test:e2e` green (headless) alongside lint/typecheck/
+vitest.
+
+---
+
 ## Dependencies & Execution Order
 
 | Phase | Depends on | Blocks |

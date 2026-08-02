@@ -36,6 +36,15 @@ export interface DocumentState {
   path: string | null
   title: string
   baseline: string
+  /** The editor's serialization of the content it last parsed, captured right
+   *  after a (re)mount (CAPTURE_BASELINE) and after a save. Unlike `baseline`
+   *  it is NOT the on-disk bytes: Crepe normalizes markdown, so for a pristine
+   *  file the editor baseline differs from the raw text (autolinks, loose
+   *  pipes, entities). It is the reference for the live-dirty check
+   *  (isDirtyLive): the editor has uncommitted drift only when its current
+   *  serialization differs from this baseline, never merely because it
+   *  normalized a pristine document. */
+  editorBaseline: string
   content: string
   dirty: boolean
   diskBytes: string | null
@@ -65,6 +74,7 @@ export function createEmpty(): DocumentState {
     path: null,
     title: `Untitled-${untitledCounter}`,
     baseline: '',
+    editorBaseline: '',
     content: '',
     dirty: false,
     diskBytes: null,
@@ -93,6 +103,7 @@ export function openFile(opened: {
     path,
     title: opened.name,
     baseline: opened.content,
+    editorBaseline: opened.content,
     content: opened.content,
     dirty: false,
     diskBytes: null,
@@ -212,15 +223,20 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
     }
 
     case 'CAPTURE_BASELINE': {
-      // Raw-bytes policy (spec 002, decision 2026-07-02): the document's
-      // content/baseline ARE the on-disk bytes read by the main process
-      // (openFile, RELOAD) or the last saved bytes (SAVE_SUCCESS). Crepe's
-      // first "baseline" emission is its normalized serialization (always a
-      // trailing `\n`), which must NOT rewrite the raw content of a pristine
-      // document — otherwise a file without a trailing newline would gain one.
-      // The payload is still passed so the FR-12 norm-notice comparison in
-      // App can react, but the store never adopts it.
-      return state
+      // Raw-bytes policy (spec 002): content/baseline remain the on-disk bytes
+      // read by the main process (openFile, RELOAD) or the last saved bytes
+      // (SAVE_SUCCESS) — Crepe's serialization must NOT rewrite the raw content
+      // of a pristine document (a file without a trailing newline would gain
+      // one). The payload is stored in the separate `editorBaseline` field, the
+      // reference the live-dirty check uses to tell "the editor normalized the
+      // document" (clean) from "the user typed" (dirty).
+      const { id, baseline } = action.payload as { id: string; baseline: string }
+      return {
+        ...state,
+        documents: state.documents.map(d =>
+          d.id === id ? { ...d, editorBaseline: baseline } : d
+        )
+      }
     }
 
     case 'SAVE_SUCCESS': {
@@ -234,6 +250,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
                 path: path || d.path,
                 title: path ? path.split('/').pop() || d.title : d.title,
                 baseline: content,
+                editorBaseline: content,
                 dirty: d.content !== content,
                 externalState: 'clean'
               }
@@ -311,6 +328,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
                 ...d,
                 content,
                 baseline: content,
+                editorBaseline: content,
                 dirty: false,
                 externalState: 'clean',
                 cursorOffset: 0,
@@ -393,6 +411,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
             ? {
                 ...d,
                 content,
+                editorBaseline: content,
                 cursorOffset: 0,
                 scrollTop: 0,
                 contentVersion: d.contentVersion + 1

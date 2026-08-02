@@ -82,44 +82,16 @@ export default function App() {
     dispatch({ type: 'UPDATE_CONTENT', payload: { id, content } })
   }, [])
 
-  // FR-12 round-trip guard: REFRESH_FROM_SOURCE injection re-parses the raw
-  // source in a fresh Crepe instance. If the parsed output differs from the
-  // text the user typed (Crepe normalises the markdown), a quiet note explains
-  // that the formatted view may look different while the raw text is preserved.
-  const normPendingRef = useRef<Map<string, string>>(new Map())
-  const [normNotice, setNormNotice] = useState<{ id: string; title: string } | null>(null)
-  const normNoticeRef = useRef(normNotice)
-  normNoticeRef.current = normNotice
-
+  // The editor's serialization right after it parses content is the reference
+  // for the live-dirty check (see isDirtyLive). It lives in the store's
+  // `editorBaseline` field; content/baseline stay the raw disk bytes
+  // (raw-bytes policy, spec 002).
   const handleBaselineCapture = useCallback((id: string, baseline: string) => {
-    const expected = normPendingRef.current.get(id)
-    if (expected !== undefined) {
-      normPendingRef.current.delete(id)
-      // Trailing-newline / EOL-only differences are not user-visible
-      // normalization, so they must not raise the FR-12 note (spec 002 edge:
-      // files without a trailing newline round-trip quietly).
-      if (!markdownSame(baseline, expected)) {
-        const doc = sessionRef.current.documents.find(d => d.id === id)
-        setNormNotice({ id, title: doc?.title ?? '' })
-        // Auto-dismiss after a few seconds; the note is informational only.
-        window.setTimeout(() => {
-          setNormNotice((current) => (current?.id === id ? null : current))
-        }, 6000)
-      }
-    }
+    dispatch({ type: 'CAPTURE_BASELINE', payload: { id, baseline } })
   }, [])
 
   const handleCursorState = useCallback((id: string, cursorOffset: number, scrollTop: number) => {
     dispatch({ type: 'CAPTURE_EDITOR_STATE', payload: { id, cursorOffset, scrollTop } })
-  }, [])
-
-  // Spec 002, save model (data-model.md): the source view writes the raw bytes
-  // the user sees (document.content) so saving never re-adds normalization
-  // (e.g. a trailing newline) to an untouched file. The formatted view keeps
-  // the Crepe serialization path.
-  const getContentToSave = useCallback((doc: DocumentState): string => {
-    if (doc.view === 'source') return doc.content
-    return instancePool.getMarkdown(doc.id) ?? doc.content
   }, [])
 
   // The listener plugin's markdownUpdated is debounced by 200 ms, so the
@@ -133,11 +105,32 @@ export default function App() {
 
   const isDirtyLive = useCallback((doc: DocumentState): boolean => {
     if (doc.dirty) return true
+    // A source-view document's text lives in the store (each keystroke
+    // dispatches UPDATE_CONTENT synchronously), and its mounted editor
+    // serializes the stale pre-source-edit content, so the editor comparison
+    // below would be meaningless. doc.dirty is the complete signal.
+    if (doc.view === 'source') return false
     const live = getLiveContent(doc)
-    // Raw-bytes policy: normalization alone (trailing newline / EOL) is not a
-    // user edit, so a pristine document stays clean (spec 002 edge cases).
-    return live !== null && !markdownSame(live, doc.baseline)
+    if (live === null) return false
+    // Raw-bytes policy (spec 002): compare against the editor's OWN baseline —
+    // its serialization of the content it last parsed — not the raw disk
+    // bytes. Crepe normalizes markdown (autolinks, loose pipes, entities), so
+    // a pristine normalizing file must not count as having unsaved changes;
+    // only drift from that baseline means the user typed.
+    return !markdownSame(live, doc.editorBaseline)
   }, [getLiveContent])
+
+  // Spec 002, save model (data-model.md): the source view writes the raw bytes
+  // the user sees (document.content) so saving never re-adds normalization
+  // (e.g. a trailing newline) to an untouched file. A formatted document that
+  // is clean in the live-dirty sense is written from the stored raw bytes too
+  // (a no-edit open/save stays byte-identical, SC-006); only a document with
+  // real drift writes the Crepe serialization so the edits are kept.
+  const getContentToSave = useCallback((doc: DocumentState): string => {
+    if (doc.view === 'source') return doc.content
+    if (isDirtyLive(doc)) return instancePool.getMarkdown(doc.id) ?? doc.content
+    return doc.content
+  }, [isDirtyLive])
 
   const flushLiveContent = useCallback(() => {
     for (const doc of sessionRef.current.documents) {
@@ -172,8 +165,6 @@ export default function App() {
       // document evicted; the next activate remounts from the stored bytes.
       instancePool.remove(evictId)
       dispatch({ type: 'EVICT', payload: { id: evictId } })
-      // A pending round-trip notice for an evicted document is stale data.
-      normPendingRef.current.delete(evictId)
     }
   }, [getLiveContent, isDirtyLive])
 
@@ -214,8 +205,6 @@ export default function App() {
   const doClose = useCallback((id: string) => {
     dispatch({ type: 'CLOSE', payload: { id } })
     instancePool.remove(id)
-    // A pending FR-12 round-trip comparison can never arrive for a closed tab.
-    normPendingRef.current.delete(id)
   }, [])
 
   const handleCloseRequest = useCallback((id: string) => {
@@ -353,10 +342,6 @@ export default function App() {
       // blank line typed at EOF in source is not silently dropped, while a
       // pristine file that Crepe merely normalized still skips the remount.
       if (live === null || !editorMatchesContent(live, doc.content)) {
-        // Re-parsing the raw source up front is impossible (the old editor
-        // still holds the *previous* doc), so the guard runs after the fresh
-        // baseline lands; queue the expected raw text for comparison.
-        normPendingRef.current.set(id, doc.content)
         dispatch({ type: 'REFRESH_FROM_SOURCE', payload: { id, content: doc.content } })
       }
       dispatch({ type: 'SET_VIEW', payload: { id, view: 'formatted' } })
@@ -399,6 +384,41 @@ export default function App() {
       void openPathInSource(path)
     },
     [openPathInSource]
+  )
+
+  // Spec 002, US7: an explorer "Open" request is the visual counterpart of
+  // "View source". It activates an already-open tab without duplicating it;
+  // a tab stuck in source view returns to formatted editing via the same
+  // content-migration path as the source toolbar's return control. An unopened
+  // file is read into a new formatted tab.
+  const openPathInFormatted = useCallback(
+    async (path: string): Promise<void> => {
+      const existing = sessionRef.current.documents.find(
+        d => d.path === path && d.editorState !== 'evicted'
+      )
+      if (existing) {
+        dispatch({ type: 'ACTIVATE', payload: { id: existing.id } })
+        if (existing.view === 'source') {
+          handleReturnToFormatted(existing.id)
+        }
+        enforcePoolCap(existing.id)
+        return
+      }
+      const read = await window.api.readFile(path)
+      if (!read.ok) return
+      // view:'formatted' also flips a reopened evicted tab that had been in
+      // source view back to visual editing (OPEN_EXISTING applies the view).
+      dispatch({ type: 'OPEN_EXISTING', payload: { ...read.value, view: 'formatted' } })
+      enforcePoolCap(sessionRef.current.activeId)
+    },
+    [enforcePoolCap, handleReturnToFormatted]
+  )
+
+  const handleOpen = useCallback(
+    (path: string) => {
+      void openPathInFormatted(path)
+    },
+    [openPathInFormatted]
   )
 
   const handleNew = useCallback(() => {
@@ -816,6 +836,7 @@ export default function App() {
                     onDeleteRequest={handleDeleteRequest}
                     onCreateRequest={handleCreate}
                     onMove={handleTreeMove}
+                    onOpen={handleOpen}
                     onViewSource={handleViewSource}
                   />
                 </div>
@@ -831,23 +852,6 @@ export default function App() {
               onClose={handleCloseRequest}
             />
             <div className="editor-area">
-              {normNotice && normNotice.id === session.activeId && (
-                <div className="norm-notice">
-                  <span className="norm-notice-text" role="status">
-                    The visual editor normalises some markdown. Your original
-                    text is preserved in the document in case the formatting
-                    looks different.
-                  </span>
-                  <button
-                    type="button"
-                    className="norm-notice-dismiss"
-                    aria-label="Dismiss"
-                    onClick={() => setNormNotice(null)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
               {session.documents.length === 0 ? (
                 <div className="empty-state">
                   <p>Open a file or create a new document to get started.</p>

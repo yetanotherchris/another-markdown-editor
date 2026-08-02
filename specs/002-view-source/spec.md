@@ -165,11 +165,41 @@ active tab each time.
 
 ---
 
+### User Story 7 - Open a file in visual editing from the explorer (Priority: P2)
+
+A writer browsing the workspace can use a file's context menu to open (or bring
+up) its visual editing view, mirroring the View source action.
+
+**Why this priority**: Open is the visual counterpart of the explorer's View
+source action; together the two actions give every file a context-menu path to
+either editing view. It reuses the existing open behaviour, so it is cheap.
+
+**Independent Test**: With a workspace open, invoke Open from a markdown file's
+context menu and verify the file opens in an active formatted tab; for an
+already-open file the existing tab is activated and, if it was in source view,
+it returns to visual editing.
+
+**Acceptance Scenarios**:
+
+1. **Given** a markdown file is visible in the explorer and is not open, **When**
+   the user chooses Open from its context menu, **Then** the file opens in a new
+   active tab displaying formatted (visual) editing.
+2. **Given** a markdown file is already open in a formatted view, **When** the
+   user chooses Open from its explorer context menu, **Then** its existing tab
+   becomes active without creating a duplicate tab or changing its content or
+   view.
+3. **Given** a markdown file is already open in source view, **When** the user
+   chooses Open from its explorer context menu, **Then** its existing tab
+   becomes active and its view returns to formatted editing.
+
+---
+
 ### Edge Cases
 
 - A source edit contains markdown that cannot be represented as formatted content:
-  the raw text remains available in source view, the document stays unsaved, and
-  the user receives a clear in-context explanation rather than losing the edit.
+  the raw text remains available in source view and the document stays unsaved —
+  nothing is discarded. An in-context explanation of the formatting drift is
+  deferred (see the note under FR-012, Clarifications 2026-08-03).
 - The user switches tabs during a view transition: the newly selected tab remains
   usable, and returning to the transitioning tab shows one complete document view
   with its current content intact.
@@ -177,6 +207,12 @@ active tab each time.
   existing unsaved-changes confirmation behaviour applies.
 - A file opened in source view changes on disk: existing external-change handling
   applies using the document's current unsaved-changes state.
+- Open chosen for a file already open in source view with unsaved edits: the
+  tab returns to formatted editing and keeps its content, dirty state, and any
+  source edits intact (the same return path as the source toolbar's control).
+- Open chosen for a file already open in a formatted tab: the existing tab is
+  activated; no duplicate tab is created and neither the content nor the view
+  changes.
 - Empty files, files without a trailing newline, and documents up to 10,000 lines
   can be shown and edited in source view without gratuitous content changes.
 - A formatted-editor toolbar control is unavailable or disabled: its tooltip
@@ -224,8 +260,15 @@ active tab each time.
   edits; when those edits can be represented as formatted content, the formatted
   view MUST reflect them.
 - **FR-012**: If source changes cannot be displayed in formatted editing, the
-  system MUST preserve the source text, keep the document unsaved, and explain
-  the issue in context without discarding edits.
+  system MUST preserve the source text and keep the document unsaved without
+  discarding edits.
+  - **Deferred (2026-08-03)**: The "explain the issue in context" branch of the
+    original FR-012 — a quiet, dismissible notice that the visual editor
+    normalises markdown ("The visual editor normalises some markdown…") — was
+    removed because the visual editor normalises markdown as a matter of course
+    and the notice fired on almost every round trip. The preservation branch
+    above stays in force. Re-add a cue (ideally quieter, triggered only when
+    the drift is material) if writers report confusion about formatting drift.
 - **FR-013**: Existing protections for saving, closing, quitting, and external
   file changes MUST apply equally to documents edited in source view.
 - **FR-014**: Switching a document between its source and formatted views MUST NOT
@@ -250,6 +293,13 @@ active tab each time.
 - **FR-021**: When the active tab has no associated workspace file or its file is
   no longer present in the explorer, the explorer MUST clear any prior active-file
   highlight rather than display a stale selection.
+- **FR-022**: The explorer context menu for each markdown file MUST provide an
+  Open action placed directly above the View source action.
+- **FR-023**: Choosing Open for an unopened explorer file MUST open that file in
+  a new active tab in formatted (visual) view.
+- **FR-024**: Choosing Open for an explorer file that is already open MUST
+  activate its existing tab rather than create a duplicate; if that tab is in
+  source view, it MUST return to formatted editing.
 
 ### Key Entities
 
@@ -285,6 +335,13 @@ active tab each time.
 - **SC-008**: In 100% of automated tab-switching tests involving workspace files,
   the explorer highlights the file represented by the active tab; it clears the
   highlight for a tab without an associated workspace file.
+- **SC-009**: In 100% of automated explorer tests, choosing Open for an already
+  open file activates its existing tab without increasing the number of open
+  tabs, and returns a source-view tab to formatted editing.
+- **SC-010**: In 100% of automated tests, a pristine (never-edited) document whose
+  editor serialisation merely normalises the raw markdown is not treated as
+  having unsaved changes: no dirty marker, no close/quit prompt, and an
+  open-and-save cycle leaves the file byte-identical.
 
 ## Assumptions
 
@@ -316,10 +373,11 @@ active tab each time.
   normalized serialization. Crepe always appends a single trailing newline
   (verified empirically in this phase), so its first emission must not rewrite a
   pristine file, give a file without a trailing newline a gratuitous newline, or
-  mark it dirty. The store never adopts an editor emission as content/baseline
-  (the `CAPTURE_BASELINE` reducer action is a no-op); only the renderer compares
-  raw-vs-editor text with trailing-newline/EOL tolerance (`markdownSame`) to
-  decide dirtiness. Source-view saves write the stored raw content verbatim.
+  mark it dirty. The store never adopts an editor emission as content/baseline;
+  the `CAPTURE_BASELINE` action stores the editor serialization in the separate
+  `editorBaseline` field (see Clarifications 2026-08-03) so the live-dirty check
+  can tell normalization from a real edit. Source-view saves write the stored
+  raw content verbatim.
 
 ## Clarifications
 
@@ -342,3 +400,31 @@ active tab each time.
   no-remount (no-op) decision uses `editorMatchesContent` — only the editor's
   single appended trailing newline counts as unchanged. An extra blank line
   typed at end-of-file in source view therefore survives the return.
+- **2026-08-03 — Explorer "Open" action**. The file context menu gains an Open
+  action directly above View source (FR-022). It is the visual counterpart of
+  View source: it opens an unopened file in a new active formatted tab
+  (FR-023), activates an already-open file's existing tab without creating a
+  duplicate, and returns a tab showing source view to formatted editing via the
+  same content-migration path as the source toolbar's return control (FR-024).
+  Confirmed: activating an already-open formatted tab is desired, not a literal
+  no-op. Added as a late addition to this spec.
+- **2026-08-03 — FR-12 banner removed**. The in-context "The visual editor
+  normalises…" notice was removed because the visual editor normalises markdown
+  as a matter of course and the notice fired on almost every round trip. FR-012
+  retains its preservation branch (raw source is kept, the document stays
+  unsaved, nothing is discarded); the *explain in context* branch is deferred —
+  see the note under FR-012 — and is to be re-added (ideally quieter, triggered
+  only when the drift is material) if writers report confusion about formatting
+  drift.
+- **2026-08-03 — Pristine normalising files are not "unsaved changes"**. The
+  live-dirty guard (`isDirtyLive`) and the save-payload path now compare against
+  the editor's own serialization of the content it last parsed
+  (`DocumentState.editorBaseline`, captured by `CAPTURE_BASELINE` on mount and
+  by `SAVE_SUCCESS`/`RELOAD`/`REFRESH_FROM_SOURCE`), never against the raw disk
+  bytes. A never-edited document whose editor merely normalises the markdown
+  (autolinks, loose pipes, entities) is therefore clean: no dirty marker, no
+  close/quit prompt, and a no-edit open-and-save cycle writes the stored raw
+  bytes back byte-identically (SC-010). Only drift from the editor baseline —
+  an actual keystroke — counts as unsaved. Source-view documents short-circuit
+  to `dirty` because their store content is always current and the mounted
+  editor serializes stale pre-source-edit text.

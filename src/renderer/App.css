@@ -375,36 +375,3 @@ html, body, #root {
   color: #999;
   font-size: 14px;
 }
-
-/* FR-12: quiet, dismissible note shown when the visual editor normalises raw
-   markdown that was edited in source view. Informational only; the raw text
-   stays in the document and in the source view (never destructive). */
-.norm-notice {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  /* Above the Crepe top bar (z-index: 10) but below the source overlay (20). */
-  z-index: 12;
-  max-width: 70%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: #fff8e1;
-  border: 1px solid #e6cf8a;
-  border-radius: 6px;
-  color: #6d5a12;
-  font-size: 13px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.norm-notice-dismiss {
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: inherit;
-  font-size: 13px;
-  line-height: 1;
-  padding: 2px;
-}

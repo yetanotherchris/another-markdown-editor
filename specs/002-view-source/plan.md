@@ -88,9 +88,27 @@ removes the item (or the whole list when it is the only child); everything else
 falls through (R-Task, FR-017/018).
 
 **Source-return round-trip guard (FR-12)** — returns to the visual editor only
-from a *changed* source compare for the normalization check; when the parsed
-output differs from the typed text a quiet, dismissible in-context banner is
-shown; raw text is always preserved in `content` and in the textarea.
+from a *changed* source compare for the normalization check; the raw text is
+always preserved in `content` and in the textarea. **Deferred 2026-08-03**: the
+quiet in-context banner ("visual editor normalises…") was removed because the
+visual editor normalises markdown as a matter of course; see the note under
+FR-012 in spec.md. The preservation behaviour is unchanged.
+
+**Explorer "Open" action (US7, late addition 2026-08-03)** — the file context
+menu's Open item is the visual counterpart of View source: an unopened file is
+read into a new formatted tab; an already-open file's tab is activated without a
+duplicate; a tab showing source view returns to formatted via the same
+`handleReturnToFormatted` path the source toolbar uses.
+
+**Live-dirty check uses the editor baseline (SC-010, late addition
+2026-08-03)** — `DocumentState.editorBaseline` stores the editor's serialization
+of the content it last parsed (captured by `CAPTURE_BASELINE` on mount and by
+`SAVE_SUCCESS`/`RELOAD`/`REFRESH_FROM_SOURCE`). `isDirtyLive` and
+`getContentToSave` compare against it rather than the raw disk bytes, so a
+pristine normalising file (autolink, loose pipes, entities) is never treated as
+having unsaved changes and a no-edit open/save stays byte-identical. Source-view
+documents short-circuit to `dirty` because their store content is always current
+and the mounted editor serializes stale pre-source-edit text.
 
 ## Project Structure
 
@@ -112,23 +130,24 @@ specs/002-view-source/
 
 ```text
 src/renderer/
-├── state/documents.ts           # + `view` field, SET_VIEW, OPEN_EXISTING-in-source, REFRESH_FROM_SOURCE
+├── state/documents.ts           # + `view` field, SET_VIEW, OPEN_EXISTING-in-source, REFRESH_FROM_SOURCE, editorBaseline
 ├── editor/
 │   ├── CrepeHost.tsx            # + featureConfigs top-bar buildTopBar, toolbar-label pass, task-backspace keydown
 │   ├── EditorPanel.tsx          # choose + blend formatted/source layers per document
 │   ├── SourceView.tsx           # NEW: textarea + compact toolbar + return button
 │   ├── toolbarLabels.ts         # NEW: ordered label map for top-bar controls
 │   └── taskBackspace.ts         # NEW: pure `planTaskBackspace` helper + prosemirror wiring
-├── explorer/Tree.tsx           # + onViewSource when the node is a file; optional apiRef
-├── App.tsx                     # view switch handlers, explorer-active selector, tab-highlight
+├── explorer/Tree.tsx           # + onViewSource/onOpen when the node is a file; optional apiRef
+├── App.tsx                     # view switch handlers, explorer-active selector, tab-highlight, live-dirty baseline check
 └── App.css                     # slide-in animation, source toolbar/panel, reduced-motion
 
 tests/
 ├── renderer/
-│   ├── documents.test.ts       # extended: view field / actions
+│   ├── documents.test.ts       # extended: view field / actions / editorBaseline
 │   └── taskBackspace.test.ts    # NEW: pure backspace decision fn
 └── e2e/
-    └── source.spec.ts            # NEW: Playwright coverage of all six stories + edges
+    ├── launch.ts                 # NEW: shared headless Electron launch args (AME_E2E_HEADED opt-out)
+    └── source.spec.ts            # NEW: coverage of all six stories + US7 + SC-010 + edges
 ```
 
 **Structure decision**: the feature lives inside `src/renderer` only; the
@@ -148,7 +167,8 @@ added files mirror the existing editor and explorer folders, keeping the
 ## Deferred / later features
 
 - Packaging, GFM source, find/replace and syntax highlighting
-- Stricter "unparseable" detection beyond the round-trip banner
+- Re-adding a quieter FR-12 "formatting drift" cue (the original in-context
+  banner was removed 2026-08-03; see the deferred note under FR-012 in spec.md)
 - Toolbars beyond the single return button (spec assumptions)
 
 ## Complexity tracking
@@ -157,3 +177,4 @@ added files mirror the existing editor and explorer folders, keeping the
 |-----------|------------|-------------------------------------|
 | A second DOM editor (a textarea) plus keeping the Crepe editor mounted underneath during source view | Crepe can't change content without a remount (R1 of 001), the WYSIWYG must keep undo/scroll across a no-edit return, and source needs plain text | Remounting WYSIWYG on every switch (drops undo/scroll on a no-edit round trip); a second Crepe instance for source (reparse-only, no raw-edit surface) |
 | Comparing exact `getMarkdown()` vs `document.content` to decide the remount | keeps Principle IV: a no-edit round trip is a pure visibility swap | Remounting always (FR-11 core) is wasteful; never remounting cannot reflect source edits (FR-11 core) |
+| A second stored serialization reference (`editorBaseline`) alongside the raw-bytes `content`/`baseline` | the live-dirty guard must distinguish "Crepe normalized a pristine file" (clean) from "the user typed" (dirty), which raw-bytes comparison cannot (late addition 2026-08-03, SC-010) | Comparing live text against the raw `baseline` (flags every normalising file as unsaved); adopting the editor serialization as `content` (breaks the raw-bytes policy and byte-identical saves) |

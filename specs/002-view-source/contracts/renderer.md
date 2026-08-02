@@ -24,16 +24,19 @@ involved.
 
 ```text
 state/Document.view                 : 'formatted' | 'source'
-documentsReducer actions            : SET_VIEW | OPEN_EXISTING (with .view) | REFRESH_FROM_SOURCE
+state/Document.editorBaseline      : string (editor serialization reference for the live-dirty check; see data-model.md)
+documentsReducer actions            : SET_VIEW | OPEN_EXISTING (with .view) | REFRESH_FROM_SOURCE | CAPTURE_BASELINE (stores editorBaseline)
 EditorPanel                          : renders formatted layer + (when view==='source') SourceView overlay
 SourceView                           : props { value, onChange, onReturnToFormatted, labelled by FR-08 }
 CrepeHost extra props               : onRequestViewSource (wired via top-bar buildTopBar)
-Tree extra prop                     : onViewSource(node: TreeNode)  // file nodes only
+Tree extra props                    : onOpen(node) | onViewSource(node)  // file nodes only
 App glue:
   showSource(tab)                   : flushLiveContent, SET_VIEW source
-  returnToFormatted(tab)            : conditional REFRESH_FROM_SOURCE, SET_VIEW formatted, optional FR-12 banner
-  openInSource(path)               : readFile + OPEN_EXISTING{view:'source'} (+ enforcePoolCap)
-  activeTabExplorerHighlight()     : openParents + scroll + SELECT / SELECT null
+  returnToFormatted(tab)            : conditional REFRESH_FROM_SOURCE, SET_VIEW formatted
+  openInSource(path)                : readFile + OPEN_EXISTING{view:'source'} (+ enforcePoolCap)
+  openInFormatted(path)             : ACTIVATE existing (source→formatted via returnToFormatted) or readFile + OPEN_EXISTING{view:'formatted'}
+  activeTabExplorerHighlight()      : openParents + scroll + SELECT / SELECT null
+  isDirtyLive(doc)                 : dirty || (formatted && live ≠ editorBaseline); source docs = dirty
 toolbarLabels util                : ordered map of control → {title, ariaLabel}
 taskBackspace util               : planTaskBackspace(EditorState) → boolean (handled) / void
 ```
@@ -44,8 +47,11 @@ taskBackspace util               : planTaskBackspace(EditorState) → boolean (h
   'source'` but there is no Crepe instance (cross-window the instance was
   evicted), `getMarkdown` returns null → treat as "different" → remount, which
   recreates the editor; the text is never lost.
-- FR-12 banners are quiet, dismissible, never destructive; source is always
-  retained in `content` and in the textarea while in source view.
+- FR-12's preservation branch: source text is always retained in `content` and
+  in the textarea while in source view. The "explain in context" banner is
+  removed (deferred 2026-08-03 — see the note under FR-012 in spec.md).
+- A pristine normalising file is clean for the close/quit guards and a no-edit
+  open/save writes the raw stored bytes (SC-010, `editorBaseline` reference).
 
 ## Tests that must exist
 

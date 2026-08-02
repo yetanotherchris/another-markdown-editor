@@ -119,7 +119,8 @@ describe('documents reducer', () => {
 
       // Crepe's baseline emission (e.g. its normalized serialization with a
       // trailing newline) must not rewrite the raw content or clear the dirty
-      // flag (raw-bytes policy, spec 002).
+      // flag (raw-bytes policy, spec 002). It is stored in the separate
+      // editorBaseline field used by the live-dirty check.
       const s3 = documentsReducer(s2, {
         type: 'CAPTURE_BASELINE',
         payload: { id: docId, baseline: 'original\n' }
@@ -127,6 +128,7 @@ describe('documents reducer', () => {
       expect(s3.documents[0].content).toBe('modified')
       expect(s3.documents[0].baseline).toBe('original')
       expect(s3.documents[0].dirty).toBe(true)
+      expect(s3.documents[0].editorBaseline).toBe('original\n')
     })
   })
 

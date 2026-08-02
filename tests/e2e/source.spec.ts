@@ -2,6 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { electronLaunchArgs } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -18,7 +19,7 @@ test.beforeAll(async () => {
 
 test.beforeEach(async () => {
   app = await electron.launch({
-    args: ['out/main/index.js']
+    args: electronLaunchArgs
   })
   window = await app.firstWindow()
   await window.waitForLoadState('domcontentloaded')
@@ -227,33 +228,62 @@ test('US5: Backspace removes an empty task item', async () => {
   await expect(window.locator('.list-item .label-wrapper')).toHaveCount(0)
 })
 
-// ---------- FR-12 banner ----------
+// ---------- FR-12: normalization is preserved, not announced ----------
 
-test('FR-12: a construct Crepe normalises raises the round-trip notice', async () => {
+test('FR-12: a construct Crepe normalises is preserved verbatim through a round trip', async () => {
   await openFolder()
   await openFile('alpha.md')
   await getViewSourceButton().click()
   // An https autolink round-trips as a bracketed link in Crepe's
   // serialization, so the fresh editor's baseline differs from the raw text
-  // the user typed — exactly the FR-12 "cannot be represented verbatim" case.
+  // the user typed — the FR-12 "cannot be represented verbatim" case.
   const raw = '# Alpha\n\nhttp://example.com/path'
   await window.getByTestId('source-textarea').fill(raw)
   await window.getByRole('button', { name: /Back to visual editing/ }).click()
   await expect(window.getByTestId('source-view')).toHaveCount(0)
-
-  // The quiet in-context banner is what FR-12 promises.
-  await expect(window.locator('.norm-notice')).toBeVisible()
-  await expect(window.locator('.norm-notice')).toContainText(/normalises|preserved/i)
-
-  // Dismiss works and clears the note.
-  await window.getByRole('button', { name: 'Dismiss' }).click()
-  await expect(window.locator('.norm-notice')).toHaveCount(0)
 
   // The raw text survived into the document and saves verbatim.
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
   await window.getByRole('button', { name: 'Save' }).click()
   const disk = fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')
   expect(disk).toContain('http://example.com/path')
+})
+
+test('a no-edit view-source round trip does not mark a normalising file as changed', async () => {
+  fs.writeFileSync(path.join(testFolder, 'link.md'), '# Alpha\n\nhttp://example.com/path')
+  await openFolder()
+  await openFile('link.md')
+  await expect(window.locator('.document-title')).not.toContainText('\u2022')
+
+  // View source and back without editing.
+  await getViewSourceButton().click()
+  await expect(window.getByTestId('source-textarea')).toBeVisible()
+  await window.getByRole('button', { name: /Back to visual editing/ }).click()
+  await expect(window.getByTestId('source-view')).toHaveCount(0)
+
+  // No dirty dot, and closing the tab does NOT prompt for unsaved changes.
+  await expect(window.locator('.document-title')).not.toContainText('\u2022')
+  await window.getByRole('button', { name: 'Close link.md' }).click()
+  const promptVisible = await window.getByRole('button', { name: 'Save' })
+    .isVisible({ timeout: 4000 }).catch(() => false)
+  expect(promptVisible).toBe(false)
+  await expect(window.getByRole('button', { name: 'Open Folder' })).toBeVisible()
+})
+
+test('saving a pristine normalising file from the formatted view keeps its bytes', async () => {
+  fs.writeFileSync(path.join(testFolder, 'link.md'), '# Alpha\n\nhttp://example.com/path')
+  await openFolder()
+  await openFile('link.md')
+  await expect(window.locator('.document-title')).not.toContainText('\u2022')
+
+  // A pristine normalising file is not treated as having unsaved changes: no
+  // save prompt on close, and the bytes on disk stay identical.
+  await window.getByRole('button', { name: 'Close link.md' }).click()
+  const promptVisible = await window.getByRole('button', { name: 'Save' })
+    .isVisible({ timeout: 4000 }).catch(() => false)
+  expect(promptVisible).toBe(false)
+  const disk = fs.readFileSync(path.join(testFolder, 'link.md'), 'utf-8')
+  expect(disk).toBe('# Alpha\n\nhttp://example.com/path')
 })
 
 test('source-view save writes the exact raw bytes, never adding a trailing newline', async () => {
@@ -271,6 +301,53 @@ test('source-view save writes the exact raw bytes, never adding a trailing newli
 
   const disk = fs.readFileSync(path.join(testFolder, 'no-newline.md'), 'utf-8')
   expect(disk).toBe('Edited raw source, no newline')
+})
+
+// ---------- US7: explorer context-menu Open ----------
+
+test('US7 Open opens an unopened file in a formatted tab', async () => {
+  await openFolder()
+
+  const row = window.getByRole('treeitem').getByText('beta.md')
+  await row.click({ button: 'right' })
+  await window.getByRole('menuitem', { name: 'Open' }).click()
+
+  await expect(window.getByRole('tab', { name: /beta\.md/ })).toBeVisible()
+  // Formatted view, not source.
+  await expect(window.getByTestId('source-view')).toHaveCount(0)
+  await expect(window.locator('.document-title')).toContainText('beta.md')
+  await expect(window.locator('[contenteditable="true"]:visible').first()).toBeVisible()
+})
+
+test('US7 Open activates the existing tab of an already-open formatted file', async () => {
+  await openFolder()
+  await openFile('alpha.md')
+  await openFile('beta.md')
+  await expect(window.locator('.document-title')).toContainText('beta.md')
+
+  const alphaRow = window.getByRole('treeitem').getByText('alpha.md')
+  await alphaRow.click({ button: 'right' })
+  await window.getByRole('menuitem', { name: 'Open' }).click()
+
+  // No duplicate tab; the existing alpha tab becomes active in formatted view.
+  await expect(window.getByRole('tab', { name: /alpha\.md/ })).toHaveCount(1)
+  await expect(window.locator('.document-title')).toContainText('alpha.md')
+  await expect(window.getByTestId('source-view')).toHaveCount(0)
+})
+
+test('US7 Open returns a source-view tab to visual editing', async () => {
+  await openFolder()
+  await openFile('alpha.md')
+  await getViewSourceButton().click()
+  await expect(window.getByTestId('source-view')).toBeVisible()
+
+  const alphaRow = window.getByRole('treeitem').getByText('alpha.md')
+  await alphaRow.click({ button: 'right' })
+  await window.getByRole('menuitem', { name: 'Open' }).click()
+
+  await expect(window.getByTestId('source-view')).toHaveCount(0)
+  await expect(window.getByRole('tab', { name: /alpha\.md/ })).toHaveCount(1)
+  await expect(window.locator('[contenteditable="true"]:visible').first()).toBeVisible()
 })
 
 // ---------- Edges ----------

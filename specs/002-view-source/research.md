@@ -80,17 +80,19 @@ correct in both views (FR-013).
 ## FR2 note — how "cannot be represented" is handled securely
 
 **Decision**: The raw source is never discarded — it is retained in
-`document.content` and remains the save payload in source mode. When
-`returning to formatted` the normalized editor round trip triggers a
-roundtrip check: if `crepe.getMarkdown()` re-parses strictly equal to the raw
-source (FR scenarios 3 and 4), no note is shown; when they differ (Crepe
-normalizes a construct the editor can't keep byte-for-byte — e.g. loose
-pipes HTML/entities/https constructs), a quiet in-context banner is shown in
-the formatted view: *"The visual editor normalises some of this document's
-markdown. Switch back to source view to edit it as text."* The banner is
-dismissible, never modal, contains no destructive action and never changes
-content. This implements FR-12's "explain in context" branch without trying to
-detect "unparseable markdown" (which does not occur for plain `.md` text).
+`document.content` and remains the save payload in source mode. When returning
+to formatted, `REFRESH_FROM_SOURCE` bumps `contentVersion` so the editor
+remounts with the source bytes; a round-trip check (`editorMatchesContent`)
+decides whether a remount is needed at all.
+
+**Deferred (2026-08-03)**: the quiet in-context banner (*"The visual editor
+normalises some of this document's markdown…"*) that previously implemented
+FR-12's "explain in context" branch was removed because the visual editor
+normalises markdown as a matter of course and the notice fired on almost every
+round trip. The preservation branch (raw text kept in `content` and in the
+source view, never destructive) is unchanged. Re-add a quieter, material-drift-
+only cue if writers report confusion (see the deferred note under FR-012 in
+spec.md).
 
 ## R4 — the entrance animation: pure CSS, reduced-motion aware
 
@@ -247,6 +249,54 @@ explorer's View source action uses the existing `file:read` +
 `OPEN_EXISTING` path; `getLiveContent`/`getContentToSave` branching happens
 inside the renderer). This keeps security review surface minimal for the
 feature.
+
+## R-Live — the editor baseline separates normalization from real edits (2026-08-03)
+
+**Observation**: `isDirtyLive` compared the live editor serialization against
+the raw disk `baseline` with only trailing-newline/EOL tolerance. Crepe
+normalizes markdown (autolinks, loose pipes, entities), so a *pristine*
+normalising file appeared to have unsaved changes: closing or quitting prompted
+"save?", and saving from the formatted view rewrote the file with the
+normalized bytes — violating SC-006's byte-identical open/save guarantee. The
+same false signal surfaced when switching to view source and back.
+
+**Decision**: compare against the editor's OWN baseline instead. New
+`DocumentState.editorBaseline` stores the editor serialization captured right
+after it parses the current content (`CAPTURE_BASELINE` fires on every
+CrepeHost mount) and is refreshed by `SAVE_SUCCESS`/`RELOAD`/
+`REFRESH_FROM_SOURCE`. Then:
+
+- `isDirtyLive(doc) = doc.dirty || (view==='formatted' && live ≠ editorBaseline)`.
+  A pristine normalising file is clean (live === editorBaseline); a real
+  keystroke drifts live from the baseline and is caught even inside the 200 ms
+  debounce window. Source-view documents short-circuit to `doc.dirty` because
+  their store content is always current and the mounted editor serializes stale
+  pre-source-edit text.
+- `getContentToSave(doc)` writes `document.content` (raw bytes) for a clean
+  document, and the editor serialization only when `isDirtyLive` — so a no-edit
+  open/save is byte-identical and the 200 ms window never drops a keystroke.
+
+**Alternatives rejected**: comparing against the raw `baseline` (false dirty for
+every normalising file — the observed bug); adopting the editor serialization
+into `content`/`baseline` (destroys the raw-bytes policy and byte-identical
+saves); a live-dirty flag derived in the pool (loses reducer purity and test
+coverage — the store field is unit-tested).
+
+## R-Open — the explorer "Open" action (US7, 2026-08-03)
+
+**Decision**: the file context menu gains an Open item directly above View
+source. App handling mirrors `openPathInSource` in reverse:
+
+1. Already open (live): `ACTIVATE` the existing tab; if it shows source view,
+   run the same `handleReturnToFormatted` path the source toolbar uses (so
+   unsaved source edits migrate via `REFRESH_FROM_SOURCE` and nothing is
+   discarded).
+2. Not open (or evicted): `readFile` → `OPEN_EXISTING {view:'formatted'}`
+   (the explicit view flips a reopened evicted tab that had been in source view
+   back to visual editing).
+
+Confirmed 2026-08-03: activating an already-open formatted tab is desired, not a
+literal no-op. No IPC or main-process change.
 
 ## R-Context for performance note
 

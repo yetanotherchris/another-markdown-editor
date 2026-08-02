@@ -23,14 +23,16 @@ containing `# Hello\n\nSome *bold* text.`, `b.md`; plus a subfolder
 3. Press **Back to visual editing**.
 4. Expected: the WYSIWYG now shows the edited content; the dirty marker stays.
 
-## 3 — US2: open an unopened file straight into source
+## 3 — US2/US7: open a file straight into source, or via Open
 
 1. Right-click `b.md` in the explorer → **View source**.
 2. Expected: `b.md` opens in a new active tab in source view (no formatted
    flash). Reopening the same file from the tree's *view source* activates the
    existing tab (no duplicate tab).
-3. Right-click `b.md` → **Open** (normal) → the WYSIWYG shows; right-click →
-   **View source** → existing tab slides to source.
+3. Right-click `b.md` → **Open** → the WYSIWYG shows in a new/active tab;
+   right-click → **View source** → existing tab slides to source.
+4. Put `b.md` in source view, then right-click `b.md` → **Open** → the tab
+   returns to visual editing (no duplicate tab).
 
 ## 4 — US3: return with and without edits
 
@@ -60,13 +62,19 @@ containing `# Hello\n\nSome *bold* text.`, `b.md`; plus a subfolder
    `notes/`.
 3. Create/activate an Untitled tab → the highlight clears.
 
-## 8 — edge: representable round trip + FR-12 banner
+## 8 — edge: representable round trip stays clean
 
-Open a doc whose raw markdown Crepe normalises (e.g. an inline-HTML or
-loose-lists fixture), Make an edit in source, return; if the round trip
-differs, a quiet banner appears in the formatted view ("The visual editor
-normalises some of this document's markdown…"). The source text is still
-available when switching back and the document stays unsaved.
+Open a doc whose raw markdown Crepe normalises (e.g. an https autolink), switch
+to source and back WITHOUT editing. Expected: no dirty dot, no close/quit
+"unsaved changes" prompt, and the source text stays raw. Save without editing
+and the file on disk is byte-identical. (A visual-editor-normalises banner no
+longer appears — see the deferred note under FR-012 in spec.md.)
+
+## 9 — e2e does not steal focus
+
+`npm run test:e2e` launches Electron with Chromium's `--headless` switch, so no
+window appears on screen. Set `AME_E2E_HEADED=1` to run with a visible window
+when debugging.
 
 ## Automate
 

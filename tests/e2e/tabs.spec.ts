@@ -2,6 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { electronLaunchArgs } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -19,7 +20,7 @@ test.beforeAll(async () => {
 
 test.beforeEach(async () => {
   app = await electron.launch({
-    args: ['out/main/index.js']
+    args: electronLaunchArgs
   })
   window = await app.firstWindow()
   await window.waitForLoadState('domcontentloaded')
