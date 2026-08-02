@@ -188,6 +188,12 @@ post-write `mtimeMs` and size against what the application just wrote; a match
 means the event is ours and is dropped. Belt and braces, because a purely
 time-based suppression window is racy on slow disks.
 
+*Implementation status (2026-08-02, PR #9 review)*: the mtime/size comparison
+and clear-on-event were never implemented; only the suppression set + fixed 2 s
+window shipped. The window is now **sliding** (each suppressed event refreshes
+its timestamp — R21), which closes the slow-disk leak; the mtime comparison
+remains unimplemented and is not currently needed.
+
 **Debounce**: 100 ms per path, since editors and sync tools commonly produce
 several events per logical change.
 
@@ -322,6 +328,96 @@ imported from `@milkdown/kit/core` (re-export of `@milkdown/core`, same version
 as `@milkdown/crepe`). Cursor is `view.state.selection.anchor`; restore clamps
 to `doc.content.size` and uses `TextSelection` from `@milkdown/kit/prose/state`.
 `@milkdown/kit` was added as a direct dependency in Phase 5 for these imports.
+
+## R18. react-arborist row identity and editing API (Phase 6, PR #9 review)
+
+**Question**: Why did inline-rename rows remount (resetting the caret), and
+what does the lazy-load path depend on?
+
+**Evidence (verified against installed sources, react-arborist 3.16.0,
+react-window 1.8.11)**:
+
+- Rows are keyed **stably by node id**: `default-container.tsx` uses
+  `itemKey: (index) => visibleNodes[index]?.id || index`, and react-window
+  passes an *index number* (only `Grid` uses the object form; arborist never
+  uses Grid). The earlier "per-render object key" theory recorded in tasks.md
+  was **wrong** and is corrected there.
+- Rows remount when the **component type or render-callable identity**
+  changes: `provider.tsx` calls `api.update(treeProps)` on every Tree render
+  with fresh `renderRow`/`children` function identities, and a new component
+  type per render forces React to unmount/remount every visible row. Fix:
+  module-scope `Row` + `useCallback` for the children renderer and
+  `disableDrop` (T079).
+- The caret regression's actual mechanisms were interaction-based (mousedown
+  bubbling to `node.handleClick`, dragstart hijack, focus reclamation); the
+  input's stopPropagation + `draggable={false}` handles those, and the caret
+  e2e test pins the behaviour.
+- Editing API: `node.edit()` returns `{ cancelled }`; `node.submit(name)`
+  awaits `onRename` before ending the edit (`tree-api.ts:328-334`), so the
+  async IPC rename is safe and a failed rename re-renders the old name.
+  `node.reset()` ends the edit without a commit. One edit at a time: a second
+  `edit()` while one is pending resolves the first as cancelled (the create
+  flow's deferred timer racing a context-menu Rename trashed placeholders
+  mid-edit — guarded in `startEditing`, T079).
+- **Version coupling**: with the `COLLAPSE` action gone, lazy-loading depends
+  on `onToggle` firing for *internal* opens (`scrollTo`/`openParents`). A
+  future arborist release firing `onToggle` only for user toggles would render
+  keyboard-opened folders empty. Pin `react-arborist@3.16.0` exactly (T086)
+  and treat organize.spec.ts as the upgrade regression net.
+
+## R19. Windows junctions and path containment (Phase 6, PR #9 review)
+
+**Question**: Are the containment and no-follow guarantees actually enforced
+on the platform the app runs on?
+
+**Evidence (empirical, win32)**:
+
+- `fs.symlinkSync(target, link, 'junction')` works without developer mode or
+  admin (file symlinks require them and throw `EPERM`). readdir `Dirent`s for
+  junctions report `isSymbolicLink() === true`, `isDirectory() === false` —
+  so `readDir` hides them and `describeEntry` never recurses into them; the
+  no-follow property holds structurally on Windows too. The old tests
+  "skipped" on win32 with a comment that claimed otherwise — corrected to
+  junction-based tests (T080).
+- **Containment hole found by the new tests**: `resolveWithinRoot`'s ancestor
+  walk re-joined `path.relative(ancestor, resolved)` onto the ancestor's real
+  path; for a target under a junction, `..` folded back into a *lexical* path
+  that passed containment while the OS write resolved **through** the junction
+  to the outside target. A nonexistent-file path through a junction
+  (`escape/new.md`) was therefore writable outside the workspace. Fixed by
+  rejecting the first existing ancestor whose real path leaves the workspace
+  (T079). Existing-file paths were already caught (realpath resolves the
+  junction, `..` survives).
+
+## R20. Editor chrome: TopBar (Phase 6)
+
+**Decision**: Crepe's `[CrepeFeature.TopBar]: true` with
+`[CrepeFeature.Toolbar]: false` and `[CrepeFeature.BlockEdit]: false`; the
+default stylesheet (`@milkdown/crepe/theme/classic.css` + `common/style.css`)
+is imported for it (main.tsx).
+
+**Rationale**: FR-011/FR-012 need persistent access to headings and formatting
+commands; the floating selection toolbar and per-line "+" handle are
+transient, mouse-oriented, and visually noisy. TopBar keeps one
+semantics-bearing element in the editor chrome. Recorded in spec.md
+Clarifications 2026-08-02 (was previously only in tasks.md).
+
+## R21. Watch suppression and `describeEntry` performance (Phase 6, PR #9 review)
+
+**Status**: R8's "belt and braces" mtime/size comparison was never
+implemented; only the suppression set + 2 s timeout shipped. The PR #9 review
+(perf M2) noted the fixed window leaks self-mutations as external changes on
+slow disks and floods the renderer after large moves. **Fix**: the window is
+now sliding — each suppressed event refreshes its timestamp (T079) — so the
+correctness gap is closed without the mtime comparison. A per-parent-dir
+coalescing pass in main is deferred (T081).
+
+**`describeEntry`** originally performed a synchronous, unbounded, recursive
+`readdirSync` on the main thread (plan.md measured ~8 s for a 7,000-file
+folder), re-run on every delete attempt. The confirmation needs only
+`isEmpty` and `hasHiddenFiles`: the scan now early-exits at the first
+non-markdown file, and an unreadable subfolder is reported as non-empty
+(conservative warning) instead of silently understating the delete (T079).
 
 ## Version matrix
 

@@ -57,13 +57,20 @@ export function resolveWithinRoot(root: string, candidate: string): ResolveResul
     }
   }
 
+  const rootReal = fs.realpathSync(root)
   const resolved = path.resolve(root, candidate)
 
   let realTarget: string
   try {
     realTarget = fs.realpathSync(resolved)
   } catch {
-    const ancestor = findExistingAncestor(resolved)
+    // The target does not exist yet (create/rename flows). Resolve the
+    // nearest existing ancestor and re-attach the remainder — but only when
+    // that ancestor's real path is still inside the workspace: a directory
+    // junction/symlink planted inside the workspace points outside, and
+    // re-joining through it would fold the `..` back into a lexical path that
+    // passes the containment check while the actual write escapes.
+    const ancestor = findExistingAncestor(resolved, rootReal)
     if (!ancestor) {
       realTarget = resolved
     } else {
@@ -71,7 +78,7 @@ export function resolveWithinRoot(root: string, candidate: string): ResolveResul
     }
   }
 
-  const relative = path.relative(root, realTarget)
+  const relative = path.relative(rootReal, realTarget)
 
   const segments = relative.split(path.sep)
   if (!relative && candidate !== '.' && candidate !== './') {
@@ -86,15 +93,29 @@ export function resolveWithinRoot(root: string, candidate: string): ResolveResul
   return { resolved: realTarget, relative: normalized }
 }
 
-function findExistingAncestor(p: string): string | null {
+/**
+ * Nearest existing ancestor of `p` (which itself does not exist yet). Its
+ * real path must stay inside the workspace: a directory junction/symlink
+ * planted in the path resolves elsewhere, and the OS will write through it,
+ * so the path escapes even though its lexical form looks contained.
+ */
+function findExistingAncestor(p: string, rootReal: string): string | null {
   let current = p
   while (current !== path.dirname(current)) {
     current = path.dirname(current)
+    let real: string
     try {
-      return fs.realpathSync(current)
+      real = fs.realpathSync(current)
     } catch {
       continue
     }
+    const rel = path.relative(rootReal, real)
+    if (!rel || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel))) {
+      return real
+    }
+    // The nearest existing ancestor resolves outside the workspace — a
+    // junction — so every path below it escapes at the OS level.
+    throw Object.assign(new Error('Path escapes workspace'), { code: 'OUTSIDE_WORKSPACE' })
   }
   return null
 }

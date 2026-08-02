@@ -75,6 +75,12 @@
   color: #222;
 }
 
+/* Keyboard focus on the rename field must stay visible (WCAG 2.4.7). */
+.tree-node-input:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 1px;
+}
+
 .context-menu {
   position: fixed;
   z-index: 1000;
@@ -89,7 +95,8 @@
 
 .context-menu-title {
   padding: 4px 10px;
-  color: #888;
+  /* #767676 ≈ 4.6:1 on white at 12px — meets WCAG 1.4.3 AA. */
+  color: #767676;
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;

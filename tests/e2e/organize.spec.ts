@@ -31,8 +31,10 @@ async function resetFixture(): Promise<void> {
       fs.writeFileSync(p, f.startsWith('alpha') ? '# Alpha\n\nHello world.' : '# Beta')
     }
   }
-  // Remove anything the previous test created.
-  for (const name of ['new-file-1.md', 'new-folder-1', 'renamed.md', 'moved.md', 'fresh.md']) {
+  // Remove anything a previous test created: placeholders, renames, the
+  // create test's sub/fresh.md, the moved folder (notes/sub from the
+  // folder-move test) and sub/alpha.md from the DnD tests.
+  for (const name of ['new-file-1.md', 'new-folder-1', 'renamed.md', 'sub/fresh.md', 'notes/sub']) {
     const p = path.join(testFolder, name)
     if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true })
   }
@@ -43,7 +45,7 @@ async function resetFixture(): Promise<void> {
 }
 
 test.beforeEach(async () => {
-  resetFixture()
+  await resetFixture()
   app = await electron.launch({
     args: ['out/main/index.js']
   })
@@ -140,22 +142,25 @@ async function dragTreeRow(sourceName: string, targetName: string): Promise<void
         }))
       }
       const rows = Array.from(document.querySelectorAll('[role="treeitem"]'))
+      // The role lives on the row wrapper; react-dnd's drag source is the
+      // inner .tree-node div, so fire from there (or the row itself).
       const source = rows.find(r => r.textContent?.includes(sourceName))
       const target = rows.find(r => r.textContent?.includes(targetName))
       if (!source || !target) throw new Error(`tree rows not found (${sourceName} -> ${targetName})`)
+      const fireFrom = (el: Element) => el.querySelector('.tree-node') ?? el
 
       const dt = new DataTransfer()
-      fire(source, 'dragstart', dt, 10, 10)
+      fire(fireFrom(source), 'dragstart', dt, 10, 10)
       const rect = target.getBoundingClientRect()
       const x = rect.x + rect.width / 2
       const y = rect.y + rect.height / 2
-      fire(target, 'dragenter', dt, x, y)
-      fire(target, 'dragover', dt, x, y)
+      fire(fireFrom(target), 'dragenter', dt, x, y)
+      fire(fireFrom(target), 'dragover', dt, x, y)
       // react-dnd defers hover to a requestAnimationFrame; let it settle
       // before the drop so the destination is recorded.
       await new Promise((resolve) => setTimeout(resolve, 150))
-      fire(target, 'drop', dt, x, y)
-      fire(source, 'dragend', dt, x, y)
+      fire(fireFrom(target), 'drop', dt, x, y)
+      fire(fireFrom(source), 'dragend', dt, x, y)
       // A landed drop auto-opens the target folder: the toggle flips to
       // "Collapse". Use it to detect success instead of a fixed delay.
       await new Promise((resolve) => setTimeout(resolve, 50))
@@ -187,12 +192,15 @@ async function dragTreeRowToRoot(sourceName: string): Promise<void> {
     }
     const rows = Array.from(document.querySelectorAll('[role="treeitem"]'))
     const source = rows.find(r => r.textContent?.includes(sourceName))
+    // The role lives on the row wrapper; the drag source is the inner
+    // .tree-node div.
+    const dragSource = source?.querySelector('.tree-node') ?? source
     // The list element is the scrollable div directly under the tree root.
     const list = document.querySelector('[role="tree"] > div')
     if (!source || !list) throw new Error(`tree rows not found (${sourceName} -> root)`)
 
     const dt = new DataTransfer()
-    fire(source, 'dragstart', dt, 10, 10)
+    fire(dragSource, 'dragstart', dt, 10, 10)
     const rect = list.getBoundingClientRect()
     const x = rect.x + rect.width / 2
     const y = rect.y + rect.height - 4
@@ -200,7 +208,7 @@ async function dragTreeRowToRoot(sourceName: string): Promise<void> {
     fire(list, 'dragover', dt, x, y)
     await new Promise((resolve) => setTimeout(resolve, 150))
     fire(list, 'drop', dt, x, y)
-    fire(source, 'dragend', dt, x, y)
+    fire(dragSource, 'dragend', dt, x, y)
   }, { sourceName })
   await window.waitForTimeout(300)
 }
@@ -233,7 +241,7 @@ test('creates a file from the tree, named inline, present on disk', async () => 
   await openContextMenu(row)
   await window.getByRole('menuitem').getByText('New File').click()
 
-  const input = window.getByRole('textbox', { name: /Rename/ })
+  const input = window.getByRole('textbox', { name: /Name new/ })
   await expect(input).toBeVisible()
   await input.fill('fresh.md')
   await input.press('Enter')
@@ -248,7 +256,7 @@ test('cancelling the inline name removes the placeholder file', async () => {
   await openContextMenu(row)
   await window.getByRole('menuitem').getByText('New Folder').click()
 
-  const input = window.getByRole('textbox', { name: /Rename/ })
+  const input = window.getByRole('textbox', { name: /Name new/ })
   await expect(input).toBeVisible()
   await input.press('Escape')
 
@@ -309,6 +317,21 @@ test('renaming a file to a non-markdown extension is refused', async () => {
   await window.getByRole('button', { name: 'OK' }).click()
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
   expect(fs.existsSync(path.join(testFolder, 'alpha.md'))).toBe(true)
+})
+
+test('a case-only rename is allowed on case-insensitive filesystems', async () => {
+  await openFolder()
+  // On a case-insensitive filesystem (Windows/macOS default) the target is the
+  // same file; on case-sensitive ones the target simply does not exist yet.
+  await renameRow(window.getByRole('treeitem').getByText('alpha.md'), 'ALPHA.md')
+
+  // Exact text matching: getByText is case-insensitive by default, so the
+  // renamed ALPHA.md would otherwise match the old-name locator.
+  await expect(window.getByRole('treeitem').getByText('ALPHA.md', { exact: true })).toBeVisible()
+  await expect(window.getByRole('treeitem').getByText('alpha.md', { exact: true })).toHaveCount(0)
+  // The file was renamed in place: exactly one alpha-named file remains.
+  const onDisk = fs.readdirSync(testFolder)
+  expect(onDisk.filter(f => f.toLowerCase() === 'alpha.md')).toHaveLength(1)
 })
 
 test('deleting a file asks for confirmation and sends it to trash', async () => {

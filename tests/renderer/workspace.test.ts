@@ -48,7 +48,7 @@ describe('workspace reducer', () => {
     })
   })
 
-  describe('EXPAND / COLLAPSE', () => {
+  describe('EXPAND', () => {
     it('expands a directory lazily', () => {
       let state = workspaceReducer(makeState(), {
         type: 'REPLACE',
@@ -77,7 +77,7 @@ describe('workspace reducer', () => {
       expect(state.nodes[0].children![0].id).toBe('sub/b.md')
     })
 
-    it('collapsing keeps loaded children in memory (arborist owns visibility)', () => {
+    it('retains loaded children after a successful expand (no COLLAPSE action exists)', () => {
       // Collapse is arborist's own visibility state; the reducer never wipes
       // loaded children, so a re-open costs no refetch and an inline edit in
       // progress (which triggers an arborist open via scrollTo) cannot erase

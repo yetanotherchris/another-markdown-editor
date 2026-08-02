@@ -79,37 +79,41 @@ export function describeEntry(root: string, relativePath: string): EntryInfo {
     return { kind: 'file', isEmpty: false, hasHiddenFiles: false }
   }
 
-  const scan = (dirPath: string): { total: number; hidden: number } => {
-    let total = 0
-    let hidden = 0
+  // Early-exit scan: the confirmation needs only `isEmpty` and
+  // `hasHiddenFiles`. Stop at the first non-markdown file; only an
+  // all-markdown deep tree forces a full walk. An unreadable subfolder is
+  // treated as non-empty (conservative: the FR-025 warning must not understate
+  // what a delete will remove).
+  const scan = (dirPath: string, state: { any: boolean; hidden: boolean; error: boolean }): boolean => {
     let entries: fs.Dirent[]
     try {
       entries = fs.readdirSync(dirPath, { withFileTypes: true })
     } catch {
-      return { total, hidden }
+      state.error = true
+      return false
     }
     for (const entry of entries) {
-      total++
+      state.any = true
       if (entry.isDirectory()) {
         // Real directories only: symlinked directories are never shown in the
         // tree (readDir filters them out) and are not recursed, so an external
         // target or a symlink loop cannot be scanned.
-        const nested = scan(path.join(dirPath, entry.name))
-        total += nested.total
-        hidden += nested.hidden
+        if (scan(path.join(dirPath, entry.name), state)) return true
       } else if (!(entry.isFile() && isMarkdown(entry.name))) {
         // Anything the tree does not show: non-markdown files, symlinks,
         // sockets, hidden dotfiles.
-        hidden++
+        state.hidden = true
+        return true
       }
     }
-    return { total, hidden }
+    return false
   }
 
-  const result = scan(resolved)
+  const state = { any: false, hidden: false, error: false }
+  scan(resolved, state)
   return {
     kind: 'directory',
-    isEmpty: result.total === 0,
-    hasHiddenFiles: result.hidden > 0
+    isEmpty: !state.any && !state.error,
+    hasHiddenFiles: state.hidden
   }
 }

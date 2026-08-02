@@ -72,35 +72,42 @@ describe('describeEntry', () => {
     expect(info.hasHiddenFiles).toBe(false)
   })
 
-  it('does not follow symlinks when scanning and counts them as hidden', () => {
-    if (process.platform === 'win32') {
-      // Symlink creation needs developer mode or admin on Windows; skip.
+  it('does not follow directory links when scanning, even into a loop', () => {
+    // POSIX symlink or Windows junction (no admin needed). The link points
+    // back at the scanned folder's parent, forming a cycle: a scan that
+    // followed the link would recurse forever (stack overflow) and throw.
+    const link = path.join(root, 'notes', 'link')
+    fs.mkdirSync(path.join(root, 'notes'))
+    try {
+      fs.symlinkSync(root, link, process.platform === 'win32' ? 'junction' : undefined)
+    } catch {
+      // Link creation unsupported on this filesystem — nothing to verify.
       return
     }
-    const outside = createTempDir()
-    fs.writeFileSync(path.join(outside, 'secret.md'), 'secret')
-    fs.mkdirSync(path.join(root, 'notes'))
-    fs.symlinkSync(outside, path.join(root, 'notes', 'link'))
 
-    // The link itself is hidden from the tree. Recursing into it would be
-    // unsafe (external target), and would not change this result, but the
-    // scan must complete without error or escaping.
     const info = describeEntry(root, 'notes')
     expect(info.kind).toBe('directory')
+    // The link itself is hidden from the tree; it must be counted as hidden
+    // without recursing into the cycle.
     expect(info.hasHiddenFiles).toBe(true)
-    expect(fs.existsSync(path.join(root, 'notes', 'link', 'secret.md'))).toBe(true)
-
-    cleanupTempDir(outside)
+    expect(info.isEmpty).toBe(false)
   })
 
-  it('counts a markdown-named symlink as hidden because the tree never shows symlinks', () => {
-    if (process.platform === 'win32') return
+  it('does not follow a markdown-named link, so it counts as hidden', () => {
     const outside = createTempDir()
     fs.writeFileSync(path.join(outside, 'secret.md'), 'secret')
     fs.mkdirSync(path.join(root, 'notes'))
-    fs.symlinkSync(outside, path.join(root, 'notes', 'link.md'))
+    try {
+      fs.symlinkSync(outside, path.join(root, 'notes', 'link.md'), process.platform === 'win32' ? 'junction' : undefined)
+    } catch {
+      cleanupTempDir(outside)
+      return
+    }
 
     const info = describeEntry(root, 'notes')
+    // A markdown-named file would be visible — but this is a link, which the
+    // tree never shows, so the scan must still report it as hidden without
+    // reading through to the external target.
     expect(info.hasHiddenFiles).toBe(true)
 
     cleanupTempDir(outside)

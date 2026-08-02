@@ -112,7 +112,7 @@ must be in place before any renderer code touches the filesystem.
 
 - [X] T042 [P] Implement `src/renderer/state/workspace.ts`: tree node list, expansion state, loading flags, replace on folder open
 - [X] T043 [P] Implement `src/renderer/explorer/Tree.tsx`: react-arborist with row renderer for files/folders
-- [ ] T044 [P] Implement `src/renderer/explorer/TreeActions.tsx`: context menu for rename, delete, move, create (new file/folder) — deferred to Phase 6 (US4 file operations)
+- [X] T044 [P] Context menu for rename, delete, move, create (new file/folder) — delivered in `Tree.tsx` (inline, no separate `TreeActions.tsx`; the component never materialised and the menu lives with the tree)
 - [X] T045 [P] Implement `src/renderer/App.tsx` sidebar layout: `react-resizable-panels`, persisted width
 - [X] T046 [P] Implement `src/renderer/App.tsx` open-folder dialog handler and workspace replacement
 - [X] T047 [P] Implement tree update on `workspace:changed` events from main
@@ -195,10 +195,12 @@ must be in place before any renderer code touches the filesystem.
 - [X] T058 [P] Implement rename inline editing in `Tree.tsx`
 - [X] T059 [P] Implement drag-and-drop move (chosen over an explicit move dialog — see plan.md Phase 6 decisions)
 - [X] T060 [P] Implement delete confirmation dialog with warning for non-empty folders and hidden files
-- [X] T061 [P] Implement tree update on `workspace:changed` for application-originated mutations
+- [X] T061 [P] Self-mutation watch suppression for `entry:create`/`entry:move`/`entry:trash` (FR-037): prefix-matched suppression in main, renderer applies mutations to its own tree/document state
 - [X] T062 [P] Implement open-document path update on rename/move of its backing file (FR-028)
-- [X] T075 [P] Playwright e2e suite in `tests/e2e/organize.spec.ts` (14 tests)
+- [X] T075 [P] Playwright e2e suite in `tests/e2e/organize.spec.ts` (16 tests)
 - [X] T076 [P] Post-review e2e additions: caret placement in the rename input; moving a file back to the workspace root via the empty-space drop zone; top-bar menu bar presence (app.spec.ts)
+- [X] T079 [P] Post-review fixes (PR #9 code review, 2026-08-02): stale `pendingCreateRef` could trash a renamed file unconfirmed; `permanent` arg accepted truthy non-booleans (unconfirmed permanent delete); save-vs-reroute race re-saves to the rerouted path; delete dialogs disabled while in flight; case-only renames allowed; placeholder-cancel failures surfaced; junction containment hole in `resolveWithinRoot` (write-through a junction) closed; `describeEntry` early-exits; `trashEntry` permanent path is async; watcher suppression is a sliding window; tree rows remount fixed (Row hoisted, render callbacks memoised); blur no longer traps focus; F2/Delete/Shift+F10 keyboard access; shared `findNodeById`/`isWithinOrEqual`/`parentPathOf`; placeholder-name CONFLICT retry; inline-edit race guard and timeout cleanup
+- [X] T080 [P] Post-review test hardening: junction/symlink-loop adversarial tests for `describeEntry`; junction containment tests for `resolveWithinRoot`; case-only rename e2e; main-side `.md` validation tests; async permanent-trash tests; dirty-survives-reroute test; fixture-reset contamination fix in organize.spec.ts
 
 ### Deviations discovered during implementation
 
@@ -227,16 +229,20 @@ must be in place before any renderer code touches the filesystem.
   not target the workspace root — react-arborist's internal root node has no
   `kind`, so the drop guard rejected it; root drops now map to `''`
   (`parentNode.isRoot`). The inline-rename caret could not be placed with the
-  mouse — arborist's `itemKey` receives react-window's object arg (not an
-  index), so its fallback key is a fresh object per render and every tree
-  re-render remounts all rows, resetting the input; clicks inside the input now
-  stop propagation to the row handlers (which triggered those re-renders) and
-  the field is `draggable={false}` so caret placement/text selection are not
-  hijacked by row drags. The default Crepe stylesheet
+  mouse — clicks inside the input now stop propagation to the row handlers
+  (which dispatched tree re-renders) and the field is `draggable={false}` so
+  caret placement/text selection are not hijacked by row drags. Note: the
+  original root cause recorded here (arborist's `itemKey` receiving a
+  per-render object) is **disproven** — react-window 1.8.11 passes an index and
+  arborist keys rows by `visibleNodes[index]?.id`, which is stable (verified
+  against installed sources, research.md R18). Rows were remounted because
+  `Row` and the children renderer were fresh functions per render; both are
+  now memoised (T079). The default Crepe stylesheet
   (`theme/classic.css` + `theme/common/style.css`) was imported and the
-  persistent TopBar menu replaces the floating toolbar and block-edit handle.
+  persistent TopBar menu replaces the floating toolbar and block-edit handle
+  (spec Clarifications 2026-08-02).
 
-**Checkpoint**: Create, rename, move, and delete files/folders from the tree; open documents follow renames; delete goes to trash. Verified by `npm run test:e2e` (35 Playwright tests) alongside lint, typecheck, and vitest (153 unit tests).
+**Checkpoint**: Create, rename, move, and delete files/folders from the tree; open documents follow renames; delete goes to trash. Verified by `npm run test:e2e` (37 Playwright tests) alongside lint, typecheck, and vitest (141 unit tests).
 
 ---
 
@@ -251,6 +257,37 @@ must be in place before any renderer code touches the filesystem.
 - [ ] T067 [P] Run full `npm run test`, `npm run typecheck`, `npm run lint`
 - [ ] T068 [P] Review `spec.md`, `plan.md`, `research.md`, `data-model.md`, and contracts for consistency
 - [ ] T069 [P] Update this `tasks.md` to mark completed tasks, add any discovered tasks
+
+### Deferred follow-ups from the PR #9 code review (2026-08-02)
+
+- [ ] T077 [P] Keyboard move: a "Move to…" command (menu or dialog) so moving
+      between folders is possible without drag-and-drop (WCAG 2.1.1). Rename
+      (F2), delete (Delete key), and the context menu (Shift+F10/Menu) are
+      keyboard-reachable since T079; moving is not.
+- [ ] T078 [P] Accessibility: dialog focus trap + focus return to the invoking
+      tree row on close; announce dialog content on open (focus the dialog
+      element, not the destructive button); `role="alert"` on `dialogError`;
+      `:focus-visible` indicator for the rename input; roving tabindex/arrow
+      keys for the context menu; aria-busy while a delete is in flight.
+- [ ] T081 [P] Watcher: coalesce per-parent-dir events in main instead of the
+      per-file flood after a large move/delete (the sliding suppression window
+      from T079 covers correctness; the renderer still receives one event per
+      file).
+- [ ] T082 [P] Perf: id→node index for the tree instead of O(N) `findNodeById`
+      walks per toggle/rename; `describeEntry` on a deep all-markdown tree is
+      already the only full walk (early-exit since T079) — benchmark a
+      node_modules-shaped folder before deciding on a cap.
+- [ ] T083 [P] Failed rename keeps the input open with the offending text
+      (client-side validation errors only); currently the input closes and the
+      user retypes.
+- [ ] T084 [P] Rename input: make it controlled so an external re-render can
+      never reset an in-progress name; add a subtle Enter/Escape hint.
+- [ ] T085 [P] Dirty-delete refusal dialog: add "Save All"/"Close All" actions
+      that re-validate instead of the single OK.
+- [ ] T086 [P] Pin `react-arborist` to the exact 3.16.0 (no `^`): the
+      lazy-load path depends on `onToggle` firing for internal opens
+      (research.md R18); organize.spec.ts doubles as the upgrade regression
+      net. Also move `jsdom` to devDependencies.
 
 **Checkpoint**: Quickstart.md smoke tests pass; all automated tests pass; no Node imports in renderer or preload.
 

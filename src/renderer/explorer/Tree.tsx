@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Tree as ArboristTree, NodeApi, TreeApi } from 'react-arborist'
-import type { RowRendererProps } from 'react-arborist'
+import type { RowRendererProps, NodeRendererProps } from 'react-arborist'
 import type { TreeNode } from '../state/workspace'
+import { findNodeById, parentPathOf } from '../state/workspace'
 import { useElementSize } from '../hooks/useElementSize'
-import { moveTargetPath, parentPathOf, wouldMoveIntoOwnDescendant } from './operations'
+import { moveTargetPath, wouldMoveIntoOwnDescendant } from './operations'
 import type { EntryKind } from '../../shared/ipc-contract'
 import './Tree.css'
 
@@ -61,36 +62,44 @@ function RenameInput({ node }: { node: NodeApi<TreeNode> }) {
     node.reset()
   }
 
+  // The placeholder flow names a brand-new entry; a real row is being renamed.
+  const isPlaceholder = node.data.name.startsWith('new-file-') ||
+    node.data.name.startsWith('new-folder-')
+  const label = isPlaceholder
+    ? `Name new ${node.data.kind === 'directory' ? 'folder' : 'file'}`
+    : `Rename ${node.data.name}`
+
   return (
     <input
       ref={inputRef}
       className="tree-node-input"
       defaultValue={node.data.name}
-      aria-label={`Rename ${node.data.name}`}
+      aria-label={label}
       draggable={false}
       // The row's select/activate handlers fire on every click and dispatch a
-      // tree re-render; react-arborist's row keys are per-render objects, so
-      // every re-render remounts the rows and this input along with them,
-      // resetting the caret. Keep the input's mouse interactions away from
-      // the row, and disable native dragging from inside the field so caret
-      // placement and text selection are not hijacked by row drags.
+      // tree re-render; react-arborist keys rows by node id, so rows survive
+      // re-renders, but the input must not hand its mouse interactions to the
+      // row: keep them inside the field so caret placement and text selection
+      // are not hijacked by row handlers or native drags.
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.stopPropagation()}
-      onBlur={() => {
-        // Blurring while the edit is still active means focus was stolen —
-        // react-arborist's container refocuses `focusedNode || firstNode`
-        // when the context menu closes, which would otherwise cancel the
-        // edit. Give focus back. A blur after the edit closed (Enter/Escape
-        // path, input unmounting) is a no-op via `closedRef`.
-        if (node.isEditing) {
+      onBlur={(e) => {
+        // Focus leaving the field does not cancel the edit (Enter/Escape are
+        // the only exits — plan.md Phase 6 decisions). Only reclaim focus when
+        // it moved inside the tree or the context menu portal; a dialog, the
+        // toolbar, or a tab must not be yanked back.
+        if (!node.isEditing) return
+        const next = e.relatedTarget as HTMLElement | null
+        if (next && (next.closest('.tree-container') || next.closest('.context-menu'))) {
           inputRef.current?.focus()
         }
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') commit()
         else if (e.key === 'Escape') cancel()
+        e.stopPropagation()
       }}
     />
   )
@@ -111,9 +120,6 @@ function TreeNode({ node, style, dragHandle, onRowContextMenu }: TreeNodeProps) 
         e.stopPropagation()
         onRowContextMenu(node.data, e.clientX, e.clientY)
       }}
-      role="treeitem"
-      aria-expanded={isDir ? node.isOpen : undefined}
-      aria-selected={node.isSelected}
     >
       {isDir && (
         <span
@@ -128,12 +134,64 @@ function TreeNode({ node, style, dragHandle, onRowContextMenu }: TreeNodeProps) 
           {node.isOpen ? '\u25BE' : '\u25B8'}
         </span>
       )}
-      <span className="tree-node-icon">{isDir ? (node.isOpen ? '📂' : '📁') : '📄'}</span>
+      <span className="tree-node-icon" aria-hidden="true">
+        {isDir ? (node.isOpen ? '📂' : '📁') : '📄'}
+      </span>
       {node.isEditing ? (
         <RenameInput node={node} />
       ) : (
         <span className="tree-node-name">{node.data.name}</span>
       )}
+    </div>
+  )
+}
+
+interface TreeRowProps extends RowRendererProps<TreeNode> {
+  onKeyboardMenu: (node: TreeNode, x: number, y: number) => void
+  onRenameKey: (node: TreeNode) => void
+  onDeleteKey: (node: TreeNode) => void
+}
+
+/**
+ * Module-scope row component: a stable function identity keeps react-arborist
+ * from remounting every visible row on each Tree re-render (a fresh inline
+ * Row would be a new component type per render, remounting all rows' DOM and
+ * dropping the inline-rename caret).
+ */
+function TreeRow({ node, attrs, innerRef, children, onKeyboardMenu, onRenameKey, onDeleteKey }: TreeRowProps) {
+  const isDir = node.data.kind === 'directory'
+
+  // Keyboard access to the row operations (WCAG 2.1.1): F2 renames, Delete
+  // opens the confirmed-delete flow, Shift+F10/Menu opens the context menu
+  // anchored to this row.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'F2') {
+      e.preventDefault()
+      onRenameKey(node.data)
+    } else if (e.key === 'Delete') {
+      e.preventDefault()
+      onDeleteKey(node.data)
+    } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+      e.preventDefault()
+      const rect = e.currentTarget.getBoundingClientRect()
+      onKeyboardMenu(node.data, rect.x + 24, rect.y + rect.height / 2)
+    }
+  }
+
+  return (
+    <div
+      ref={innerRef}
+      style={attrs.style}
+      className={attrs.className}
+      tabIndex={attrs.tabIndex}
+      role="treeitem"
+      aria-level={node.level}
+      aria-selected={node.isSelected}
+      aria-expanded={isDir ? node.isOpen : undefined}
+      onClick={node.handleClick}
+      onKeyDown={onKeyDown}
+    >
+      {children}
     </div>
   )
 }
@@ -157,6 +215,7 @@ export default function Tree({
   const [editingId, setEditingId] = useState<string | null>(null)
   const editingIdRef = useRef(editingId)
   editingIdRef.current = editingId
+  const editingInFlightRef = useRef(false)
 
   useEffect(() => {
     if (!pendingEditId || editingIdRef.current === pendingEditId) return
@@ -164,25 +223,41 @@ export default function Tree({
   }, [pendingEditId])
 
   const startEditing = useCallback(async (id: string) => {
-    let node = treeRef.current?.get(id)
-    if (!node) {
-      // The node exists in the data but its parent is closed in arborist's
-      // own visibility state (create flow). Opening the parent fires our
-      // onToggle, which lazy-loads the folder if needed and then leaves the
-      // already-loaded data alone — see App.handleTreeToggle.
-      const parent = parentPathOf(id)
-      if (parent) treeRef.current?.open(parent)
-      for (let i = 0; i < 20 && !node; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 25))
-        node = treeRef.current?.get(id)
+    // One edit at a time: a second call (e.g. the deferred create-flow timer
+    // racing a context-menu Rename on the same node) must not resolve the
+    // first edit as cancelled and trash a placeholder mid-edit.
+    if (editingInFlightRef.current) return
+    editingInFlightRef.current = true
+    try {
+      let node = treeRef.current?.get(id)
+      if (!node) {
+        // The node exists in the data but its parent is closed in arborist's
+        // own visibility state (create flow). Opening the parent fires our
+        // onToggle, which lazy-loads the folder if needed and then leaves the
+        // already-loaded data alone — see App.handleTreeToggle.
+        const parent = parentPathOf(id)
+        if (parent) treeRef.current?.open(parent)
+        for (let i = 0; i < 20 && !node; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 25))
+          node = treeRef.current?.get(id)
+        }
       }
+      if (!node) {
+        // The node never became visible (slow expand). For a placeholder this
+        // removes it instead of leaving it on disk under its generated name;
+        // for any other id the callback is a no-op.
+        onEditingCancelled(id)
+        setEditingId((current) => (current === id ? null : current))
+        return
+      }
+      const result = await node.edit()
+      if (result.cancelled) {
+        onEditingCancelled(id)
+      }
+      setEditingId((current) => (current === id ? null : current))
+    } finally {
+      editingInFlightRef.current = false
     }
-    if (!node) return
-    const result = await node.edit()
-    if (result.cancelled) {
-      onEditingCancelled(id)
-    }
-    setEditingId((current) => (current === id ? null : current))
   }, [onEditingCancelled])
 
   useEffect(() => {
@@ -263,22 +338,48 @@ export default function Tree({
     setContextMenu({ x, y, node })
   }, [])
 
-  // react-arborist puts role="treeitem" on the row wrapper AND on the node
-  // renderer, doubling every row for screen readers and role locators. Strip
-  // the wrapper role so each row exposes exactly one treeitem (the node div).
-function Row({ node, attrs, innerRef, children }: RowRendererProps<TreeNode>) {
-  return (
-    <div
-      ref={innerRef}
-      style={attrs.style}
-      className={attrs.className}
-      tabIndex={attrs.tabIndex}
-      onClick={node.handleClick}
-    >
-      {children}
-    </div>
-  )
-}
+  const handleRenameKey = useCallback((node: TreeNode) => {
+    startEditing(node.id)
+  }, [startEditing])
+
+  const handleDeleteKey = useCallback((node: TreeNode) => {
+    onDeleteRequest(node)
+  }, [onDeleteRequest])
+
+  const handleKeyboardMenu = useCallback((node: TreeNode, x: number, y: number) => {
+    setContextMenu({ x, y, node })
+  }, [])
+
+  // Stable render callbacks: fresh identities on every Tree render would make
+  // react-arborist remount every visible row (perf M1) — rows are keyed by
+  // node id, but component-type identity changes force full remounts.
+  const renderNode = useCallback((nodeProps: NodeRendererProps<TreeNode>) => (
+    <TreeNode
+      {...nodeProps}
+      onRowContextMenu={handleRowContextMenu}
+    />
+  ), [handleRowContextMenu])
+
+  const renderRow = useCallback((rowProps: RowRendererProps<TreeNode>) => (
+    <TreeRow
+      {...rowProps}
+      onKeyboardMenu={handleKeyboardMenu}
+      onRenameKey={handleRenameKey}
+      onDeleteKey={handleDeleteKey}
+    />
+  ), [handleKeyboardMenu, handleRenameKey, handleDeleteKey])
+
+  const disableDrop = useCallback(({ parentNode, dragNodes }: {
+    parentNode: NodeApi<TreeNode>
+    dragNodes: NodeApi<TreeNode>[]
+  }) => {
+    // The internal root node (drop on empty space) is a valid
+    // destination; everything else must be a directory.
+    if (!parentNode.isRoot && parentNode.data.kind !== 'directory') return true
+    return dragNodes.some(dn =>
+      parentNode.isRoot ? false : wouldMoveIntoOwnDescendant(dn.id, parentNode.data.id)
+    )
+  }, [])
 
   const handleContainerContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -305,6 +406,7 @@ function Row({ node, attrs, innerRef, children }: RowRendererProps<TreeNode>) {
       className="context-menu"
       style={{ left: contextMenu.x, top: contextMenu.y }}
       role="menu"
+      aria-label="Entry actions"
     >
       {contextMenu.node && (
         <div className="context-menu-title" aria-hidden="true">
@@ -351,40 +453,16 @@ function Row({ node, attrs, innerRef, children }: RowRendererProps<TreeNode>) {
           onRename={handleRename}
           onMove={handleMove}
           disableMultiSelection={true}
-          disableDrop={({ parentNode, dragNodes }) => {
-            // The internal root node (drop on empty space) is a valid
-            // destination; everything else must be a directory.
-            if (parentNode && !parentNode.isRoot && parentNode.data.kind !== 'directory') return true
-            return dragNodes.some(dn =>
-              parentNode && !parentNode.isRoot
-                ? wouldMoveIntoOwnDescendant(dn.id, parentNode.data.id)
-                : false
-            )
-          }}
+          disableDrop={disableDrop}
           openByDefault={false}
-          renderRow={Row}
+          renderRow={renderRow}
+          aria-label="Workspace files"
         >
-          {(nodeProps) => (
-            <TreeNode
-              {...nodeProps}
-              onRowContextMenu={handleRowContextMenu}
-            />
-          )}
+          {renderNode}
         </ArboristTree>
       )}
 
       {createPortal(menu, document.body)}
     </div>
   )
-}
-
-function findNodeById(nodes: TreeNode[], id: string): TreeNode | null {
-  for (const node of nodes) {
-    if (node.id === id) return node
-    if (node.children) {
-      const found = findNodeById(node.children, id)
-      if (found) return found
-    }
-  }
-  return null
 }

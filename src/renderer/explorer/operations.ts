@@ -1,13 +1,10 @@
 import type { EntryInfo, EntryKind } from '../../shared/ipc-contract'
 import type { DocumentState } from '../state/documents'
+import { isWithinOrEqual, parentPathOf } from '../state/workspace'
 
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown'])
 
-export function parentPathOf(id: string): string {
-  const lastSlash = id.lastIndexOf('/')
-  if (lastSlash <= 0) return ''
-  return id.slice(0, lastSlash)
-}
+export { isWithinOrEqual }
 
 export function entryName(id: string): string {
   const segments = id.split('/')
@@ -33,7 +30,7 @@ export function moveTargetPath(fromPath: string, targetDirId: string): string | 
 
 /** FR-027 guard, mirroring the main-process check for fast, friendly feedback. */
 export function wouldMoveIntoOwnDescendant(fromPath: string, targetDirId: string): boolean {
-  return targetDirId === fromPath || targetDirId.startsWith(fromPath + '/')
+  return isWithinOrEqual(targetDirId, fromPath)
 }
 
 /**
@@ -53,11 +50,6 @@ export function validateEntryName(kind: EntryKind, currentName: string, newName:
     }
   }
   return null
-}
-
-/** True when `path` is at or under `prefix` (used for folder moves and deletes). */
-export function isWithinOrEqual(path: string, prefix: string): boolean {
-  return path === prefix || path.startsWith(prefix + '/')
 }
 
 export interface DeletePlan {

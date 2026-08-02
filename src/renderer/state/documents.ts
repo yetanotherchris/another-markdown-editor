@@ -1,3 +1,5 @@
+import { isWithinOrEqual } from './workspace'
+
 export interface DocumentState {
   id: string
   path: string | null
@@ -283,7 +285,7 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
         ...state,
         documents: state.documents.map(d => {
           if (!d.path) return d
-          if (d.path !== fromPath && !d.path.startsWith(fromPath + '/')) return d
+          if (!isWithinOrEqual(d.path, fromPath)) return d
           const suffix = d.path.slice(fromPath.length)
           const newPath = toPath + suffix
           return { ...d, path: newPath, title: newPath.split('/').pop() || d.title }

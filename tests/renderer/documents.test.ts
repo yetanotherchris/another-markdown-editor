@@ -456,6 +456,22 @@ describe('documents reducer', () => {
         expect(state.documents[0].path).toBeNull()
         expect(state.documents[0].title).toMatch(/Untitled/)
       })
+
+      it('keeps a dirty document dirty across a reroute', () => {
+        const s1 = openTwoFiles()
+        let s2 = documentsReducer(s1, {
+          type: 'UPDATE_CONTENT',
+          payload: { id: 'a.md', content: 'edited' }
+        })
+        s2 = documentsReducer(s2, {
+          type: 'REROUTE_PATHS',
+          payload: { fromPath: 'a.md', toPath: 'renamed.md' }
+        })
+        const moved = s2.documents.find(d => d.id === 'a.md')!
+        expect(moved.path).toBe('renamed.md')
+        expect(moved.content).toBe('edited')
+        expect(moved.dirty).toBe(true)
+      })
     })
   })
 })

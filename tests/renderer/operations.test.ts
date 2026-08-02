@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { parentPathOf } from '../../src/renderer/state/workspace'
 import {
-  parentPathOf,
   entryName,
   renameTargetPath,
   moveTargetPath,

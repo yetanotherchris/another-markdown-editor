@@ -12,6 +12,7 @@ import {
 import {
   initialWorkspaceState,
   workspaceReducer,
+  findNodeById,
   TreeNode
 } from './state/workspace'
 import { loadSettingsFromMain, updateSettings, getSettings } from './state/settings'
@@ -24,6 +25,7 @@ import {
   renameTargetPath,
   moveTargetPath,
   validateEntryName,
+  entryName,
   planDelete,
   deleteDescription,
   DeletePlan,
@@ -50,6 +52,7 @@ export default function App() {
   const [deleteRefused, setDeleteRefused] = useState<{ node: TreeNode; blockers: DocumentState[] } | null>(null)
   const [permanentDelete, setPermanentDelete] = useState<{ node: TreeNode; plan: DeletePlan } | null>(null)
   const [operationError, setOperationError] = useState<string | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const pendingCreateRef = useRef(new Set<string>())
   const createCounterRef = useRef(0)
   const activeDoc = getActiveDocument(session)
@@ -127,9 +130,24 @@ export default function App() {
   const saveDocument = useCallback(async (doc: DocumentState, forceDialog = false): Promise<SaveResult> => {
     const content = getContentToSave(doc.id, doc.content)
     if (doc.path && !forceDialog) {
-      const result = await window.api.writeFile(doc.path, content)
+      const pathAtStart = doc.path
+      const result = await window.api.writeFile(pathAtStart, content)
       if (result.ok) {
-        dispatch({ type: 'SAVE_SUCCESS', payload: { id: doc.id, path: doc.path, content } })
+        // A rename/move may have rerouted this document while the write was
+        // in flight (REROUTE_PATHS, FR-028). The write hit the pre-reroute
+        // path; re-apply it to the current path so the content does not fork
+        // into two divergent files and the tab does not silently point back
+        // at the old location.
+        const current = sessionRef.current.documents.find(d => d.id === doc.id)
+        const currentPath = current?.path ?? pathAtStart
+        if (currentPath !== pathAtStart) {
+          const rerouted = await window.api.writeFile(currentPath, content)
+          if (!rerouted.ok) {
+            dispatch({ type: 'SAVE_FAILED', payload: { id: doc.id } })
+            return 'failed'
+          }
+        }
+        dispatch({ type: 'SAVE_SUCCESS', payload: { id: doc.id, path: currentPath, content } })
         return 'saved'
       }
       dispatch({ type: 'SAVE_FAILED', payload: { id: doc.id } })
@@ -331,13 +349,14 @@ export default function App() {
     }
     const fromPath = node.id
     const toPath = renameTargetPath(fromPath, newName.trim())
+    // The placeholder state ends at the first committed rename attempt. The
+    // 2026-08-02 clarification limits unconfirmed trash to *empty placeholders*;
+    // keeping the id in pendingCreateRef past this point would let a later
+    // Escape-cancel silently trash a file that may now hold real content.
+    pendingCreateRef.current.delete(fromPath)
+    setPendingEditId(null)
     if (toPath === fromPath) return true
-    const applied = await applyMove(fromPath, toPath)
-    if (applied) {
-      pendingCreateRef.current.delete(fromPath)
-      setPendingEditId(null)
-    }
-    return applied
+    return applyMove(fromPath, toPath)
   }, [applyMove])
 
   const handleEditingCancelled = useCallback((id: string) => {
@@ -348,7 +367,14 @@ export default function App() {
     window.api.trashEntry(id).then((result) => {
       if (result.ok) {
         dispatchWorkspace({ type: 'REMOVE_ENTRY', payload: { id } })
+        return
       }
+      // The placeholder is still on disk under its generated name. The tree
+      // still shows it, so the user can retry via the context menu's Delete
+      // (which confirms), or remove it manually — but a silent failure would
+      // break the clarification's promise that cancelling removes the file.
+      const name = entryName(id)
+      setOperationError(`Could not remove "${name}". It is still on disk — right-click and delete it, or remove it manually.`)
     })
   }, [])
 
@@ -367,13 +393,23 @@ export default function App() {
       dispatchWorkspace({ type: 'EXPAND_SUCCESS', payload: { id: parentNode.id, entries: read.value } })
     }
 
-    createCounterRef.current++
-    const placeholder = kind === 'file'
-      ? `new-file-${createCounterRef.current}.md`
-      : `new-folder-${createCounterRef.current}`
-    const result = await window.api.createEntry(parent ? parent.id : '.', placeholder, kind)
-    if (!result.ok) {
-      setOperationError(result.message)
+    // createCounterRef resets on app restart, so a leftover placeholder from a
+    // previous session can make the first name collide (CONFLICT). Retry with
+    // the next number instead of failing the operation.
+    let result: Awaited<ReturnType<typeof window.api.createEntry>> | null = null
+    for (let attempt = 0; attempt < 5; attempt++) {
+      createCounterRef.current++
+      const placeholder = kind === 'file'
+        ? `new-file-${createCounterRef.current}.md`
+        : `new-folder-${createCounterRef.current}`
+      const attemptResult = await window.api.createEntry(parent ? parent.id : '.', placeholder, kind)
+      if (attemptResult.ok || attemptResult.code !== 'CONFLICT') {
+        result = attemptResult
+        break
+      }
+    }
+    if (!result || !result.ok) {
+      setOperationError(result?.message ?? 'Could not create the new entry')
       return
     }
     const entry = result.value
@@ -387,6 +423,7 @@ export default function App() {
   }, [])
 
   const handleDeleteRequest = useCallback(async (node: TreeNode) => {
+    setDialogError(null)
     const result = await window.api.describeEntry(node.id)
     if (!result.ok) {
       setOperationError(result.message)
@@ -405,43 +442,56 @@ export default function App() {
       doClose(doc.id)
     }
     dispatchWorkspace({ type: 'REMOVE_ENTRY', payload: { id: node.id } })
-    if (workspaceRef.current.selectedId === node.id) {
+    const selected = workspaceRef.current.selectedId
+    // A descendant may have been selected (e.g. a file inside a deleted
+    // folder); it is gone too, so clear the selection as well.
+    if (selected === node.id || (selected !== null && selected.startsWith(node.id + '/'))) {
       dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
     }
   }, [doClose])
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTarget) return
-    const { node, plan } = deleteTarget
-    const result = await window.api.trashEntry(node.id)
-    if (result.ok) {
-      cleanupAfterDelete(node, plan)
+    if (!deleteTarget || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      const { node, plan } = deleteTarget
+      const result = await window.api.trashEntry(node.id)
+      if (result.ok) {
+        cleanupAfterDelete(node, plan)
+        setDeleteTarget(null)
+        return
+      }
+      if (result.code === 'TRASH_UNAVAILABLE') {
+        // FR-029a: trash is not available — offer permanent deletion only as an
+        // explicit second confirmation.
+        setDeleteTarget(null)
+        setPermanentDelete({ node, plan })
+        return
+      }
+      setOperationError(result.message)
       setDeleteTarget(null)
-      return
+    } finally {
+      setDeleteBusy(false)
     }
-    if (result.code === 'TRASH_UNAVAILABLE') {
-      // FR-029a: trash is not available — offer permanent deletion only as an
-      // explicit second confirmation.
-      setDeleteTarget(null)
-      setPermanentDelete({ node, plan })
-      return
-    }
-    setOperationError(result.message)
-    setDeleteTarget(null)
-  }, [deleteTarget, cleanupAfterDelete])
+  }, [deleteTarget, deleteBusy, cleanupAfterDelete])
 
   const handleDeletePermanent = useCallback(async () => {
-    if (!permanentDelete) return
-    const { node, plan } = permanentDelete
-    const result = await window.api.trashEntry(node.id, true)
-    if (result.ok) {
-      cleanupAfterDelete(node, plan)
+    if (!permanentDelete || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      const { node, plan } = permanentDelete
+      const result = await window.api.trashEntry(node.id, true)
+      if (result.ok) {
+        cleanupAfterDelete(node, plan)
+        setPermanentDelete(null)
+        return
+      }
+      setOperationError(result.message)
       setPermanentDelete(null)
-      return
+    } finally {
+      setDeleteBusy(false)
     }
-    setOperationError(result.message)
-    setPermanentDelete(null)
-  }, [permanentDelete, cleanupAfterDelete])
+  }, [permanentDelete, deleteBusy, cleanupAfterDelete])
 
   // T059: drag-and-drop move between folders.
   const handleTreeMove = useCallback((id: string, targetParentId: string) => {
@@ -713,6 +763,7 @@ export default function App() {
         ) : deleteRefused ? (
           <ConfirmDialog
             title="Cannot delete"
+            busy={deleteBusy}
             onCancel={() => setDeleteRefused(null)}
             buttons={[{ label: 'OK', kind: 'primary', onClick: () => setDeleteRefused(null) }]}
           >
@@ -731,6 +782,7 @@ export default function App() {
           <ConfirmDialog
             title={`Delete ${deleteTarget.node.name}?`}
             error={dialogError}
+            busy={deleteBusy}
             onCancel={() => setDeleteTarget(null)}
             buttons={[
               { label: 'Cancel', onClick: () => setDeleteTarget(null) },
@@ -750,6 +802,7 @@ export default function App() {
           <ConfirmDialog
             title="Trash unavailable"
             error={dialogError}
+            busy={deleteBusy}
             onCancel={() => setPermanentDelete(null)}
             buttons={[
               { label: 'Cancel', onClick: () => setPermanentDelete(null) },
@@ -779,15 +832,4 @@ export default function App() {
         ) : null}
     </div>
   )
-}
-
-function findNodeById(nodes: TreeNode[], id: string): TreeNode | null {
-  for (const node of nodes) {
-    if (node.id === id) return node
-    if (node.children) {
-      const found = findNodeById(node.children, id)
-      if (found) return found
-    }
-  }
-  return null
 }

@@ -346,11 +346,14 @@ export function setupHandlers(window: BrowserWindow): void {
       return withWorkspace(() => {
         // FR-037: suppress both endpoints (plus subtrees via prefix matching)
         // so a move/rename the user performed in the app is not reported back
-        // as an external change to its own open documents.
+        // as an external change to its own open documents. The canonical path
+        // plus the lexical target cover case-only renames, where realpath
+        // canonicalises the case and chokidar may report either spelling.
         const fromResolved = resolveWithinRoot(workspaceRoot!, fromPath)
         const toResolved = resolveWithinRoot(workspaceRoot!, toPath)
         workspaceState?.suppressWatch(fromResolved.resolved)
         workspaceState?.suppressWatch(toResolved.resolved)
+        workspaceState?.suppressWatch(path.resolve(workspaceRoot!, toPath))
         return moveEntry(workspaceRoot!, fromPath, toPath)
       })
     } catch (e: unknown) {
@@ -364,7 +367,11 @@ export function setupHandlers(window: BrowserWindow): void {
       validateShape(args, ['path'])
       const { path: p, permanent } = args as { path: string; permanent?: unknown }
 
-      if (typeof permanent === 'string') {
+      // The contract is `permanent?: boolean`. Any other value must be
+      // rejected: a truthy non-boolean (e.g. `{}` or `1`) would otherwise
+      // take the unrecoverable permanent-delete path past the renderer's
+      // double confirmation.
+      if (permanent !== undefined && typeof permanent !== 'boolean') {
         return err('IO', 'permanent must be a boolean')
       }
 
@@ -372,7 +379,7 @@ export function setupHandlers(window: BrowserWindow): void {
       const resolved = resolveWithinRoot(workspaceRoot, p)
       // FR-037: the deletion is ours — do not report it back as external.
       workspaceState?.suppressWatch(resolved.resolved)
-      const receipt = await trashEntry(workspaceRoot, p, permanent as boolean | undefined)
+      const receipt = await trashEntry(workspaceRoot, p, permanent)
       return ok(receipt)
     } catch (e: unknown) {
       const appErr = toAppError(e)

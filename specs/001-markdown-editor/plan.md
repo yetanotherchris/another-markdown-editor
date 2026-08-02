@@ -8,7 +8,7 @@
 
 A single-window Electron desktop application presenting a resizable
 sidebar-and-editor split. The main process owns all filesystem access and
-exposes a fixed set of seven named operations across a `contextBridge` preload
+exposes a fixed set of eight named operations across a `contextBridge` preload
 API; the renderer is a sandboxed React application with no Node access.
 
 Every path crosses one central `resolveWithinRoot` guard that resolves real
@@ -51,7 +51,7 @@ files — see [research.md](./research.md) R1.
 
 | Principle | Gate | Status |
 |-----------|------|--------|
-| I. Process Isolation Is Absolute | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; preload exposes a fixed operation list with no generic `invoke` | **PASS** — see `contracts/preload-api.md`; the contract is a closed union of 7 operations |
+| I. Process Isolation Is Absolute | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; preload exposes a fixed operation list with no generic `invoke` | **PASS** — see `contracts/preload-api.md`; the contract is a closed union of 8 operations |
 | II. Every Path Is Untrusted | All paths validated in main against the resolved real root | **PASS** — single `resolveWithinRoot` chokepoint, research.md R6 |
 | III. Never Lose The User's Words | Atomic writes; failed save stays dirty; confirmation before discard | **PASS** — research.md R7; FR-021/022/023; dirty documents never evicted (R2) |
 | IV. Calm, Predictable Editing | No sync disk work on keystroke path; tab switch preserves undo/cursor/scroll | **PASS** — per-tab instances (R1), hidden not unmounted (R3) |
@@ -143,12 +143,12 @@ directory split makes Principle I auditable by inspection: any `import ... from
 
 ## Phase 1 design decisions
 
-**IPC surface** (see `contracts/ipc-channels.md`): seven operations —
+**IPC surface** (see `contracts/ipc-channels.md`): eight operations —
 `openFolder`, `readDir`, `readFile`, `writeFile`, `createEntry`, `moveEntry`,
-`trashEntry` — plus two main→renderer events, `workspace:changed` and
-`document:externallyChanged`. Every response is a discriminated union of
-`{ ok: true, ... }` or `{ ok: false, code, message }`; handlers never throw
-across the boundary.
+`trashEntry`, `describeEntry` — plus two main→renderer events,
+`workspace:changed` and `document:externallyChanged`. Every response is a
+discriminated union of `{ ok: true, ... }` or `{ ok: false, code, message }`;
+handlers never throw across the boundary.
 
 **Error codes** are a closed set (`OUTSIDE_WORKSPACE`, `NOT_FOUND`, `CONFLICT`,
 `PERMISSION`, `LOCKED`, `TOO_LARGE`, `NOT_TEXT`, `TRASH_UNAVAILABLE`, `IO`) so
@@ -193,6 +193,35 @@ its own internal auto-opens (`scrollTo`/`openParents` during inline edit and
 keyboard navigation); treating those as user collapses wiped the loaded
 children of the folder being edited. The tree now never discards loaded
 children — re-opening a folder costs no refetch.
+
+**Phase 6 post-review decisions** (PR #9, 2026-08-02 — recorded per AGENTS.md
+Step 4; the code-level rationale for each is in `research.md`):
+
+- **Inline-rename exit is Enter/Escape only.** Blur never ends an edit: focus
+  leaving the input (clicking another row, a toolbar, a dialog) keeps the edit
+  open, and only focus returning *inside* the tree reclaims the input. A
+  blur-commit would race the row's refocus and lose typed text. User-visible
+  consequence: you cannot dismiss a rename by clicking away.
+- **A reroute onto an already-open path leaves two tabs pointing at the same
+  file** (deliberate): the rerouted document keeps its id so tabs never merge.
+- **Deletes disable their dialog while in flight**: buttons disabled, Escape
+  ignored, second confirmations guarded — a double-click cannot fire two
+  trashes and Escape cannot cancel a delete that is already executing.
+- **`.md`-only names are enforced in main** (`createFile`/`moveEntry`), not
+  just the renderer: renderer-side checks are never trusted (Principle II).
+- **Case-only renames are allowed**: `existsSync` cannot distinguish a
+  case-only rename from a real conflict on case-insensitive filesystems.
+- **Watcher suppression is a sliding window**: each suppressed event refreshes
+  the 2 s timestamp, so large moves/deletes (slow/AV-scanned disks) stay
+  suppressed instead of re-surfacing as external changes after 2 s.
+- **Tree rows are keyboard-reachable for rename/delete/menu** (F2, Delete,
+  Shift+F10/Menu on the focused row). Moving between folders remains
+  drag-and-drop only; a keyboard "Move to…" command is deferred (tasks.md
+  T077). Accessibility blockers (dialog focus trap/return, focus-visible
+  indicator) are also deferred to tasks.md T078.
+- **`describeEntry` scans are early-exit**: the delete confirmation needs only
+  `isEmpty`/`hasHiddenFiles`, so the walk stops at the first non-markdown file
+  and reports unreadable subfolders as non-empty (conservative warning).
 
 ## Complexity Tracking
 

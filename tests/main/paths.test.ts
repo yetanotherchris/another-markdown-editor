@@ -103,7 +103,38 @@ describe('resolveWithinRoot', () => {
       expect(result.resolved).toBe(markdownFile)
       expect(result.relative).toBe('test.md')
     } catch {
-      // symlinks may not be supported on all platforms
+      // File symlinks need developer mode or admin on Windows. Junctions work
+      // without admin but only for directories — use one as the equivalent.
+      if (process.platform === 'win32') {
+        const junctionPath = path.join(root, 'linkdir')
+        try {
+          fs.symlinkSync(subdir, junctionPath, 'junction')
+          const result = resolveWithinRoot(root, 'linkdir')
+          expect(result.resolved).toBe(subdir)
+          expect(result.relative).toBe('sub')
+        } catch {
+          // Filesystem does not support links at all.
+        }
+      }
+    }
+  })
+
+  it('rejects a path escaping through a directory junction/symlink to outside the root', () => {
+    // A junction (Windows, no admin required) or symlink planted inside the
+    // workspace pointing outside must not let a candidate path escape: the
+    // containment check resolves through the link and must fail closed.
+    const outside = createTempDir()
+    try {
+      fs.symlinkSync(outside, path.join(root, 'escape'), process.platform === 'win32' ? 'junction' : undefined)
+    } catch {
+      cleanupTempDir(outside)
+      return
+    }
+    try {
+      expect(() => resolveWithinRoot(root, 'escape/secret.md')).toThrow()
+      expect(() => resolveNonExistent(root, 'escape/new.md')).toThrow()
+    } finally {
+      cleanupTempDir(outside)
     }
   })
 })
