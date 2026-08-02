@@ -346,6 +346,12 @@ html, body, #root {
   color: #222;
 }
 
+/* outline: none is offset by a visible keyboard focus indicator (WCAG 2.4.11). */
+.source-textarea:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+}
+
 @keyframes source-slide-in {
   from {
     transform: translateX(100%);
@@ -375,10 +381,11 @@ html, body, #root {
    stays in the document and in the source view (never destructive). */
 .norm-notice {
   position: absolute;
-  top: 8px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 3;
+  /* Above the Crepe top bar (z-index: 10) but below the source overlay (20). */
+  z-index: 12;
   max-width: 70%;
   display: flex;
   align-items: center;

@@ -66,6 +66,7 @@ export default function EditorPanel({
       value={document.content}
       onChange={(content) => onContentChange(document.id, content)}
       onReturnToFormatted={() => onReturnToFormatted(document.id)}
+      isActive={isActive}
     />
   )
 
@@ -78,6 +79,7 @@ export default function EditorPanel({
         key={`${document.id}-v${document.contentVersion}`}
         defaultValue={document.content}
         active={isActive && !sourceView}
+        locked={document.view === 'source'}
         restoreCursor={{ cursorOffset: document.cursorOffset, scrollTop: document.scrollTop }}
         onMarkdownUpdated={handleMarkdownUpdated}
         onReady={handleReady}

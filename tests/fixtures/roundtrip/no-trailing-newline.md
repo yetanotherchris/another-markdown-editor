@@ -1,0 +1,1 @@
+A file that ends exactly here, with no trailing newline.

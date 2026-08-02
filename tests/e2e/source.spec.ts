@@ -13,6 +13,7 @@ test.beforeAll(async () => {
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
   fs.mkdirSync(path.join(testFolder, 'nested'))
   fs.writeFileSync(path.join(testFolder, 'nested', 'deep.md'), '# Deep')
+  fs.writeFileSync(path.join(testFolder, 'no-newline.md'), 'No trailing newline')
 })
 
 test.beforeEach(async () => {
@@ -74,11 +75,6 @@ async function openFile(name: string): Promise<void> {
 
 function getViewSourceButton(): ReturnType<Page['getByRole']> {
   return window.getByRole('button', { name: 'View source' })
-}
-
-async function typeInFormatted(text: string): Promise<void> {
-  await window.locator('[contenteditable="true"]').first().click()
-  await window.keyboard.type(text)
 }
 
 // ---------- US1: toolbar View source, edit, return ----------
@@ -202,6 +198,12 @@ test('US4 every formatted toolbar control has a tooltip', async () => {
   for (const label of labels) {
     expect(label.length).toBeGreaterThan(0)
   }
+  // Semantic spot checks: the heading selector is first, Bold carries its own
+  // label (the exact misalignment the 13-entry draft produced) and the trailing
+  // custom control is the View source action.
+  expect(labels[0]).toContain('Paragraph or heading style')
+  expect(labels).toContain('Bold')
+  expect(labels[labels.length - 1]).toBe('View source')
 })
 
 // ---------- US5: task backspace ----------
@@ -209,8 +211,13 @@ test('US4 every formatted toolbar control has a tooltip', async () => {
 test('US5: Backspace removes an empty task item', async () => {
   await openFolder()
   await openFile('alpha.md')
-  await typeInFormatted('\n- [ ] \n')
-  // The checklist control on the formatted toolbar creates an empty task item.
+  // Place the caret in the paragraph text, then add one empty block.
+  await window.locator('[contenteditable="true"] p').last().click()
+  await window.keyboard.press('End')
+  await window.keyboard.press('Enter')
+  // Create the task item strictly with the checklist control (SC-005) rather
+  // than by typing `- [ ] ` raw — the raw path makes the button click race the
+  // ingest of the typed text and is flaky.
   await window.getByRole('button', { name: 'Task list' }).click()
   await expect(window.locator('.list-item .label-wrapper')).toBeVisible()
 
@@ -222,21 +229,48 @@ test('US5: Backspace removes an empty task item', async () => {
 
 // ---------- FR-12 banner ----------
 
-test('FR-12: normalisation notice appears when markup is re-parsed', async () => {
+test('FR-12: a construct Crepe normalises raises the round-trip notice', async () => {
   await openFolder()
   await openFile('alpha.md')
   await getViewSourceButton().click()
-  // A markup construct Crepe normalises (e.g. underscores) exercises the
-  // round-trip guard; the notice is optional and quiet, so this asserts only
-  // that returning works and never loses the edit.
-  await window.getByTestId('source-textarea').fill('# Alpha\n\n_italic_ and **bold**')
+  // An https autolink round-trips as a bracketed link in Crepe's
+  // serialization, so the fresh editor's baseline differs from the raw text
+  // the user typed — exactly the FR-12 "cannot be represented verbatim" case.
+  const raw = '# Alpha\n\nhttp://example.com/path'
+  await window.getByTestId('source-textarea').fill(raw)
   await window.getByRole('button', { name: /Back to visual editing/ }).click()
   await expect(window.getByTestId('source-view')).toHaveCount(0)
-  // The raw text survived into the document content.
+
+  // The quiet in-context banner is what FR-12 promises.
+  await expect(window.locator('.norm-notice')).toBeVisible()
+  await expect(window.locator('.norm-notice')).toContainText(/normalises|preserved/i)
+
+  // Dismiss works and clears the note.
+  await window.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(window.locator('.norm-notice')).toHaveCount(0)
+
+  // The raw text survived into the document and saves verbatim.
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
   await window.getByRole('button', { name: 'Save' }).click()
   const disk = fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')
-  expect(disk).toContain('_italic_')
+  expect(disk).toContain('http://example.com/path')
+})
+
+test('source-view save writes the exact raw bytes, never adding a trailing newline', async () => {
+  await openFolder()
+  const row = window.getByRole('treeitem').getByText('no-newline.md')
+  await row.click({ button: 'right' })
+  await window.getByRole('menuitem', { name: 'View source' }).click()
+  await expect(window.getByTestId('source-textarea')).toHaveValue('No trailing newline')
+
+  // Edit AND save while still in source view: the disk write must be the raw
+  // store bytes — neither a re-serialized editor output nor an added `\n`.
+  await window.getByTestId('source-textarea').fill('Edited raw source, no newline')
+  await window.getByRole('button', { name: 'Close no-newline.md' }).click()
+  await window.getByRole('button', { name: 'Save' }).click()
+
+  const disk = fs.readFileSync(path.join(testFolder, 'no-newline.md'), 'utf-8')
+  expect(disk).toBe('Edited raw source, no newline')
 })
 
 // ---------- Edges ----------

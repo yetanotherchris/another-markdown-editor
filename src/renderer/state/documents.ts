@@ -15,6 +15,22 @@ export function markdownSame(a: string, b: string): boolean {
   return A === B || A === `${B}\n` || B === `${A}\n`
 }
 
+/**
+ * Editor-vs-store equality for the return-to-formatted remount decision (spec
+ * 002, data-model.md R3). Crepe's serialization always appends exactly one
+ * trailing newline, so a live serialization equal to the stored content or that
+ * content plus ONE trailing newline is "unchanged" (no remount — undo, cursor
+ * and scroll survive). Unlike `markdownSame`, this is directional and strict:
+ * a stored content that ends in an EXTRA blank line (`...\n\n`) is NOT equal to
+ * a live `...\n`, so a blank line added at EOF in source view is neither
+ * dropped nor mistaken for pure editor normalization.
+ */
+export function editorMatchesContent(live: string, content: string): boolean {
+  const L = live.replace(/\r\n/g, '\n')
+  const C = content.replace(/\r\n/g, '\n')
+  return L === C || L === `${C}\n`
+}
+
 export interface DocumentState {
   id: string
   path: string | null

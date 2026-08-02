@@ -320,3 +320,25 @@ active tab each time.
   (the `CAPTURE_BASELINE` reducer action is a no-op); only the renderer compares
   raw-vs-editor text with trailing-newline/EOL tolerance (`markdownSame`) to
   decide dirtiness. Source-view saves write the stored raw content verbatim.
+
+## Clarifications
+
+- **2026-08-02 — Explorer reveal is lazy**. FR-019/020's highlight for a file
+  inside a folder that has never been expanded is achieved by lazily opening the
+  parent chain (`openParents`) when the tab becomes active; the folder is
+  auto-expanded and the file selected rather than the highlight being dropped.
+  The check uses the workspace-relative form of a document's path (files opened
+  through the OS dialog are absolute paths and clear the highlight).
+- **2026-08-02 — Editor serialization never replaces pristine content**.
+  `flushLiveContent()` (and the pool-eviction path) adopt a formatted editor's
+  live text into `content` only when the reducer already knows the document is
+  dirty. A pristine file's stored bytes are never replaced by Crepe's
+  serialization, so Value: clicking View source on an unedited file whose
+  serialization normalizes (loose pipes, entities, autolinks) cannot mark it
+  dirty. A sub-200 ms debounce window where a freshly typed keystroke on a
+  pristine file is not yet `dirty` is not adopted on that exact switch; the
+  keystroke is retained by the editor and surfaces on the next change.
+- **2026-08-02 — Return-to-formatted remount is strict about EOF blanks.** The
+  no-remount (no-op) decision uses `editorMatchesContent` — only the editor's
+  single appended trailing newline counts as unchanged. An extra blank line
+  typed at end-of-file in source view therefore survives the return.

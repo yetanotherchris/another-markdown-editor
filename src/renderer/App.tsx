@@ -10,6 +10,7 @@ import {
   planClose,
   DocumentState,
   markdownSame,
+  editorMatchesContent,
 } from './state/documents'
 import {
   initialWorkspaceState,
@@ -38,6 +39,13 @@ const initialSession: EditingSession = {
   documents: [],
   activeId: null,
   untitledCounter: 0
+}
+
+/** True when `path` is a workspace-relative path. Absolute paths come from the
+ *  OS file dialog (e.g. `C:\...` or `/...`) and are not under the workspace. */
+function isWorkspaceRelative(path: string): boolean {
+  if (path.startsWith('/') || path.startsWith('\\')) return false
+  return !/^[a-zA-Z]:[\\/]/.test(path)
 }
 
 type SaveResult = 'saved' | 'cancelled' | 'failed'
@@ -138,9 +146,16 @@ export default function App() {
       // flushing it would clobber the edits the user made in source.
       if (doc.view === 'source') continue
       const live = getLiveContent(doc)
-      if (live !== null && !markdownSame(live, doc.content)) {
-        dispatch({ type: 'UPDATE_CONTENT', payload: { id: doc.id, content: live } })
-      }
+      if (live === null || markdownSame(live, doc.content)) continue
+      // Raw-bytes policy (spec 002): the serialization of a PRISTINE document
+      // must never replace the stored disk bytes — Crepe's output can differ
+      // from raw text beyond the tolerated trailing newline (loose pipes,
+      // entities, autolinks) and would mark an unedited file dirty. Only adopt
+      // the live text when the reducer already knows the document was edited
+      // (the debounced emission set `dirty`; a sub-200 ms keystroke window is
+      // rare enough to leave to the next change).
+      if (!doc.dirty) continue
+      dispatch({ type: 'UPDATE_CONTENT', payload: { id: doc.id, content: live } })
     }
   }, [getLiveContent])
 
@@ -152,18 +167,13 @@ export default function App() {
       activeId
     )
     if (evictId) {
-      // Capture the live content before dropping the pool entry — evictLRU
-      // only finds the candidate; getMarkdown must still see it. A source-view
-      // document's editor serializes the stale pre-source-edit text, so its
-      // raw content is already current; skip the update in that case (and
-      // never rewrite a pristine doc with editor normalization, see markdownSame).
-      const evictDoc = current.documents.find(d => d.id === evictId)
-      const live = evictDoc && evictDoc.view !== 'source' ? getLiveContent(evictDoc) : null
+      // evictLRU only returns clean documents, so the store already holds the
+      // authoritative content — nothing to capture. Drop the entry and mark the
+      // document evicted; the next activate remounts from the stored bytes.
       instancePool.remove(evictId)
       dispatch({ type: 'EVICT', payload: { id: evictId } })
-      if (live !== null && !markdownSame(live, evictDoc!.content)) {
-        dispatch({ type: 'UPDATE_CONTENT', payload: { id: evictId, content: live } })
-      }
+      // A pending round-trip notice for an evicted document is stale data.
+      normPendingRef.current.delete(evictId)
     }
   }, [getLiveContent, isDirtyLive])
 
@@ -204,6 +214,8 @@ export default function App() {
   const doClose = useCallback((id: string) => {
     dispatch({ type: 'CLOSE', payload: { id } })
     instancePool.remove(id)
+    // A pending FR-12 round-trip comparison can never arrive for a closed tab.
+    normPendingRef.current.delete(id)
   }, [])
 
   const handleCloseRequest = useCallback((id: string) => {
@@ -336,7 +348,11 @@ export default function App() {
       const doc = sessionRef.current.documents.find(d => d.id === id)
       if (!doc) return
       const live = getLiveContent(doc)
-      if (live === null || !markdownSame(live, doc.content)) {
+      // editorMatchesContent (not markdownSame) decides the no-op round trip:
+      // only the editor's single appended trailing newline is "unchanged", so a
+      // blank line typed at EOF in source is not silently dropped, while a
+      // pristine file that Crepe merely normalized still skips the remount.
+      if (live === null || !editorMatchesContent(live, doc.content)) {
         // Re-parsing the raw source up front is impossible (the old editor
         // still holds the *previous* doc), so the guard runs after the fresh
         // baseline lands; queue the expected raw text for comparison.
@@ -368,7 +384,10 @@ export default function App() {
       const read = await window.api.readFile(path)
       if (!read.ok) return null
       dispatch({ type: 'OPEN_EXISTING', payload: { ...read.value, view: 'source' } })
-      // The freshly opened tab is the newest pool entry and won't be evicted.
+      // The freshly opened tab's editor registers on mount, so it is the newest
+      // LRU entry and cannot be evicted here. sessionRef.current.activeId is
+      // still the pre-dispatch document — passing it only protects the tab that
+      // is visible right now, which is the intent.
       enforcePoolCap(sessionRef.current.activeId)
       return read.value.path ?? read.value.name
     },
@@ -708,24 +727,29 @@ export default function App() {
 
   // Spec 002, US004: the explorer follows the active tab. When the active
   // document maps to a workspace file, open its parent folders, reveal it, and
-  // select it; a document without a workspace path clears the highlight so the
-  // explorer never shows a stale selection (FR-017).
+  // select it; a document without a workspace path (untitled) or an absolute
+  // path (opened outside the workspace) clears the highlight so the explorer
+  // never shows a stale selection (FR-021).
   const workspaceActiveId = session.activeId
   useEffect(() => {
     if (!workspace.name) return
     const active = sessionRef.current.documents.find(d => d.id === workspaceActiveId)
     const path = active?.path
-    if (!path || !findNodeById(workspaceRef.current.nodes, path)) {
+    if (!path || !isWorkspaceRelative(path)) {
       dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
       return
     }
+    // The reveal may target a file inside a folder that has never been
+    // expanded. openParents lazily loads each ancestor through the existing
+    // onToggle; the effect re-runs when those loaded nodes land, completing the
+    // reveal (US6 acceptance 2, research R-Explorer).
     dispatchWorkspace({ type: 'SELECT', payload: { id: path } })
     const api = treeApiRef.current
     if (api) {
       api.openParents(path)
       api.scrollTo(path)
     }
-  }, [workspaceActiveId, workspace.name])
+  }, [workspaceActiveId, workspace.name, workspace.nodes])
 
   const handleOpenFolder = useCallback(async () => {
     const result = await window.api.openFolderDialog()
@@ -808,10 +832,12 @@ export default function App() {
             />
             <div className="editor-area">
               {normNotice && normNotice.id === session.activeId && (
-                <div className="norm-notice" role="status">
-                  The visual editor normalises some markdown. Your original text
-                  is preserved in the document in case the formatting looks
-                  different.
+                <div className="norm-notice">
+                  <span className="norm-notice-text" role="status">
+                    The visual editor normalises some markdown. Your original
+                    text is preserved in the document in case the formatting
+                    looks different.
+                  </span>
                   <button
                     type="button"
                     className="norm-notice-dismiss"

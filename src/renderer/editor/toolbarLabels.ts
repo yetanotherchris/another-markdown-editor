@@ -50,5 +50,13 @@ export function applyToolbarLabels(container: HTMLElement): number {
     button.setAttribute('aria-label', label.ariaLabel)
     labelled++
   })
+  // A library or feature-flag change that drifts the DOM count from the map
+  // mislabels controls silently; break loudly instead (research WG).
+  if (controls.length !== TOP_BAR_LABELS.length) {
+    console.warn(
+      `[toolbar-labels] DOM has ${controls.length} top-bar controls but TOP_BAR_LABELS has ` +
+        `${TOP_BAR_LABELS.length}; labels may be misaligned`
+    )
+  }
   return labelled
 }

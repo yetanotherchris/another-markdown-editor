@@ -1,10 +1,12 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { ChangeEvent } from 'react'
 
 interface SourceViewProps {
   value: string
   onChange: (value: string) => void
   onReturnToFormatted: () => void
+  /** Focus the textarea only when this tab is actually visible (FR-021). */
+  isActive: boolean
 }
 
 /**
@@ -13,7 +15,9 @@ interface SourceViewProps {
  * saving behave identically (FR-013). A compact top toolbar mirroring the Crepe
  * top bar's height hosts the labeled return control (FR-008).
  */
-export default function SourceView({ value, onChange, onReturnToFormatted }: SourceViewProps) {
+export default function SourceView({ value, onChange, onReturnToFormatted, isActive }: SourceViewProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
   const handleChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
       onChange(event.target.value)
@@ -21,8 +25,14 @@ export default function SourceView({ value, onChange, onReturnToFormatted }: Sou
     [onChange]
   )
 
+  // Focus management (US1/US3): entering source view or activating a tab that
+  // is already in source view puts the caret straight into the raw text.
+  useEffect(() => {
+    if (isActive) textareaRef.current?.focus()
+  }, [isActive])
+
   return (
-    <div className="source-view" data-testid="source-view">
+    <div className="source-view" data-testid="source-view" role="region" aria-label="Markdown source">
       <div className="source-toolbar">
         <button
           type="button"
@@ -35,6 +45,7 @@ export default function SourceView({ value, onChange, onReturnToFormatted }: Sou
         </button>
       </div>
       <textarea
+        ref={textareaRef}
         className="source-textarea"
         data-testid="source-textarea"
         value={value}
