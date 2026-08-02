@@ -43,10 +43,12 @@ function RenameInput({ node }: { node: NodeApi<TreeNode> }) {
   const closedRef = useRef(false)
 
   useEffect(() => {
+    console.log('[trace] input MOUNT', node.data.id)
     if (inputRef.current) {
       inputRef.current.focus()
       inputRef.current.select()
     }
+    return () => console.log('[trace] input UNMOUNT', node.data.id)
   }, [])
 
   const commit = () => {
