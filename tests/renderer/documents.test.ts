@@ -101,7 +101,7 @@ describe('documents reducer', () => {
   })
 
   describe('CAPTURE_BASELINE', () => {
-    it('sets baseline and recalculates dirty', () => {
+    it('does not adopt editor normalization into a raw document', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
@@ -109,20 +109,23 @@ describe('documents reducer', () => {
       })
       const docId = s1.documents[0].id
 
-      // Content differs from original
+      // A real edit arrives (e.g. typed in source).
       const s2 = documentsReducer(s1, {
         type: 'UPDATE_CONTENT',
         payload: { id: docId, content: 'modified' }
       })
       expect(s2.documents[0].dirty).toBe(true)
 
-      // Capture new baseline (like Crepe normalisation)
+      // Crepe's baseline emission (e.g. its normalized serialization with a
+      // trailing newline) must not rewrite the raw content or clear the dirty
+      // flag (raw-bytes policy, spec 002).
       const s3 = documentsReducer(s2, {
         type: 'CAPTURE_BASELINE',
-        payload: { id: docId, baseline: 'modified' }
+        payload: { id: docId, baseline: 'original\n' }
       })
-      expect(s3.documents[0].baseline).toBe('modified')
-      expect(s3.documents[0].dirty).toBe(false)
+      expect(s3.documents[0].content).toBe('modified')
+      expect(s3.documents[0].baseline).toBe('original')
+      expect(s3.documents[0].dirty).toBe(true)
     })
   })
 
@@ -399,7 +402,141 @@ describe('documents reducer', () => {
       expect(planClose(state, 'unknown-id')).toBe('close')
     })
 
-    describe('REROUTE_PATHS (FR-028)', () => {
+    describe('view mode (spec 002)', () => {
+    it('new documents default to formatted view', () => {
+      const s1 = documentsReducer(createSession(), { type: 'OPEN_NEW' })
+      expect(s1.documents[0].view).toBe('formatted')
+    })
+
+    it('opened files default to formatted view', () => {
+      const state = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      expect(state.documents[0].view).toBe('formatted')
+    })
+
+    it('OPEN_EXISTING with view source opens the file in source view', () => {
+      const state = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1, view: 'source' }
+      })
+      expect(state.documents[0].view).toBe('source')
+    })
+
+    it('OPEN_EXISTING with view source switches an already-open formatted tab without duplicating', () => {
+      const s1 = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      const id = s1.documents[0].id
+      const s2 = documentsReducer(s1, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1, view: 'source' }
+      })
+      expect(s2.documents).toHaveLength(1)
+      expect(s2.activeId).toBe(id)
+      expect(s2.documents[0].view).toBe('source')
+    })
+
+    it('OPEN_EXISTING without view leaves an existing tab untouched (dedupe unchanged)', () => {
+      const s1 = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      const id = s1.documents[0].id
+      const s2 = documentsReducer(s1, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      expect(s2.documents).toHaveLength(1)
+      expect(s2.documents[0].view).toBe('formatted')
+      expect(s2.activeId).toBe(id)
+    })
+
+    it('SET_VIEW flips the view and leaves content and dirty untouched', () => {
+      let state = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      const id = state.documents[0].id
+      state = documentsReducer(state, { type: 'UPDATE_CONTENT', payload: { id, content: 'y' } })
+      state = documentsReducer(state, { type: 'SET_VIEW', payload: { id, view: 'source' } })
+      expect(state.documents[0].view).toBe('source')
+      expect(state.documents[0].content).toBe('y')
+      expect(state.documents[0].dirty).toBe(true)
+    })
+
+    it('SET_VIEW with the same view is a no-op (no re-render needed)', () => {
+      let state = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      const id = state.documents[0].id
+      state = documentsReducer(state, { type: 'SET_VIEW', payload: { id, view: 'formatted' } })
+      expect(state.documents[0].view).toBe('formatted')
+      expect(state.documents).toHaveLength(1)
+    })
+
+    it('SET_VIEW does not affect other documents', () => {
+      const s1 = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'a.md', name: 'a.md', content: 'a', mtimeMs: 1, size: 1 }
+      })
+      const s2 = documentsReducer(s1, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'b.md', name: 'b.md', content: 'b', mtimeMs: 1, size: 1 }
+      })
+      const aId = s2.documents[0].id
+      const bId = s2.documents[1].id
+      expect(aId).not.toBe(bId)
+      const s3 = documentsReducer(s2, { type: 'SET_VIEW', payload: { id: aId, view: 'source' } })
+      expect(s3.documents.find(d => d.id === aId)?.view).toBe('source')
+      expect(s3.documents.find(d => d.id === bId)?.view).toBe('formatted')
+    })
+
+    it('REFRESH_FROM_SOURCE replaces content, resets cursor/scroll, bumps version, keeps dirty', () => {
+      let state = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      const id = state.documents[0].id
+      state = documentsReducer(state, { type: 'UPDATE_CONTENT', payload: { id, content: 'raw [ ] text' } })
+      state = documentsReducer(state, {
+        type: 'CAPTURE_EDITOR_STATE',
+        payload: { id, cursorOffset: 42, scrollTop: 137 }
+      })
+      const before = state.documents[0]
+      state = documentsReducer(state, {
+        type: 'REFRESH_FROM_SOURCE',
+        payload: { id, content: '*edited* raw' }
+      })
+      const after = state.documents[0]
+      expect(after.content).toBe('*edited* raw')
+      expect(after.baseline).toBe('x')
+      expect(after.dirty).toBe(true)
+      expect(after.cursorOffset).toBe(0)
+      expect(after.scrollTop).toBe(0)
+      expect(after.contentVersion).toBe(before.contentVersion + 1)
+    })
+
+    it('REFRESH_FROM_SOURCE keeps baseline so a clean doc stays clean when text unchanged', () => {
+      const state = documentsReducer(createSession(), {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+      })
+      const id = state.documents[0].id
+      const after = documentsReducer(state, {
+        type: 'REFRESH_FROM_SOURCE',
+        payload: { id, content: 'x' }
+      })
+      expect(after.documents[0].content).toBe('x')
+      expect(after.documents[0].baseline).toBe('x')
+      expect(after.documents[0].dirty).toBe(false)
+    })
+  })
+
+  describe('REROUTE_PATHS (FR-028)', () => {
       it('updates the path and title of a renamed open document, keeping its id', () => {
         const s1 = openTwoFiles()
         const doc = s1.documents[0]

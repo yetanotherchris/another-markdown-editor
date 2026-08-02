@@ -309,5 +309,14 @@ active tab each time.
   the start of an empty task-list item. Other task-list keyboard behavior remains
   unchanged unless required to preserve ordinary text deletion.
 - **Explorer selection**: The explorer highlight identifies the file represented
-  by the active tab, not the most recently clicked tree item. The feature does not
-  add multi-selection or change how a user opens files from the explorer.
+  by the active tab, not the most recently clicked tree item. The feature does
+  not add multi-selection or change how a user opens files from the explorer.
+- **Raw bytes are authoritative** *(decided 2026-08-02)*: The document's stored
+  content and baseline are the exact bytes read from disk, never Crepe's
+  normalized serialization. Crepe always appends a single trailing newline
+  (verified empirically in this phase), so its first emission must not rewrite a
+  pristine file, give a file without a trailing newline a gratuitous newline, or
+  mark it dirty. The store never adopts an editor emission as content/baseline
+  (the `CAPTURE_BASELINE` reducer action is a no-op); only the renderer compares
+  raw-vs-editor text with trailing-newline/EOL tolerance (`markdownSame`) to
+  decide dirtiness. Source-view saves write the stored raw content verbatim.

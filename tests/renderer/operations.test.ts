@@ -25,6 +25,7 @@ function makeDoc(patch: Partial<DocumentState> & { id: string; path: string | nu
     lastActiveAt: 0,
     externalState: 'clean',
     contentVersion: 0,
+    view: 'formatted',
     ...patch
   }
 }

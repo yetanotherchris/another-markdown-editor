@@ -1,5 +1,6 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
 import { Panel, Group, Separator } from 'react-resizable-panels'
+import type { TreeApi } from 'react-arborist'
 import type { MenuCommand, EntryKind, EntryInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
@@ -8,6 +9,7 @@ import {
   getDirtyDocuments,
   planClose,
   DocumentState,
+  markdownSame,
 } from './state/documents'
 import {
   initialWorkspaceState,
@@ -55,6 +57,7 @@ export default function App() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const pendingCreateRef = useRef(new Set<string>())
   const createCounterRef = useRef(0)
+  const treeApiRef = useRef<TreeApi<TreeNode> | null>(null)
   const activeDoc = getActiveDocument(session)
   const sessionRef = useRef(session)
   sessionRef.current = session
@@ -71,16 +74,44 @@ export default function App() {
     dispatch({ type: 'UPDATE_CONTENT', payload: { id, content } })
   }, [])
 
+  // FR-12 round-trip guard: REFRESH_FROM_SOURCE injection re-parses the raw
+  // source in a fresh Crepe instance. If the parsed output differs from the
+  // text the user typed (Crepe normalises the markdown), a quiet note explains
+  // that the formatted view may look different while the raw text is preserved.
+  const normPendingRef = useRef<Map<string, string>>(new Map())
+  const [normNotice, setNormNotice] = useState<{ id: string; title: string } | null>(null)
+  const normNoticeRef = useRef(normNotice)
+  normNoticeRef.current = normNotice
+
   const handleBaselineCapture = useCallback((id: string, baseline: string) => {
-    dispatch({ type: 'CAPTURE_BASELINE', payload: { id, baseline } })
+    const expected = normPendingRef.current.get(id)
+    if (expected !== undefined) {
+      normPendingRef.current.delete(id)
+      // Trailing-newline / EOL-only differences are not user-visible
+      // normalization, so they must not raise the FR-12 note (spec 002 edge:
+      // files without a trailing newline round-trip quietly).
+      if (!markdownSame(baseline, expected)) {
+        const doc = sessionRef.current.documents.find(d => d.id === id)
+        setNormNotice({ id, title: doc?.title ?? '' })
+        // Auto-dismiss after a few seconds; the note is informational only.
+        window.setTimeout(() => {
+          setNormNotice((current) => (current?.id === id ? null : current))
+        }, 6000)
+      }
+    }
   }, [])
 
   const handleCursorState = useCallback((id: string, cursorOffset: number, scrollTop: number) => {
     dispatch({ type: 'CAPTURE_EDITOR_STATE', payload: { id, cursorOffset, scrollTop } })
   }, [])
 
-  const getContentToSave = useCallback((docId: string, fallback: string): string => {
-    return instancePool.getMarkdown(docId) ?? fallback
+  // Spec 002, save model (data-model.md): the source view writes the raw bytes
+  // the user sees (document.content) so saving never re-adds normalization
+  // (e.g. a trailing newline) to an untouched file. The formatted view keeps
+  // the Crepe serialization path.
+  const getContentToSave = useCallback((doc: DocumentState): string => {
+    if (doc.view === 'source') return doc.content
+    return instancePool.getMarkdown(doc.id) ?? doc.content
   }, [])
 
   // The listener plugin's markdownUpdated is debounced by 200 ms, so the
@@ -95,13 +126,19 @@ export default function App() {
   const isDirtyLive = useCallback((doc: DocumentState): boolean => {
     if (doc.dirty) return true
     const live = getLiveContent(doc)
-    return live !== null && live !== doc.baseline
+    // Raw-bytes policy: normalization alone (trailing newline / EOL) is not a
+    // user edit, so a pristine document stays clean (spec 002 edge cases).
+    return live !== null && !markdownSame(live, doc.baseline)
   }, [getLiveContent])
 
   const flushLiveContent = useCallback(() => {
     for (const doc of sessionRef.current.documents) {
+      // A source-view document's text lives in the store (raw bytes); its
+      // mounted editor serializes the stale pre-source-edit content, so
+      // flushing it would clobber the edits the user made in source.
+      if (doc.view === 'source') continue
       const live = getLiveContent(doc)
-      if (live !== null && live !== doc.content) {
+      if (live !== null && !markdownSame(live, doc.content)) {
         dispatch({ type: 'UPDATE_CONTENT', payload: { id: doc.id, content: live } })
       }
     }
@@ -116,19 +153,22 @@ export default function App() {
     )
     if (evictId) {
       // Capture the live content before dropping the pool entry — evictLRU
-      // only finds the candidate; getMarkdown must still see it.
+      // only finds the candidate; getMarkdown must still see it. A source-view
+      // document's editor serializes the stale pre-source-edit text, so its
+      // raw content is already current; skip the update in that case (and
+      // never rewrite a pristine doc with editor normalization, see markdownSame).
       const evictDoc = current.documents.find(d => d.id === evictId)
-      const live = evictDoc ? getLiveContent(evictDoc) : null
+      const live = evictDoc && evictDoc.view !== 'source' ? getLiveContent(evictDoc) : null
       instancePool.remove(evictId)
-      if (live !== null) {
+      dispatch({ type: 'EVICT', payload: { id: evictId } })
+      if (live !== null && !markdownSame(live, evictDoc!.content)) {
         dispatch({ type: 'UPDATE_CONTENT', payload: { id: evictId, content: live } })
       }
-      dispatch({ type: 'EVICT', payload: { id: evictId } })
     }
   }, [getLiveContent, isDirtyLive])
 
   const saveDocument = useCallback(async (doc: DocumentState, forceDialog = false): Promise<SaveResult> => {
-    const content = getContentToSave(doc.id, doc.content)
+    const content = getContentToSave(doc)
     if (doc.path && !forceDialog) {
       const pathAtStart = doc.path
       const result = await window.api.writeFile(pathAtStart, content)
@@ -273,6 +313,74 @@ export default function App() {
     // pre-batch value, so reading it here could evict the tab just clicked.
     enforcePoolCap(id)
   }, [enforcePoolCap])
+
+  // Spec 002, US1: the formatted→source transition syncs the live editor text
+  // into the store first so the raw source reflects every keystroke, then
+  // flips the tab. The source textarea reads `document.content`.
+  const handleShowSource = useCallback(
+    (id: string) => {
+      flushLiveContent()
+      dispatch({ type: 'SET_VIEW', payload: { id, view: 'source' } })
+    },
+    [flushLiveContent]
+  )
+
+  // Spec 002, US3: returning to formatted editing. When the raw source text
+  // equals what Crepe already parsed, the editor can stay mounted and
+  // undo/scroll/cursor survive (research.md R3, no-edit round trip). When the
+  // source text changed (or the editor was evicted so nothing is live), the
+  // new text must become the editor's content — REFRESH_FROM_SOURCE bumps
+  // contentVersion so CrepeHost remounts with the source bytes.
+  const handleReturnToFormatted = useCallback(
+    (id: string) => {
+      const doc = sessionRef.current.documents.find(d => d.id === id)
+      if (!doc) return
+      const live = getLiveContent(doc)
+      if (live === null || !markdownSame(live, doc.content)) {
+        // Re-parsing the raw source up front is impossible (the old editor
+        // still holds the *previous* doc), so the guard runs after the fresh
+        // baseline lands; queue the expected raw text for comparison.
+        normPendingRef.current.set(id, doc.content)
+        dispatch({ type: 'REFRESH_FROM_SOURCE', payload: { id, content: doc.content } })
+      }
+      dispatch({ type: 'SET_VIEW', payload: { id, view: 'formatted' } })
+    },
+    [getLiveContent]
+  )
+
+  // Spec 002, US2: an explorer "View source" request routes to the open-tab
+  // fast path or reads the file into a new source-view tab. Called with the
+  // workspace path of the node (Tree passes node.id).
+  const openPathInSource = useCallback(
+    async (path: string): Promise<string | null> => {
+      const existing = sessionRef.current.documents.find(
+        d => d.path === path && d.editorState !== 'evicted'
+      )
+      if (existing) {
+        dispatch({ type: 'ACTIVATE', payload: { id: existing.id } })
+        if (existing.view !== 'source') {
+          flushLiveContent()
+          dispatch({ type: 'SET_VIEW', payload: { id: existing.id, view: 'source' } })
+        }
+        enforcePoolCap(existing.id)
+        return existing.id
+      }
+      const read = await window.api.readFile(path)
+      if (!read.ok) return null
+      dispatch({ type: 'OPEN_EXISTING', payload: { ...read.value, view: 'source' } })
+      // The freshly opened tab is the newest pool entry and won't be evicted.
+      enforcePoolCap(sessionRef.current.activeId)
+      return read.value.path ?? read.value.name
+    },
+    [enforcePoolCap, flushLiveContent]
+  )
+
+  const handleViewSource = useCallback(
+    (path: string) => {
+      void openPathInSource(path)
+    },
+    [openPathInSource]
+  )
 
   const handleNew = useCallback(() => {
     dispatch({ type: 'OPEN_NEW' })
@@ -598,6 +706,27 @@ export default function App() {
     }
   }, [])
 
+  // Spec 002, US004: the explorer follows the active tab. When the active
+  // document maps to a workspace file, open its parent folders, reveal it, and
+  // select it; a document without a workspace path clears the highlight so the
+  // explorer never shows a stale selection (FR-017).
+  const workspaceActiveId = session.activeId
+  useEffect(() => {
+    if (!workspace.name) return
+    const active = sessionRef.current.documents.find(d => d.id === workspaceActiveId)
+    const path = active?.path
+    if (!path || !findNodeById(workspaceRef.current.nodes, path)) {
+      dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
+      return
+    }
+    dispatchWorkspace({ type: 'SELECT', payload: { id: path } })
+    const api = treeApiRef.current
+    if (api) {
+      api.openParents(path)
+      api.scrollTo(path)
+    }
+  }, [workspaceActiveId, workspace.name])
+
   const handleOpenFolder = useCallback(async () => {
     const result = await window.api.openFolderDialog()
     if (result.ok && result.value) {
@@ -663,6 +792,7 @@ export default function App() {
                     onDeleteRequest={handleDeleteRequest}
                     onCreateRequest={handleCreate}
                     onMove={handleTreeMove}
+                    onViewSource={handleViewSource}
                   />
                 </div>
               </Panel>
@@ -677,6 +807,21 @@ export default function App() {
               onClose={handleCloseRequest}
             />
             <div className="editor-area">
+              {normNotice && normNotice.id === session.activeId && (
+                <div className="norm-notice" role="status">
+                  The visual editor normalises some markdown. Your original text
+                  is preserved in the document in case the formatting looks
+                  different.
+                  <button
+                    type="button"
+                    className="norm-notice-dismiss"
+                    aria-label="Dismiss"
+                    onClick={() => setNormNotice(null)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               {session.documents.length === 0 ? (
                 <div className="empty-state">
                   <p>Open a file or create a new document to get started.</p>
@@ -690,6 +835,8 @@ export default function App() {
                     onContentChange={handleContentChange}
                     onBaselineCapture={handleBaselineCapture}
                     onCursorState={handleCursorState}
+                    onRequestViewSource={handleShowSource}
+                    onReturnToFormatted={handleReturnToFormatted}
                   />
                 ))
               )}
