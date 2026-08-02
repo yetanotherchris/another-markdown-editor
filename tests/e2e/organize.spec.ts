@@ -168,6 +168,65 @@ async function dragTreeRow(sourceName: string, targetName: string): Promise<void
   }
 }
 
+/**
+ * Drag a row onto the empty space below the last row: the tree's outer drop
+ * zone, which targets the workspace root.
+ */
+async function dragTreeRowToRoot(sourceName: string): Promise<void> {
+  await expect(window.getByRole('treeitem').getByText(sourceName)).toBeVisible()
+  await window.evaluate(async ({ sourceName }) => {
+    const fire = (el: Element, type: string, dt: DataTransfer, x: number, y: number) => {
+      el.dispatchEvent(new DragEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        dataTransfer: dt,
+        clientX: x,
+        clientY: y
+      }))
+    }
+    const rows = Array.from(document.querySelectorAll('[role="treeitem"]'))
+    const source = rows.find(r => r.textContent?.includes(sourceName))
+    // The list element is the scrollable div directly under the tree root.
+    const list = document.querySelector('[role="tree"] > div')
+    if (!source || !list) throw new Error(`tree rows not found (${sourceName} -> root)`)
+
+    const dt = new DataTransfer()
+    fire(source, 'dragstart', dt, 10, 10)
+    const rect = list.getBoundingClientRect()
+    const x = rect.x + rect.width / 2
+    const y = rect.y + rect.height - 4
+    fire(list, 'dragenter', dt, x, y)
+    fire(list, 'dragover', dt, x, y)
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    fire(list, 'drop', dt, x, y)
+    fire(source, 'dragend', dt, x, y)
+  }, { sourceName })
+  await window.waitForTimeout(300)
+}
+
+test('clicking inside the rename input places the caret at the click point', async () => {
+  await openFolder()
+  await openContextMenu(window.getByRole('treeitem').getByText('alpha.md'))
+  await window.getByRole('menuitem').getByText('Rename').click()
+  const input = window.getByRole('textbox', { name: /Rename/ })
+  await expect(input).toBeVisible()
+
+  // Click just after the "ph" of "alpha.md": the caret must land mid-text,
+  // not snap back to a full selection (row remounts must not reset it).
+  const box = await input.boundingBox()
+  await window.mouse.click(box!.x + 22, box!.y + box!.height / 2)
+  await window.waitForTimeout(200)
+
+  const state = await window.evaluate(() => {
+    const el = document.querySelector('.tree-node-input') as HTMLInputElement
+    return { selStart: el.selectionStart, selEnd: el.selectionEnd }
+  })
+  expect(state.selStart).toBeGreaterThan(0)
+  expect(state.selStart).toBeLessThan(8)
+  expect(state.selStart).toBe(state.selEnd)
+})
+
 test('creates a file from the tree, named inline, present on disk', async () => {
   await openFolder()
   const row = window.getByRole('treeitem').filter({ hasText: 'sub' })
@@ -346,6 +405,17 @@ test('moves a file into a folder by drag and drop', async () => {
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
   await expect.poll(() => fs.existsSync(path.join(testFolder, 'sub', 'alpha.md'))).toBe(true)
   await expect.poll(() => !fs.existsSync(path.join(testFolder, 'alpha.md'))).toBe(true)
+})
+
+test('moves a file back to the root folder by dropping on empty space', async () => {
+  await openFolder()
+  await dragTreeRow('alpha.md', 'sub')
+  await expect.poll(() => fs.existsSync(path.join(testFolder, 'sub', 'alpha.md'))).toBe(true)
+
+  await dragTreeRowToRoot('alpha.md')
+
+  await expect.poll(() => !fs.existsSync(path.join(testFolder, 'sub', 'alpha.md'))).toBe(true)
+  await expect.poll(() => fs.existsSync(path.join(testFolder, 'alpha.md'))).toBe(true)
 })
 
 test('moving a folder containing an open document reroutes the document (FR-028)', async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Crepe } from '@milkdown/crepe'
+import { CrepeFeature } from '@milkdown/crepe'
 import { editorViewCtx } from '@milkdown/kit/core'
 import { TextSelection } from '@milkdown/kit/prose/state'
 import type { EditorView } from '@milkdown/kit/prose/view'
@@ -62,7 +63,15 @@ export default function CrepeHost({
       const { Crepe: CrepeClass } = await import('@milkdown/crepe')
       const crepe = new CrepeClass({
         root: containerRef.current!,
-        defaultValue
+        defaultValue,
+        features: {
+          // A persistent menu bar (headings + formatting buttons) replaces the
+          // floating toolbar that pops up on selection, and the per-line
+          // block-edit "+" handle.
+          [CrepeFeature.Toolbar]: false,
+          [CrepeFeature.BlockEdit]: false,
+          [CrepeFeature.TopBar]: true
+        }
       })
 
       crepe.on((listener) => {

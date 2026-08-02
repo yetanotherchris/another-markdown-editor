@@ -43,12 +43,10 @@ function RenameInput({ node }: { node: NodeApi<TreeNode> }) {
   const closedRef = useRef(false)
 
   useEffect(() => {
-    console.log('[trace] input MOUNT', node.data.id)
     if (inputRef.current) {
       inputRef.current.focus()
       inputRef.current.select()
     }
-    return () => console.log('[trace] input UNMOUNT', node.data.id)
   }, [])
 
   const commit = () => {
@@ -69,6 +67,17 @@ function RenameInput({ node }: { node: NodeApi<TreeNode> }) {
       className="tree-node-input"
       defaultValue={node.data.name}
       aria-label={`Rename ${node.data.name}`}
+      draggable={false}
+      // The row's select/activate handlers fire on every click and dispatch a
+      // tree re-render; react-arborist's row keys are per-render objects, so
+      // every re-render remounts the rows and this input along with them,
+      // resetting the caret. Keep the input's mouse interactions away from
+      // the row, and disable native dragging from inside the field so caret
+      // placement and text selection are not hijacked by row drags.
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.stopPropagation()}
       onBlur={() => {
         // Blurring while the edit is still active means focus was stolen —
         // react-arborist's container refocuses `focusedNode || firstNode`
@@ -237,7 +246,11 @@ export default function Tree({
     parentNode: NodeApi<TreeNode> | null
     index: number
   }) => {
-    const targetParentId = args.parentNode ? args.parentNode.data.id : ''
+    // A drop on empty space targets the root: parentNode is the internal root
+    // node (its data has no kind), which maps to the workspace root ''.
+    const targetParentId = args.parentNode && !args.parentNode.isRoot
+      ? args.parentNode.data.id
+      : ''
     for (const id of args.dragIds) {
       const target = moveTargetPath(id, targetParentId)
       if (!target) continue
@@ -253,17 +266,19 @@ export default function Tree({
   // react-arborist puts role="treeitem" on the row wrapper AND on the node
   // renderer, doubling every row for screen readers and role locators. Strip
   // the wrapper role so each row exposes exactly one treeitem (the node div).
-  const renderRow = useCallback((props: RowRendererProps<TreeNode>) => (
+function Row({ node, attrs, innerRef, children }: RowRendererProps<TreeNode>) {
+  return (
     <div
-      ref={props.innerRef}
-      style={props.attrs.style}
-      className={props.attrs.className}
-      tabIndex={props.attrs.tabIndex}
-      onClick={props.node.handleClick}
+      ref={innerRef}
+      style={attrs.style}
+      className={attrs.className}
+      tabIndex={attrs.tabIndex}
+      onClick={node.handleClick}
     >
-      {props.children}
+      {children}
     </div>
-  ), [])
+  )
+}
 
   const handleContainerContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -337,13 +352,17 @@ export default function Tree({
           onMove={handleMove}
           disableMultiSelection={true}
           disableDrop={({ parentNode, dragNodes }) => {
-            if (parentNode && parentNode.data.kind !== 'directory') return true
+            // The internal root node (drop on empty space) is a valid
+            // destination; everything else must be a directory.
+            if (parentNode && !parentNode.isRoot && parentNode.data.kind !== 'directory') return true
             return dragNodes.some(dn =>
-              parentNode ? wouldMoveIntoOwnDescendant(dn.id, parentNode.data.id) : false
+              parentNode && !parentNode.isRoot
+                ? wouldMoveIntoOwnDescendant(dn.id, parentNode.data.id)
+                : false
             )
           }}
           openByDefault={false}
-          renderRow={renderRow}
+          renderRow={Row}
         >
           {(nodeProps) => (
             <TreeNode

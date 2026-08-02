@@ -87,3 +87,15 @@ test('keeps documents open when switching tree selection', async () => {
   await window.getByRole('treeitem').getByText('alpha.md').click()
   await expect(window.locator('.document-title')).toContainText('alpha.md')
 })
+
+test('editor shows the persistent menu bar instead of the floating toolbar', async () => {
+  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await window.getByRole('treeitem').getByText('alpha.md').click()
+
+  // The classic theme stylesheet ships the Crepe menu bar (headings +
+  // formatting buttons) as the editor chrome.
+  await expect(window.locator('.milkdown-top-bar')).toBeVisible()
+
+  // The floating selection toolbar is disabled in favour of the menu bar.
+  await expect(window.locator('.milkdown-toolbar')).toHaveCount(0)
+})

@@ -198,6 +198,7 @@ must be in place before any renderer code touches the filesystem.
 - [X] T061 [P] Implement tree update on `workspace:changed` for application-originated mutations
 - [X] T062 [P] Implement open-document path update on rename/move of its backing file (FR-028)
 - [X] T075 [P] Playwright e2e suite in `tests/e2e/organize.spec.ts` (14 tests)
+- [X] T076 [P] Post-review e2e additions: caret placement in the rename input; moving a file back to the workspace root via the empty-space drop zone; top-bar menu bar presence (app.spec.ts)
 
 ### Deviations discovered during implementation
 
@@ -222,6 +223,18 @@ must be in place before any renderer code touches the filesystem.
   `readDir` cannot provide.
 - **Dirty-delete refusal, .md-only file rename, placeholder cleanup on
   cancel**: recorded as spec Clarifications 2026-08-02.
+- **Post-review fixes (PR #9, 2026-08-02)**: dropping onto empty space could
+  not target the workspace root — react-arborist's internal root node has no
+  `kind`, so the drop guard rejected it; root drops now map to `''`
+  (`parentNode.isRoot`). The inline-rename caret could not be placed with the
+  mouse — arborist's `itemKey` receives react-window's object arg (not an
+  index), so its fallback key is a fresh object per render and every tree
+  re-render remounts all rows, resetting the input; clicks inside the input now
+  stop propagation to the row handlers (which triggered those re-renders) and
+  the field is `draggable={false}` so caret placement/text selection are not
+  hijacked by row drags. The default Crepe stylesheet
+  (`theme/classic.css` + `theme/common/style.css`) was imported and the
+  persistent TopBar menu replaces the floating toolbar and block-edit handle.
 
 **Checkpoint**: Create, rename, move, and delete files/folders from the tree; open documents follow renames; delete goes to trash. Verified by `npm run test:e2e` (35 Playwright tests) alongside lint, typecheck, and vitest (153 unit tests).
 
