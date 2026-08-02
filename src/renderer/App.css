@@ -265,6 +265,12 @@ html, body, #root {
   overflow: auto;
 }
 
+/* Milkdown's Crepe theme defaults the canvas to padding: 60px 120px
+   (reset.css), which is oversized for a desktop editor. Tighten it. */
+.editor-host .milkdown .ProseMirror {
+  padding: 32px 48px;
+}
+
 .editor-host.evicted {
   pointer-events: none;
 }
