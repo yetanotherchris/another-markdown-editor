@@ -31,7 +31,7 @@ export default function SourceView({ value, onChange, onReturnToFormatted }: Sou
           aria-label="Back to visual editing"
           onClick={onReturnToFormatted}
         >
-          ← Format
+          ← Visual Editing
         </button>
       </div>
       <textarea
