@@ -20,13 +20,13 @@ coverage in `tests/e2e/source.spec.ts`.
 **Purpose**: A green baseline to measure against, and the two dependency-free
 helper modules that the user-story phases will consume.
 
-- [ ] T001 Establish a green baseline: run `npm run lint`, `npm run typecheck`,
+- [X] T001 Establish a green baseline: run `npm run lint`, `npm run typecheck`,
       `npm run test` on a clean checkout and record the result in this file
-- [ ] T002 [P] Implement `src/renderer/editor/toolbarLabels.ts` — ordered const
+- [X] T002 [P] Implement `src/renderer/editor/toolbarLabels.ts` — ordered const
       map of Crepe top-bar control label → { label } and an
       `applyToolbarLabels(container)` helper that assigns `title` + `aria-label`
       to the heading selector and each `top-bar-item` button (research WG)
-- [ ] T003 [P] Implement `src/renderer/editor/taskBackspace.ts` — a pure
+- [X] T003 [P] Implement `src/renderer/editor/taskBackspace.ts` — a pure
       `planTaskBackspace(state)` that flags Backspace-eligible empty task items
       (start of an empty `list_item` with `checked` attr) and returns either a
       removal transaction to run or `null` (research R-Task)
@@ -41,12 +41,12 @@ helper modules that the user-story phases will consume.
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T004 Implement the `view` field (`'formatted' | 'source'`,
+- [X] T004 Implement the `view` field (`'formatted' | 'source'`,
       default `'formatted'`), the `SET_VIEW` action, the optional `view`
       payload on `OPEN_EXISTING`, and the `REFRESH_FROM_SOURCE` action
       (contentVersion bump, `baseline`/`dirty` untouched) in
       `src/renderer/state/documents.ts`
-- [ ] T005 [P] Extend `tests/renderer/documents.test.ts`: SET_VIEW no-op cases,
+- [X] T005 [P] Extend `tests/renderer/documents.test.ts`: SET_VIEW no-op cases,
       dirty preserved across REFRESH_FROM_SOURCE, OPEN_EXISTING with `view`,
       dedupe-on-open behaviour unchanged (FR-6/14)
 
@@ -64,21 +64,21 @@ markdown, see dirty marker, return.
 
 ### Implementation
 
-- [ ] T006 [US1] Wire the Crepe top bar in `src/renderer/editor/CrepeHost.tsx`:
+- [X] T006 [US1] Wire the Crepe top bar in `src/renderer/editor/CrepeHost.tsx`:
       pass `featureConfigs['top-bar'].buildTopBar` that appends a **View source**
       item (its own group) calling a new `onRequestViewSource` prop; run
       `applyToolbarLabels` once the bar exists
-- [ ] T007 [US1] Implement `src/renderer/editor/SourceView.tsx` — plain
+- [X] T007 [US1] Implement `src/renderer/editor/SourceView.tsx` — plain
       monospace `<textarea>` bound to `document.content` (dispatch in App) +
       compact toolbar with a clearly labelled return control
-- [ ] T008 [US1] Extend `src/renderer/editor/EditorPanel.tsx` to render the
+- [X] T008 [US1] Extend `src/renderer/editor/EditorPanel.tsx` to render the
       source layer over the editor host when `document.view === 'source'`,
       keeping the Crepe host mounted (visibility hidden)
-- [ ] T009 [US1] `src/renderer/App.tsx` — `flushLiveContent`/`getLiveContent`/
-      `getContentToSave` branch on `viewMode` so source tabs read raw
+- [X] T009 [US1] `src/renderer/App.tsx` — `flushLiveContent`/`getLiveContent`/
+      `getContentToSave` branch on `view` so source tabs read raw
       `document.content`; add `handleShowSource(id)` (flush, `SET_VIEW`) and
       wire `onRequestViewSource` down to it
-- [ ] T010 [US1] `src/renderer/App.css` — `.source-view` slide-in from the right
+- [X] T010 [US1] `src/renderer/App.css` — `.source-view` slide-in from the right
       (160 ms keyframes) over the host, `prefers-reduced-motion: reduce` → none,
       source toolbar top styling
 
@@ -96,9 +96,9 @@ in source view without duplicating a tab.
 
 ### Implementation
 
-- [ ] T011 [US2] Extend `src/renderer/explorer/Tree.tsx` with an
+- [X] T011 [US2] Extend `src/renderer/explorer/Tree.tsx` with an
       `onViewSource(node)` prop and a **View source** menu item for file nodes
-- [ ] T012 [US2] `src/renderer/App.tsx` — `handleOpenInSource(path)`: 
+- [X] T012 [US2] `src/renderer/App.tsx` — `handleOpenInSource(path)`:
       `readFile` → `OPEN_EXISTING {view:'source'}` (activating+dedup) →
       `enforcePoolCap(active)`
 
@@ -116,9 +116,9 @@ changes, revealing nested files, and clearing for pathless tabs.
 
 ### Implementation
 
-- [ ] T013 [US6] Extend `src/renderer/explorer/Tree.tsx` with an optional
+- [X] T013 [US6] Extend `src/renderer/explorer/Tree.tsx` with an optional
       `treeRef` callback so App can open parents / scroll / select a path
-- [ ] T014 [US6] `src/renderer/App.tsx` — on active-tab change: when the
+- [X] T014 [US6] `src/renderer/App.tsx` — on active-tab change: when the
       active doc has a workspace `path`, `openParents(path)` + `scrollTo(path)`
       + `SELECT {path}`; when pathless, `SELECT {null}` (FR-021)
 
@@ -138,11 +138,11 @@ in-context note (FR-12).
 
 ### Implementation
 
-- [ ] T015 [US3] `src/renderer/App.tsx` — `handleReturnToFormatted(doc)`:
+- [X] T015 [US3] `src/renderer/App.tsx` — `handleReturnToFormatted(doc)`:
       compare `content` with live `getMarkdown()`; equal → `SET_VIEW`;
       differs → `REFRESH_FROM_SOURCE` (bumps version to remount) then
       `SET_VIEW`; wire the SourceView return button and the toolbar return
-- [ ] T016 [US3] Round-trip guard + banner in `EditorPanel`/`App`: when the
+- [X] T016 [US3] Round-trip guard + banner in `App`: when the
       parsed output differs from the raw source and the doc is dirty, show a
       quiet dismissible note ("visual editor normalises…", FR-12) — preserved
       raw text, never destructive
@@ -157,23 +157,25 @@ kept); return after edits replaces the content and the dirty marker stays.
 **Goal** US4 (tooltip on every formatted toolbar control), US5 (empty
 task-list item Backspace), plus the required e2e suite and final validation.
 
-- [ ] T017 [P] [US4] US4 completes — the toolbarLabels pass in
+- [X] T017 [P] [US4] US4 completes — the toolbarLabels pass in
       `CrepeHost.tsx` covers every control incl. the heading selector and the
       new **View source** button (title on hover + focus, aria-label)
-- [ ] T018 [P] [US5] Wire `planTaskBackspace` to the `.ProseMirror` keydown in
+- [X] T018 [P] [US5] Wire `planTaskBackspace` to the `.ProseMirror` keydown in
       `src/renderer/editor/CrepeHost.tsx` (capture), restoring ordinary
       Backspace behavior elsewhere (FR-018)
-- [ ] T019 [P] [US5] Unit tests for `planTaskBackspace` in
+- [X] T019 [P] [US5] Unit tests for `planTaskBackspace` in
       `tests/renderer/taskBackspace.test.ts` (empty item removal, sole-item
       list collapse, non-empty preservation), and unit checks for the toolbar
       label map
-- [ ] T020 Write the Playwright suite `tests/e2e/source.spec.ts` covering all
+- [X] T020 Write the Playwright suite `tests/e2e/source.spec.ts` covering all
       six user stories + edges (reduced-motion slide, tab-switch mid-view,
       close/quit with dirty source, FR-12 banner, active-highlight clear,
       tooltip-a11y) — run with `npm run test:e2e`
-- [ ] T021 [P] Run quickstart.md smoke and full `npm run lint`,
+- [X] T021 [P] Run quickstart.md smoke and full `npm run lint`,
       `npm run typecheck`, `npm run test`, `npm run test:e2e`; review
-      plan/research/data-model/contracts consistency; mark every task [X]
+      plan/research/data-model/contracts consistency
+
+**Checkpoint**: `npm run test:e2e` all green alongside lint/typecheck/vitest.
 
 **Checkpoint**: `npm run test:e2e` all green alongside lint/typecheck/vitest.
 
