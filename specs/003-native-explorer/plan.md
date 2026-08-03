@@ -107,8 +107,12 @@ targets the interface chrome).
 The footer updates automatically because it derives from `session.activeId` /
 `activeDoc` and `workspace` reducer state; opening, closing, replacing,
 renaming or clearing a document or workspace re-renders it in the same frame
-(FR-012). Path shortening is driven by `useElementSize` on the workspace span
-(ResizeObserver), so it re-computes on window resize and never on keystrokes.
+(FR-012). Path shortening is driven by `useElementSize` on the
+`.footer-workspace-region` **container** (ResizeObserver), so it re-computes on
+window resize and never on keystrokes. Measuring the workspace span instead
+would be a feedback loop — the shortened text shrinks the span it was sized
+against — so the container is measured (research R4; deviation recorded there
+and in `research.md`).
 
 **Header cleanup (FR-011)** — the `.document-title` span and the
 `.workspace-name` span are removed from the `.toolbar`; the header keeps only

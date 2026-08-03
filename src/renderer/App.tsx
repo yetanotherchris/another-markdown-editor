@@ -878,7 +878,6 @@ export default function App() {
       <StatusFooter
         activeDoc={activeDoc}
         workspaceRoot={workspace.root}
-        workspaceName={workspace.name}
       />
 
       {quitDirtyDocs ? (

@@ -82,11 +82,24 @@ This is "an unambiguous shortened form that keeps the final folder name visible"
 `text-overflow` alone, which clips the *tail* (the opposite of what we need).
 
 **Width driving**: the footer measures its workspace span with the existing
-`useElementSize` hook (ResizeObserver). `maxLength = max(finalFolderLen + 3,
+`useElementSize` hook (ResizeObserver). `maxLength = max(finalFolderLen + 2,
 floor(widthPx / 8))` — the `/8` is a conservative character width estimate for
-Inter at the footer's ~12px; the final-folder floor guarantees the folder name
-always survives even at tiny widths. Recomputes on resize; nothing runs on the
-keystroke path (Principle IV).
+Inter at the footer's ~12px; the final-folder floor (`finalFolderLen + 2`,
+exactly the width of the minimal `…` + separator + folder form) guarantees the
+folder name always survives even at tiny widths. Recomputes on resize; nothing
+runs on the keystroke path (Principle IV).
+
+> **Deviation (recorded, 003 review #3)**: `useElementSize` is mounted on the
+> `.footer-workspace-region` **container** (`flex: 1, min-width: 0`), not the
+> text span. Measuring the span is a feedback loop — the shortened text shrinks
+> the very span it was sized against — so the container is the correct choice.
+> This lives in the `StatusFooter.tsx` code comment and is recorded here.
+
+> **Known limitation (recorded, 003 review #4)**: the char-width model counts
+> UTF-16 code units (`/8` px each), so a CJK/wide final folder can exceed the
+> region in pixels while fitting in characters; the CSS ellipsis on the span is
+> the accepted hard cap and clips the tail (a display-only edge, never the
+> saved path). Non-BMP (e.g. emoji) folder names are likewise under-budgeted.
 
 ## R-Path — the workspace root path is added to the open-folder response
 
@@ -108,6 +121,12 @@ the workspace-relative paths the renderer handles every day. Adding it to a
 successful open-folder result does not widen the trust boundary. No new channel;
 a preload change is unnecessary (the type flows through `WorkspaceInfo`).
 
+**Note (003 review #2)**: the footer displays the **realpath** of the opened
+folder (main resolves the dialog result), which can differ from the literal
+path the user picked when the folder is reached through a symlink/junction —
+a trust/UX nit, not a boundary violation: main anchors all containment on that
+same realpath, so the app operates consistently inside what it displays.
+
 **Alternatives rejected**: reconstructing the path renderer-side from
 `workspace.name` (no absolute info exists in the renderer); showing only the
 folder name (fails FR-010's "full location when space permits"); a separate
@@ -119,11 +138,22 @@ folder name (fails FR-010's "full location when space permits"); a separate
   text label ("New", "Open Folder") is the accessible name, so keyboard/screen
   reader users get the purpose (US2 acceptance 3).
 - The expand/collapse toggle stays `role="button"` with `aria-label` "Expand" /
-  "Collapse" (already present) and gains a `:focus-visible` ring.
+  "Collapse" and a `:focus-visible` ring. Because react-arborist's container
+  owns the tree's single Tab stop and its Tab handler skips everything inside
+  the tree, the toggle is **mouse / screen-reader only** (`tabIndex={-1}`);
+  keyboard expand/collapse is on the focused row (Space / ArrowRight /
+  ArrowLeft). The tree container and the focused row both carry a
+  `:focus-visible` ring.
+- **Selection does NOT follow focus** (recorded, 003 review #4): selecting a
+  file opens it (`handleTreeSelect` → `OPEN_EXISTING`), so `selectionFollowsFocus`
+  would open every document arrow-navigated over. Focus is therefore a roving
+  ring (WCAG 2.4.7) independent of the selection highlight.
 - The footer is informational; left/right regions are plain text with a muted
   placeholder when empty, and the right region exposes the full path as a
-  `title` tooltip.
-- All font sizes/colors keep AA contrast against the existing light theme.
+  `title` tooltip and as selectable text (`user-select: text`).
+- All font sizes/colors keep AA contrast against the existing light theme
+  (placeholder `#737373` on `#fafafa` = 4.54:1; focus rings `#4a90d9` clear
+  3:1 non-text).
 
 ## Decisions validated against the constitution
 

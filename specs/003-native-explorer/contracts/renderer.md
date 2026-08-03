@@ -31,11 +31,15 @@ Tree rows (explorer/Tree.tsx):
               role="button", aria-label "Expand"/"Collapse", :focus-visible ring
 
 StatusFooter (new, status/StatusFooter.tsx):
-  props        : { activeDoc, workspaceRoot, workspaceName }
-  left region  : class "document-title", text = activeDoc title + dirty marker,
+  props        : { activeDoc, workspaceRoot }   (workspaceName removed — the
+                 placeholder keys off the path; both REPLACE dispatches
+                 populate name + root together)
+  left region  : class "document-title", text = activeDoc title + dirty marker
+                 (marker wrapped in a span aria-label="unsaved changes"),
                  or muted "No document open"
   right region : class "footer-workspace", title = full root, text =
-                 shortenPath(root, maxChars) or muted "No folder open"
+                 shortenPath(root, maxChars) or muted "No folder open";
+                 user-select: text so the path is copyable
 
 shortenPath (new, status/shortenPath.ts):
   pure fn, keeps the final folder name whole, prefixes '…' + separator when
@@ -58,13 +62,26 @@ Header (.toolbar):
   overlaps the left region.
 - **Non-Latin / long names**: lucide icons are resolution-independent inline
   SVGs; Inter covers Latin + Latin-ext, falling back to system fonts for other
-  scripts (the tree text is unchanged and remains readable).
+  scripts (the tree text is unchanged and remains readable). Covered by an e2e
+  fixture (`native.spec.ts`).
+- **Workspace path display**: the footer shows the **realpath** of the opened
+  folder (main resolves the dialog result), which can differ from the picked
+  path through a symlink/junction. Containment is anchored on that same
+  realpath, so the app operates inside what it displays.
 - **Keyboard / screen reader**: icon buttons keep visible text labels; the
-  toggle keeps its role/aria-label/focus ring (FR-013).
+  toggle keeps its role/aria-label/focus ring but is mouse/SR-only
+  (`tabIndex={-1}`) — react-arborist's container owns the tree's single Tab
+  stop, so keyboard expand/collapse is on the focused row (Space/arrows), and
+  the row carries a visible `:focus-visible` ring (FR-013).
 
 ## Tests that must exist
 
 - `tests/renderer/shortenPath.test.ts` — full-fit, short-tail, final-folder
-  survival, tiny-width floor, `\` vs `/`, no-separator input.
-- `tests/main/ipc.test.ts` — WorkspaceInfo shape now includes `path`.
-- `tests/e2e/native.spec.ts` — US1–US4 + edges, run with `npm run test:e2e`.
+  survival, tiny-width floor, `\` vs `/`, no-separator input, mixed separators,
+  trailing separator, empty path, `maxLength ≤ 0`.
+- `tests/main/ipc.test.ts` — WorkspaceInfo shape now includes `path`;
+  `tests/main/paths.test.ts` — readFile/readDir reject absolute paths (the
+  handler gate).
+- `tests/e2e/native.spec.ts` — US1–US4 + edges (offline font, icons, footer,
+  shortening, placeholders, non-Latin names, workspace replacement,
+  keyboard focus), run with `npm run test:e2e`.

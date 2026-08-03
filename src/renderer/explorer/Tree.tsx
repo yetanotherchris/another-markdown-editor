@@ -135,6 +135,15 @@ function TreeNode({ node, style, dragHandle, onRowContextMenu }: TreeNodeProps) 
           type="button"
           className="tree-node-toggle"
           aria-label={node.isOpen ? 'Collapse' : 'Expand'}
+          // The chevron is a mouse/screen-reader affordance, not a keyboard
+          // tab stop: react-arborist's container owns the tree's single Tab
+          // stop and its Tab handler skips everything inside the tree (its
+          // getFocusable filters out contained elements). Keyboard toggling
+          // happens on the focused row (Space / ArrowRight / ArrowLeft), so
+          // this button is removed from the tab order rather than leaving a
+          // phantom stop its FR-013 ring can never reach. Mouse clicks still
+          // focus it; :focus-visible does not match mouse-initiated focus.
+          tabIndex={-1}
           onClick={(e) => {
             e.stopPropagation()
             node.toggle()
@@ -196,7 +205,7 @@ function TreeRow({ node, attrs, innerRef, children, onKeyboardMenu, onRenameKey,
       className={attrs.className}
       tabIndex={attrs.tabIndex}
       role="treeitem"
-      aria-level={node.level}
+      aria-level={node.level + 1}
       aria-selected={node.isSelected}
       aria-expanded={isDir ? node.isOpen : undefined}
       onClick={node.handleClick}

@@ -23,6 +23,8 @@ constitution, every user-visible behaviour gets e2e coverage in
 - [X] T001 Establish a green baseline: run `npm run lint`, `npm run typecheck`,
       `npm run test` on the `003-native-explorer` branch and record the result
       in this file
+      **Result**: baseline green — lint 0 errors, typecheck clean, 189 unit
+      tests (17 files), 65 e2e tests (recorded post-review, 003 review #3 nit).
 - [X] T002 Install `lucide-react` (ISC) and `@fontsource/inter` (OFL-1.1);
       verify the font woff2 assets exist under `node_modules/@fontsource/inter`
 
@@ -146,6 +148,13 @@ the renderer build (no remote src).
       + edges (offline font check via `document.fonts.check`, icon presence,
       footer left/right updates, shortening, placeholders) — run with
       `npm run test:e2e`
+      **Post-review additions**: behavioral keyboard test (row focus ring +
+      Space toggle — the chevron is mouse/SR-only because react-arborist owns
+      the tree's Tab stop), icon distinctness (folder≠file, toolbar icons
+      differ), non-Latin/long-name fixture (spec edge), FR-012 workspace
+      replacement (no stale path), selectable footer path, toolbar focus ring.
+      The spec edge "non-Latin / long file names remain readable" is covered
+      rather than scoped out.
 - [X] T015 [P] Run quickstart.md smoke and full `npm run lint`,
       `npm run typecheck`, `npm run test`, `npm run test:e2e`; review
       plan/research/data-model/contracts consistency

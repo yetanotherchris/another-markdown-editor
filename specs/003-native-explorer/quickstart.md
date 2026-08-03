@@ -17,8 +17,14 @@ a subfolder `notes/` with `deep.md`.
 
 ## 2 — US1: keyboard toggle
 
-1. Tab to a folder row, then Tab until the chevron (Expand) is focused.
-2. Expected: a visible focus ring; Enter/Space toggles the folder.
+1. Tab into the tree (the tree is one Tab stop; the first Tab reaches it after
+   the two toolbar buttons). The first row gains a visible focus ring.
+2. Use Arrow Down/Up to move the ring between rows; the selected file's
+   highlight stays on the last clicked row (selection and focus are separate).
+3. On a folder row, press Space (or Arrow Right to expand / Arrow Left to
+   collapse). Expected: the folder toggles and the focus ring stays visible.
+4. Note: the chevron itself is mouse / screen-reader only — keyboard users
+   toggle with Space/arrows on the focused row.
 
 ## 3 — US2: toolbar buttons use icons
 

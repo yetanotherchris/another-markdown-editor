@@ -5,14 +5,24 @@
  * prefixes the retained tail with an ellipsis + separator, e.g.
  * `…\projects\notes` for a too-long `C:\Users\me\projects\notes`.
  *
- * The final segment is never split: if even it alone cannot fit, the
- * final-folder floor (callers pass a maxLength that is at least its length)
- * keeps it intact and the span's overflow CSS is the hard cap.
+ * Both separators (`\` and `/`) are recognised when splitting; the output uses
+ * backslash when the input contains any (the Windows convention), so a
+ * mixed-separator input does not mis-split. Empty segments (a trailing
+ * separator, repeated separators) are dropped. A single-segment path has no
+ * separator to shorten with, so the minimal `…<sep>final` form is returned
+ * even when it exceeds `maxLength` — the caller's final-folder floor guarantees
+ * `maxLength >= final.length + 2` (see StatusFooter), and the span's overflow
+ * CSS is the hard cap beyond that.
+ *
+ * Lengths are UTF-16 code units; a non-BMP folder name (e.g. an emoji) is
+ * therefore under-budgeted. Display-only, and CSS ellipsis clips the tail.
  */
 export function shortenPath(path: string, maxLength: number): string {
+  if (maxLength <= 0) return '…'
+  if (path.length === 0) return ''
   if (path.length <= maxLength) return path
   const sep = path.includes('\\') ? '\\' : '/'
-  const segments = path.split(sep)
+  const segments = path.split(/[\\/]/).filter((s) => s.length > 0)
   const final = segments[segments.length - 1] ?? path
   // Walk from the end, prepending each segment while the candidate (plus the
   // leading '…' + separator) still fits. The final folder is always included.

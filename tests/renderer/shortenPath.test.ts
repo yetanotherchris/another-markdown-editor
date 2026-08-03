@@ -37,4 +37,23 @@ describe('shortenPath', () => {
     expect(out.startsWith('…/')).toBe(true)
     expect(out.endsWith('notes')).toBe(true)
   })
+
+  it('handles mixed separators without mis-splitting', () => {
+    // Backslash wins for output when the input mixes both separators.
+    expect(shortenPath('C:\\Users\\me/notes', 12)).toBe('…\\me\\notes')
+  })
+
+  it('handles a trailing separator', () => {
+    // The empty final segment is dropped, so the folder name survives.
+    expect(shortenPath('C:\\Users\\me\\', 6)).toBe('…\\me')
+  })
+
+  it('returns an empty path unchanged', () => {
+    expect(shortenPath('', 10)).toBe('')
+  })
+
+  it('handles maxLength of zero or less without throwing', () => {
+    expect(shortenPath('/a/b/notes', 0)).toBe('…')
+    expect(shortenPath('/a/b/notes', -5)).toBe('…')
+  })
 })

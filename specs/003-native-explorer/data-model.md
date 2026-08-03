@@ -29,10 +29,15 @@ the footer can read the full location.
 
 | Value | Derivation |
 |-------|-----------|
-| Footer left text | `activeDoc ? activeDoc.title + (dirty ? ' •' : '') : 'No document open'` |
-| Footer right full text | `workspace.root` (or `'No folder open'` when `workspace.name === null`) |
+| Footer left text | `activeDoc ? activeDoc.title + dirty-marker : 'No document open'` (marker wrapped in a span `aria-label="unsaved changes"`, mirroring the tab marker) |
+| Footer right full text | `workspace.root` (or `'No folder open'` when `workspace.root === null` — the footer keys both the placeholder and the display off the path, not the name) |
 | Footer right displayed text | `workspace.root === null ? placeholder : (fits ? root : shortenPath(root, maxChars))` |
-| `maxChars` | `max(finalFolderName.length + 3, floor(footerWorkspaceWidthPx / 8))` |
+| `maxChars` | `max(finalFolderName.length + 2, floor(footerWorkspaceRegionWidthPx / 8))` — `+ 2` is exactly the `…` + separator overhead of the minimal shortened form |
+
+`StatusFooter` takes `{ activeDoc, workspaceRoot }` — the `workspaceName` prop
+was dropped during review: it was only ever used to decide the placeholder, and
+keying that off `root` (which both REPLACE dispatches populate together) keeps
+the "no folder open" invariant structural.
 
 ## Reducer changes
 

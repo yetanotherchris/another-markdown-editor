@@ -11,6 +11,13 @@ html, body, #root {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
 }
 
+/* Form controls and buttons do not inherit font-family from their ancestors;
+   without this reset the dialogs, tab close buttons and context menu render in
+   the platform default font while the chrome is Inter (FR-006). */
+button, input, select, textarea {
+  font-family: inherit;
+}
+
 /* The editor canvas consumes the same sans-serif family as the chrome so the
    whole interface has one clean desktop-editor appearance (research R2). */
 .milkdown {
@@ -437,9 +444,13 @@ html, body, #root {
   white-space: nowrap;
   direction: ltr;
   text-align: right;
+  /* The workspace path is real information the user may want to copy; the
+     footer's user-select: none would otherwise block selecting it. */
+  user-select: text;
 }
 
 .footer-placeholder {
-  color: #999;
+  /* #737373 on the #fafafa footer = 4.54:1 — WCAG AA for 12px text. */
+  color: #737373;
   font-style: italic;
 }

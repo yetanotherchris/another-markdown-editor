@@ -76,37 +76,49 @@ test('US1 tree rows render cohesive lucide icons (folder, file, chevron)', async
   await expect(alphaRow.locator('.tree-node-icon svg')).toBeVisible()
   await expect(alphaRow.getByRole('button', { name: 'Expand' })).toHaveCount(0)
 
+  // The icons are genuinely distinct — a folder glyph is not a file glyph (a
+  // regression that rendered one identical icon everywhere must fail here).
+  const folderIcon = await subRow.locator('.tree-node-icon svg').innerHTML()
+  const fileIcon = await alphaRow.locator('.tree-node-icon svg').innerHTML()
+  expect(folderIcon).not.toBe(fileIcon)
+
   // Expand flips the affordance (chevron + open-folder icon).
   await subRow.getByRole('button', { name: 'Expand' }).click()
   await expect(subRow.getByRole('button', { name: 'Collapse' })).toBeVisible()
   await expect(window.getByRole('treeitem').getByText('gamma.md')).toBeVisible()
 })
 
-test('US1 keyboard access to the expand control (FR-013)', async () => {
+test('US1 keyboard access to expand/collapse via the focused row (FR-013)', async () => {
   await openFolder()
   const subRow = window.getByRole('treeitem').filter({ hasText: 'sub' })
-  const toggle = subRow.getByRole('button', { name: 'Expand' })
-  // A real <button> is natively keyboard-focusable and Enter/Space-operable;
-  // its accessible name exposes the purpose without relying on the icon
-  // (US2 acceptance 3).
-  await expect(toggle).toHaveAccessibleName('Expand')
-  // The keyboard focus ring is defined in the loaded stylesheet (react-arborist
-  // manages row focus, so assert the rule rather than transient DOM focus).
-  const hasFocusRule = await window.evaluate(() => {
-    for (const sheet of Array.from(document.styleSheets)) {
-      try {
-        for (const rule of Array.from(sheet.cssRules)) {
-          if ((rule as CSSStyleRule).selectorText?.includes('.tree-node-toggle:focus-visible')) {
-            return true
-          }
-        }
-      } catch {
-        /* cross-origin sheet — skip */
-      }
-    }
-    return false
+
+  // The chevron keeps its accessible name for screen readers and mouse use.
+  await expect(subRow.getByRole('button', { name: 'Expand' })).toHaveAccessibleName('Expand')
+
+  // react-arborist gives the [role=tree] container the tree's single Tab
+  // stop; focusing it roving-focuses the first row. Keyboard toggling happens
+  // on the row (Space), not on the chevron button (which is mouse/SR-only —
+  // the container's Tab handler skips elements inside the tree).
+  await window.getByRole('tree').focus()
+  await expect
+    .poll(() => window.evaluate(() => (document.activeElement as HTMLElement | null)?.getAttribute('role')))
+    .toBe('treeitem')
+
+  // Space toggles the focused folder. A real keyboard event also establishes
+  // the keyboard input modality so :focus-visible matches the focused row.
+  await window.keyboard.press('Space')
+
+  // The focused row carries a visible focus ring (the row that would otherwise
+  // be silently focus-moved with no indicator — WCAG 2.4.7).
+  const ringVisible = await window.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null
+    if (!el) return false
+    const style = getComputedStyle(el)
+    return style.outlineStyle !== 'none' && style.outlineWidth !== '0px'
   })
-  expect(hasFocusRule).toBe(true)
+  expect(ringVisible).toBe(true)
+
+  await expect(window.getByRole('treeitem').getByText('gamma.md')).toBeVisible()
 })
 
 // ---------- US2: toolbar action buttons use icons ----------
@@ -123,6 +135,30 @@ test('US2 New and Open Folder buttons show icons with accessible names', async (
     .locator('svg').count()
   expect(newIcon).toBe(1)
   expect(openIcon).toBe(1)
+
+  // The two toolbar glyphs are genuinely different (Plus vs FolderOpen) — an
+  // "every button renders the same icon" regression must fail here.
+  const plusIcon = await window.getByRole('button', { name: 'New' }).locator('svg').innerHTML()
+  const folderOpenIcon = await window.getByRole('button', { name: 'Open Folder' }).locator('svg').innerHTML()
+  expect(plusIcon).not.toBe(folderOpenIcon)
+})
+
+test('US2 toolbar buttons show a visible keyboard focus ring (FR-013)', async () => {
+  // First Tab in a fresh window lands on the first toolbar button (the toolbar
+  // precedes the tree in the DOM). A mouse click would not match :focus-visible,
+  // so drive focus with the keyboard.
+  await window.keyboard.press('Tab')
+  const focused = await window.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null
+    if (!el) return null
+    const style = getComputedStyle(el)
+    return {
+      label: el.textContent?.trim(),
+      ring: style.outlineStyle !== 'none' && style.outlineWidth !== '0px'
+    }
+  })
+  expect(focused?.label).toContain('New')
+  expect(focused?.ring).toBe(true)
 })
 
 // ---------- US3: status footer ----------
@@ -167,12 +203,17 @@ test('US3 footer right shortens a long workspace path keeping the final folder',
   }, nested)
   await openFolder()
 
-  const workspaceText = await window.getByTestId('footer-workspace').textContent()
+  // Wait for the async open-dialog -> REPLACE -> render roundtrip before
+  // reading text: a read-once textContent() right after the click races the
+  // footer still showing the placeholder.
+  const workspace = window.getByTestId('footer-workspace')
+  await expect(workspace).toContainText('…')
+  const workspaceText = await workspace.textContent()
   expect(workspaceText).toContain('…')
   // The final folder name survives whole (FR-010).
   expect(workspaceText).toContain(longName)
   // Nothing overlaps the footer: the workspace span does not overflow its box.
-  const overflow = await window.getByTestId('footer-workspace').evaluate((el) => {
+  const overflow = await workspace.evaluate((el) => {
     return el.scrollWidth > el.clientWidth
   })
   expect(overflow).toBe(false)
@@ -197,7 +238,13 @@ test('US3 the header no longer shows the active document (FR-011)', async () => 
 test('US4 Inter is loaded from bundled assets (no network dependency)', async () => {
   await openFolder()
   // The typeface must be available without a network fetch (FR-007).
-  const loaded = await window.evaluate(() => document.fonts.check('16px Inter'))
+  // document.fonts.check is racy while the face is pending: gate on ready and
+  // load the face first, then check.
+  const loaded = await window.evaluate(async () => {
+    await document.fonts.ready
+    await document.fonts.load('16px Inter')
+    return document.fonts.check('16px Inter')
+  })
   expect(loaded).toBe(true)
   // The chrome resolves to Inter.
   const font = await window.evaluate(() => getComputedStyle(document.body).fontFamily)
@@ -209,4 +256,54 @@ test('US4 Inter is loaded from bundled assets (no network dependency)', async ()
 test('untitled document shows its display title in the footer', async () => {
   await window.getByRole('button', { name: 'New' }).click()
   await expect(window.getByTestId('footer-document')).toContainText(/Untitled-\d/)
+})
+
+test('non-Latin file and folder names stay readable and aligned (spec edge)', async () => {
+  // The spec's non-Latin / long-name edge case: the tree rows and the footer
+  // must keep working and the icons must stay aligned.
+  const longName = '文件夹名称特别特别长-namethat-is-long'
+  const nested = path.join(testFolder, '笔记', longName)
+  fs.mkdirSync(nested, { recursive: true })
+  fs.writeFileSync(path.join(nested, '文档.md'), '# 文档')
+
+  await app.evaluate(({ dialog }, folder) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [folder as string]
+    })
+  }, nested)
+  await openFolder()
+
+  // The tree lists the non-Latin file with its icon.
+  const docRow = window.getByRole('treeitem').filter({ hasText: '文档.md' })
+  await expect(docRow).toBeVisible()
+  await expect(docRow.locator('.tree-node-icon svg')).toBeVisible()
+  // The footer shows the (non-Latin) final folder, not a stale placeholder.
+  await expect(window.getByTestId('footer-workspace')).toContainText(longName)
+})
+
+test('US3 replacing the workspace updates the footer path promptly (FR-012)', async () => {
+  await openFolder()
+  await expect(window.getByTestId('footer-workspace')).toHaveText(fs.realpathSync(testFolder))
+
+  // Open a different workspace; the footer must follow, never keeping a stale path.
+  const other = path.join(testFolder, 'other-workspace')
+  fs.mkdirSync(other)
+  await app.evaluate(({ dialog }, folder) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [folder as string]
+    })
+  }, other)
+  await openFolder()
+  await expect(window.getByTestId('footer-workspace')).toHaveText(fs.realpathSync(other))
+})
+
+test('US3 the workspace path in the footer is selectable text', async () => {
+  // The footer's user-select: none must not block copying the real path.
+  await openFolder()
+  const selectable = await window.getByTestId('footer-workspace').evaluate((el) => {
+    return getComputedStyle(el).userSelect === 'text'
+  })
+  expect(selectable).toBe(true)
 })
