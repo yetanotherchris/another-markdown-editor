@@ -99,6 +99,88 @@ describe('documents reducer', () => {
       })
       expect(s3.documents[0].dirty).toBe(false)
     })
+
+    it('a formatted edit undone back to the original is not dirty (no trailing-newline file)', () => {
+      const state = createSession()
+      const s1 = documentsReducer(state, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 }
+      })
+      const docId = s1.documents[0].id
+      // Mount captured the editor's serialization: raw bytes + the newline
+      // Milkdown always appends (CrepeHost CAPTURE_BASELINE).
+      const s2 = documentsReducer(s1, {
+        type: 'CAPTURE_BASELINE',
+        payload: { id: docId, baseline: 'hello\n' }
+      })
+      // A real edit marks the document dirty...
+      const s3 = documentsReducer(s2, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: docId, content: 'hello world\n' }
+      })
+      expect(s3.documents[0].dirty).toBe(true)
+      // ...but Ctrl+Z back to the original content must clear it again.
+      const s4 = documentsReducer(s3, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: docId, content: 'hello\n' }
+      })
+      expect(s4.documents[0].content).toBe('hello\n')
+      expect(s4.documents[0].dirty).toBe(false)
+    })
+
+    it('a formatted edit undone back to the original is not dirty (file with trailing newline)', () => {
+      const state = createSession()
+      const s1 = documentsReducer(state, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'hello\n', mtimeMs: 1, size: 6 }
+      })
+      const docId = s1.documents[0].id
+      const s2 = documentsReducer(s1, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: docId, content: 'hello world\n' }
+      })
+      expect(s2.documents[0].dirty).toBe(true)
+      const s3 = documentsReducer(s2, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: docId, content: 'hello\n' }
+      })
+      expect(s3.documents[0].dirty).toBe(false)
+    })
+
+    it('a real formatted edit stays dirty even after a CRLF→LF normalization', () => {
+      const state = createSession()
+      const s1 = documentsReducer(state, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: '# Title\r\n\r\nbody', mtimeMs: 1, size: 16 }
+      })
+      const docId = s1.documents[0].id
+      // Mounted editor normalized EOLs; its baseline serialization is LF-only.
+      const s2 = documentsReducer(s1, {
+        type: 'CAPTURE_BASELINE',
+        payload: { id: docId, baseline: '# Title\n\nbody\n' }
+      })
+      const s3 = documentsReducer(s2, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: docId, content: '# Title\n\nbody edited\n' }
+      })
+      expect(s3.documents[0].dirty).toBe(true)
+    })
+
+    it('source view uses exact raw-byte comparison: a trailing newline typed in source is a real edit', () => {
+      const state = createSession()
+      const s1 = documentsReducer(state, {
+        type: 'OPEN_EXISTING',
+        payload: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5, view: 'source' }
+      })
+      const docId = s1.documents[0].id
+      // Source view reports raw text — a newline the user typed is an edit,
+      // not editor normalization.
+      const s2 = documentsReducer(s1, {
+        type: 'UPDATE_CONTENT',
+        payload: { id: docId, content: 'hello\n' }
+      })
+      expect(s2.documents[0].dirty).toBe(true)
+    })
   })
 
   describe('CAPTURE_BASELINE', () => {

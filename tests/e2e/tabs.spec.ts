@@ -125,6 +125,23 @@ test('edits mark a tab dirty and survive tab switches', async () => {
   await expect(alphaTab.locator('.tab-dirty')).toBeVisible()
 })
 
+test('opening a no-trailing-newline file stays clean, and edit undone to original clears dirty', async () => {
+  await openFolderAndFile('alpha.md')
+
+  // alpha.md is written without a trailing newline; the editor appends one on
+  // serialization, but a pristine document must not show a dirty marker.
+  const alphaTab = window.getByRole('tab', { name: /alpha\.md/ })
+  await expect(alphaTab.locator('.tab-dirty')).toHaveCount(0)
+
+  await typeInEditor(' EXTRA')
+  await expect(alphaTab.locator('.tab-dirty')).toBeVisible()
+
+  // Undo back to the original content: no real change remains, so the dirty
+  // marker clears (the appended trailing newline is not an edit).
+  await window.keyboard.press('Control+z')
+  await expect(alphaTab.locator('.tab-dirty')).toHaveCount(0)
+})
+
 test('closing a clean tab closes it without a prompt', async () => {
   await openFolderAndFile('alpha.md')
   await openSecondFile('beta.md')

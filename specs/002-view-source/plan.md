@@ -62,7 +62,13 @@ each `Document`, and three actions: `SET_VIEW`, `OPEN_EXISTING` open-in-source
 (accepted as an action payload flag), and `REFRESH_FROM_SOURCE` (bumps
 `contentVersion` to remount Crepe with the new text, keeping baseline/dirty).
 Source textarea content is dispatched straight into `UPDATE_CONTENT`, the same
-store path formatted edits use; `dirty = content !== baseline` is unchanged.
+store path formatted edits use. The reducer's dirty flag is view-aware
+(2026-08-03 fix): source `dirty = content !== baseline`; formatted
+`dirty = !markdownSame(content, editorBaseline)` so a formatted edit undone
+back to the original content is clean — the formatted content slot holds the
+editor serialization with its always-appended trailing newline, which
+`editorBaseline` already absorbed; a strict raw-byte comparison would mark
+that round-trip dirty.
 
 **View switching** (research R3): formatted→source syncs live Crepe content
 into the store first; source→formatted compares the live instance's

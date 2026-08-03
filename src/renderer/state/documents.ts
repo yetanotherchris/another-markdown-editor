@@ -43,7 +43,9 @@ export interface DocumentState {
    *  pipes, entities). It is the reference for the live-dirty check
    *  (isDirtyLive): the editor has uncommitted drift only when its current
    *  serialization differs from this baseline, never merely because it
-   *  normalized a pristine document. */
+   *  normalized a pristine document. It is also the reference UPDATE_CONTENT
+   *  uses to compute the reducer dirty flag for formatted documents (an
+   *  edit → undo back to the original content is not dirty). */
   editorBaseline: string
   content: string
   dirty: boolean
@@ -216,7 +218,27 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
         ...state,
         documents: state.documents.map(d =>
           d.id === id
-            ? { ...d, content, dirty: content !== d.baseline, lastActiveAt: Date.now() }
+            ? {
+                ...d,
+                content,
+                // A formatted document's content slot holds the editor's
+                // serialization, which always appends a single trailing newline
+                // and normalizes EOLs. Comparing it byte-for-byte against the
+                // raw on-disk baseline would mark an untouched document dirty
+                // (e.g. edit → undo back to the original). Compare against the
+                // editor's OWN baseline serialization instead — it already
+                // absorbed every normalization (trailing newline, CRLF→LF,
+                // re-escaped entities), so only real drift is dirty.
+                // markdownSame is the belt-and-suspenders covering the windows
+                // where editorBaseline is still the raw bytes (pre-CAPTURE_BASELINE,
+                // post-raw-bytes SAVE_SUCCESS). Source-view content is raw text,
+                // so the exact byte comparison stays correct there.
+                dirty:
+                  d.view === 'source'
+                    ? content !== d.baseline
+                    : !markdownSame(content, d.editorBaseline),
+                lastActiveAt: Date.now()
+              }
             : d
         )
       }

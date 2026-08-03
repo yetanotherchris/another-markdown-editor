@@ -32,10 +32,17 @@ mount + has no raw-text surface).
 **Decision**: Both views read/write `DocumentState.content`. WYSIWYG updates
 already arrive through `UPDATE_CONTENT` (via the listener's debounced
 `markdownUpdated`). Source view dispatches `UPDATE_CONTENT` with its textarea
-value on every change. `dirty = content !== baseline` stays as-is in the
-reducer (FR-10, FR-13). No new dirty logic exists: a source edit marks the
-tab dirty exactly like a formatted edit, and the existing save/close/quit/
-external-change guards apply unchanged.
+value on every change. The reducer's dirty flag is view-aware (2026-08-03
+fix): source documents keep `dirty = content !== baseline` (raw bytes), while
+formatted documents compute `dirty = !markdownSame(content, editorBaseline)`.
+The formatted content slot holds the editor's serialization, which always
+appends a single trailing newline and normalizes EOLs, so a strict comparison
+against the raw baseline marked an edit→undo back to the original as dirty.
+Comparing against the editor's own baseline (which already absorbed that
+normalization) keeps "returned to original" clean and still flags real edits —
+it is the reducer-side equivalent of the live-dirty guard (late addition
+2026-08-03). A source edit marks the tab dirty exactly like a formatted edit,
+and the existing save/close/quit/external-change guards apply unchanged.
 
 **Saved bytes**: while a tab shows source, `getContentToSave` returns the raw
 `document.content` rather than `crepe.getMarkdown()`, so Ctrl+S writes the
