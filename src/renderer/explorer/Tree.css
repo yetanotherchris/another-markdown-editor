@@ -31,6 +31,18 @@
   background: rgba(0, 0, 0, 0.08);
 }
 
+/* Keyboard focus must stay visible on the tree itself (FR-013, WCAG 2.4.7).
+   react-arborist gives the [role=tree] container the tree's single Tab stop
+   and roving-focuses the rows (tabIndex -1), so both need a ring: the
+   container when it is tabbed into, and the focused row during arrow-key
+   navigation (selection does NOT follow focus — selecting opens a file, so
+   arrow navigation must not open documents; the ring is the focus indicator). */
+[role='tree']:focus-visible,
+[role='treeitem']:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+}
+
 .tree-node-toggle {
   width: 16px;
   flex-shrink: 0;
@@ -38,18 +50,29 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #888;
-  font-size: 10px;
+  color: #666;
+  padding: 0;
+  border: none;
+  background: none;
   user-select: none;
+  border-radius: 3px;
 }
 
 .tree-node-toggle:hover {
-  color: #333;
+  color: #222;
+}
+
+/* Keyboard focus on the expand/collapse control must stay visible (FR-013). */
+.tree-node-toggle:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 1px;
 }
 
 .tree-node-icon {
   font-size: 14px;
   line-height: 1;
+  display: inline-flex;
+  color: #5a5a5a;
 }
 
 .tree-node-name {

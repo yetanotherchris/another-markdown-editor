@@ -18,6 +18,9 @@ export type EntryKind = 'file' | 'directory'
 
 export interface WorkspaceInfo {
   name: string
+  /** The realpath of the opened workspace root (spec 003, display only — the
+   *  renderer never feeds it back into any filesystem call). */
+  path: string | null
   entries: DirEntry[]
 }
 
