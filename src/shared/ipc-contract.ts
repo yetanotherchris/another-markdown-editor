@@ -66,9 +66,21 @@ export interface DocumentChangeEvent {
   kind: 'changed' | 'removed'
 }
 
+/** Recent-entry type: a markdown file or a workspace folder (spec 004). */
+export type RecentKind = 'file' | 'folder'
+
+/** A persisted recent item (spec 004, FR-001…013). `path` is absolute. */
+export interface RecentItem {
+  path: string
+  kind: RecentKind
+  name: string
+  lastOpenedAt: number
+}
+
 export type MenuCommand =
   | 'open-file' | 'open-folder' | 'save' | 'save-as'
   | 'close-tab' | 'new-file'
+  | { type: 'open-recent'; path: string; kind: RecentKind }
 
 export interface Settings {
   sidebarWidth: number
@@ -80,6 +92,8 @@ export interface DesktopApi {
   readDir(relativePath: string): Promise<Result<DirEntry[]>>
   openFileDialog(): Promise<Result<OpenedFile | null>>
   readFile(relativePath: string): Promise<Result<OpenedFile>>
+  openRecentFile(path: string): Promise<Result<OpenedFile>>
+  openRecentFolder(path: string): Promise<Result<WorkspaceInfo>>
   writeFile(relativePath: string, content: string): Promise<Result<WriteReceipt>>
   saveFileDialog(suggestedName: string, content: string): Promise<Result<OpenedFile | null>>
   createEntry(parentRelativePath: string, name: string, kind: EntryKind): Promise<Result<DirEntry>>

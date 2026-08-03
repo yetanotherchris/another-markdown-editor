@@ -657,6 +657,39 @@ export default function App() {
   useEffect(() => {
     const unsubMenu = window.api.onMenuCommand((command: MenuCommand) => {
       const active = getActiveDocument(sessionRef.current)
+      if (typeof command === 'object') {
+        // Spec 004: File > Recent Items. Route through the exact same dispatch
+        // paths as File > Open File / Open Folder (FR-007). A failed open
+        // surfaces in-context and leaves the session untouched (FR-009).
+        if (command.type === 'open-recent') {
+          if (command.kind === 'file') {
+            window.api.openRecentFile(command.path).then((result) => {
+              if (result.ok) {
+                dispatch({ type: 'OPEN_EXISTING', payload: result.value })
+                enforcePoolCap(sessionRef.current.activeId)
+              } else {
+                setOperationError(result.message)
+              }
+            })
+          } else {
+            window.api.openRecentFolder(command.path).then((result) => {
+              if (result.ok) {
+                dispatchWorkspace({
+                  type: 'REPLACE',
+                  payload: {
+                    name: result.value.name,
+                    root: result.value.path,
+                    entries: result.value.entries
+                  }
+                })
+              } else {
+                setOperationError(result.message)
+              }
+            })
+          }
+        }
+        return
+      }
       switch (command) {
         case 'open-file': {
           window.api.openFileDialog().then((result) => {

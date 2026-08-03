@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import type { DocumentState } from '../state/documents'
 import { useElementSize } from '../hooks/useElementSize'
-import { shortenPath } from './shortenPath'
+import { shortenPath } from '../../shared/shortenPath'
 
 interface StatusFooterProps {
   activeDoc: DocumentState | null

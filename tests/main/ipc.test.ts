@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
-  WriteReceipt, TrashReceipt, ErrorCode
+  WriteReceipt, TrashReceipt, ErrorCode, MenuCommand, RecentItem
 } from '../../src/shared/ipc-contract'
 
 describe('IPC contract types', () => {
@@ -71,5 +71,18 @@ describe('IPC contract types', () => {
     expect(info.name).toBe('my-workspace')
     expect(info.path).toBe('/home/me/projects/my-workspace')
     expect(info.entries.length).toBe(1)
+  })
+
+  it('RecentItem carries an absolute path, kind, name and timestamp', () => {
+    const file: RecentItem = { path: '/home/me/notes/a.md', kind: 'file', name: 'a.md', lastOpenedAt: 1000 }
+    const folder: RecentItem = { path: '/home/me/notes', kind: 'folder', name: 'notes', lastOpenedAt: 2000 }
+    expect(file.kind).toBe('file')
+    expect(folder.kind).toBe('folder')
+    expect(folder.lastOpenedAt).toBeGreaterThan(file.lastOpenedAt)
+  })
+
+  it('MenuCommand includes the open-recent object form', () => {
+    const cmd: MenuCommand = { type: 'open-recent', path: '/home/me/notes/a.md', kind: 'file' }
+    expect(cmd).toMatchObject({ type: 'open-recent' })
   })
 })

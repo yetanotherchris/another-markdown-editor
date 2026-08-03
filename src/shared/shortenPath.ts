@@ -1,9 +1,10 @@
 /**
- * Shorten a filesystem path for display (spec 003, FR-010). When `path` fits
- * within `maxLength` it is returned unchanged; otherwise the shortest
- * unambiguous form that still fits keeps the FINAL folder name whole and
- * prefixes the retained tail with an ellipsis + separator, e.g.
- * `…\projects\notes` for a too-long `C:\Users\me\projects\notes`.
+ * Shorten a filesystem path for display (spec 003, FR-010; reused by spec 004
+ * native-menu labels). When `path` fits within `maxLength` it is returned
+ * unchanged; otherwise the shortest unambiguous form that still fits keeps the
+ * FINAL folder name whole and prefixes the retained tail with an ellipsis +
+ * separator, e.g. `…\projects\notes` for a too-long
+ * `C:\Users\me\projects\notes`.
  *
  * Both separators (`\` and `/`) are recognised when splitting; the output uses
  * backslash when the input contains any (the Windows convention), so a

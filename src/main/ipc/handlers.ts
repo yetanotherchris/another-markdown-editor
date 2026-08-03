@@ -8,10 +8,13 @@ import { writeFile } from '../fs/write'
 import { mkdir, createFile, moveEntry, trashEntry } from '../fs/mutate'
 import { loadSettings, saveSettings } from '../settings'
 import { WorkspaceState } from '../workspace'
+import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem } from '../recentItems'
+import { recentItemsConfigPath } from '../recentItemsPath'
+import { refreshApplicationMenu } from '../menu'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, TrashReceipt, Settings, EntryKind, ErrorCode,
-  WatchEvent, EntryInfo
+  WatchEvent, EntryInfo, RecentKind
 } from '../../shared/ipc-contract'
 
 let workspaceState: WorkspaceState | null = null
@@ -144,17 +147,72 @@ export function getWorkspaceRoot(): string | null {
 export function setupHandlers(window: BrowserWindow): void {
   setupWindowCloseHandler(window)
 
-  ipcMain.handle('workspace:openDialog', async (): Promise<Result<WorkspaceInfo | null>> => {
-    try {
-      const result = await dialog.showOpenDialog({
-        properties: ['openDirectory']
-      })
+  // ---- spec-004 recent items helpers ----
 
-      if (result.canceled || result.filePaths.length === 0) {
-        return ok(null)
+  // The renderer may only open a path main itself recorded (research R4):
+  // the recent-open handlers re-validate against the persisted list before any
+  // filesystem access.
+  function isRecentEntry(path_: string, kind: RecentKind): boolean {
+    return loadRecentItems(recentItemsConfigPath()).some(
+      (i) => i.path === path_ && i.kind === kind
+    )
+  }
+
+  function recordRecent(path_: string, kind: RecentKind, name: string): void {
+    const configPath = recentItemsConfigPath()
+    const items = loadRecentItems(configPath)
+    saveRecentItems(configPath, recordRecentItem(items, {
+      path: path_, kind, name, lastOpenedAt: Date.now()
+    }))
+    refreshApplicationMenu(window)
+  }
+
+  function removeRecent(path_: string, kind: RecentKind): void {
+    const configPath = recentItemsConfigPath()
+    const items = loadRecentItems(configPath)
+    saveRecentItems(configPath, removeRecentItem(items, path_, kind))
+    refreshApplicationMenu(window)
+  }
+
+  // Opens a file by absolute path, mirroring the dialog handler: when the file
+  // sits inside the current workspace the response carries the workspace-
+  // relative path and the parent is watched; otherwise the content is read
+  // directly with a `path: null` response.
+  function openFileFromPath(filePath: string): OpenedFile {
+    if (workspaceRoot) {
+      const relativePath = resolveAbsolutePath(workspaceRoot, filePath)
+      if (relativePath) {
+        const opened = readFile(workspaceRoot, relativePath)
+        const parent = relativePath.includes('/')
+          ? relativePath.split('/').slice(0, -1).join('/')
+          : '.'
+        workspaceState?.watchDir(parent)
+        return opened
       }
+    }
 
-      const rootPath = result.filePaths[0]
+    const buffer = fs.readFileSync(filePath)
+
+    try {
+      new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+    } catch {
+      throw Object.assign(new Error('File is not valid UTF-8 text'), { code: 'NOT_TEXT' as ErrorCode })
+    }
+
+    return {
+      path: null,
+      name: path.basename(filePath),
+      content: buffer.toString('utf-8'),
+      mtimeMs: fs.statSync(filePath).mtimeMs,
+      size: fs.statSync(filePath).size
+    }
+  }
+
+  // Opens a folder as the workspace by absolute path, mirroring the dialog
+  // handler. On failure the workspace state is reset and the error propagates
+  // so the caller can classify it and drop a dead recent entry (FR-009).
+  function openFolderFromPath(rootPath: string): WorkspaceInfo {
+    try {
       const realRootPath = fs.realpathSync(rootPath)
 
       workspaceRoot = realRootPath
@@ -168,13 +226,34 @@ export function setupHandlers(window: BrowserWindow): void {
       workspaceState.open(realRootPath)
 
       const entries = workspaceState.getEntries('.')
-      return ok({ path: workspaceRoot, name: workspaceName, entries })
+      return { path: workspaceRoot, name: workspaceName, entries }
     } catch (e: unknown) {
       workspaceRoot = null
       workspaceName = null
       workspaceState?.close()
       workspaceState = null
-      return err('IO', sanitizeError(e, null))
+      throw e
+    }
+  }
+
+  ipcMain.handle('workspace:openDialog', async (): Promise<Result<WorkspaceInfo | null>> => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory']
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return ok(null)
+      }
+
+      const info = openFolderFromPath(result.filePaths[0])
+      // FR-003: a folder successfully opened as a workspace is a recent folder.
+      // Store the resolved realpath so reopen and containment agree (R4).
+      recordRecent(workspaceRoot!, 'folder', path.basename(workspaceRoot!))
+      return ok(info)
+    } catch (e: unknown) {
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
@@ -204,37 +283,70 @@ export function setupHandlers(window: BrowserWindow): void {
         return ok(null)
       }
 
-      const filePath = result.filePaths[0]
+      const opened = openFileFromPath(result.filePaths[0])
+      // FR-002: a markdown file successfully opened through the File menu is a
+      // recent file. FR-013: explorer opens use file:read and never record.
+      recordRecent(opened.path ? path.resolve(workspaceRoot!, opened.path) : result.filePaths[0], 'file', opened.name)
+      return ok(opened)
+    } catch (e: unknown) {
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
+    }
+  })
 
-      if (workspaceRoot) {
-        const relativePath = resolveAbsolutePath(workspaceRoot, filePath)
-        if (relativePath) {
-          const opened = readFile(workspaceRoot, relativePath)
-          const parent = relativePath.includes('/')
-            ? relativePath.split('/').slice(0, -1).join('/')
-            : '.'
-          workspaceState?.watchDir(parent)
-          return ok(opened)
-        }
+  ipcMain.handle('recent:openFile', (_e, args: unknown): Result<OpenedFile> => {
+    try {
+      validateShape(args, ['path'])
+      ensureString((args as { path: unknown }).path, 'path')
+      const requestedPath = (args as { path: string }).path
+
+      // Research R4: only open a path main itself recorded. Rejecting here
+      // keeps the renderer unable to read arbitrary paths through this channel.
+      if (!isRecentEntry(requestedPath, 'file')) {
+        return err('OUTSIDE_WORKSPACE', 'Path is not a recorded recent file')
       }
-
-      const buffer = fs.readFileSync(filePath)
 
       try {
-        new TextDecoder('utf-8', { fatal: true }).decode(buffer)
-      } catch {
-        return err('NOT_TEXT', 'File is not valid UTF-8 text')
+        const opened = openFileFromPath(requestedPath)
+        // FR-006: a successful reopen moves the entry to the front.
+        recordRecent(opened.path ? path.resolve(workspaceRoot!, opened.path) : requestedPath, 'file', opened.name)
+        return ok(opened)
+      } catch (e: unknown) {
+        // FR-009: the target is unavailable — drop the entry, then report.
+        removeRecent(requestedPath, 'file')
+        const appErr = toAppError(e)
+        return err(appErr.code, sanitizeError(e, workspaceRoot))
+      }
+    } catch (e: unknown) {
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
+    }
+  })
+
+  ipcMain.handle('recent:openFolder', (_e, args: unknown): Result<WorkspaceInfo> => {
+    try {
+      validateShape(args, ['path'])
+      ensureString((args as { path: unknown }).path, 'path')
+      const requestedPath = (args as { path: string }).path
+
+      if (!isRecentEntry(requestedPath, 'folder')) {
+        return err('OUTSIDE_WORKSPACE', 'Path is not a recorded recent folder')
       }
 
-      return ok({
-        path: null,
-        name: path.basename(filePath),
-        content: buffer.toString('utf-8'),
-        mtimeMs: fs.statSync(filePath).mtimeMs,
-        size: fs.statSync(filePath).size
-      })
+      try {
+        const info = openFolderFromPath(requestedPath)
+        // FR-006: reopen moves the folder to the front (store the realpath).
+        recordRecent(workspaceRoot!, 'folder', path.basename(workspaceRoot!))
+        return ok(info)
+      } catch (e: unknown) {
+        // FR-009: unavailable — drop the entry, then report.
+        removeRecent(requestedPath, 'folder')
+        const appErr = toAppError(e)
+        return err(appErr.code, sanitizeError(e, workspaceRoot))
+      }
     } catch (e: unknown) {
-      return err('IO', sanitizeError(e, null))
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 
