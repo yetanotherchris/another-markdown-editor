@@ -77,6 +77,23 @@ Same actions can also be reached from the UI (toolbar/buttons) where it makes se
 - Active tab shows in the editor; edits mark the tab **dirty**
 - **Save** / **Save As** write via main process
 
+### Dirty-state model
+
+How "has the file actually changed?" is decided. Two references per open document:
+
+- `baseline` — the **raw bytes on disk** (what "saved" means).
+- `editorBaseline` — **Milkdown's serialization of a pristine copy** (what the file looks like *after* the editor normalizes it: an appended trailing newline, CRLF→LF, re-escaped entities). It exists because Milkdown's output never equals the raw bytes — a raw comparison would flag every file as edited.
+
+The flow:
+
+1. **Open** — raw bytes go into `baseline`/`content`; the editor re-serializes them into `editorBaseline`. `dirty = false`.
+2. **Edit (formatted view)** — Milkdown emits its serialization (200 ms debounce) → `UPDATE_CONTENT`. The reducer's `dirty` flag is a **strict raw-bytes comparison** (`content !== baseline`): a trailing newline the editor appends marks the file dirty in the store until a save, because the store deliberately keeps the raw bytes (raw-bytes policy). The editor-normalization tolerance is **not** applied in the reducer; it lives in the live-dirty guard (step 4).
+3. **Edit (source view)** — raw text vs. `baseline`, exact bytes (a newline typed in source is a real edit); the reducer's flag is the same strict comparison.
+4. **Close / quit / delete guard** — does not trust the debounced flag alone. `isDirtyLive(doc)` first checks `doc.dirty`; for a formatted document it then reads the live editor's `getMarkdown()` and compares it against `editorBaseline` with `markdownSame` (tolerant of the appended trailing newline / EOL normalization), so a keystroke inside the 200 ms debounce window is never silently dropped and an untouched normalizing file is never flagged.
+5. **Save** — written bytes become the new `baseline`, `content`, and `editorBaseline`; `dirty = false`.
+
+Rule of thumb: **never compare editor output against raw disk bytes for the live-dirty check.** Compare it against what the editor would output for a pristine copy (`editorBaseline`). A trailing newline the editor appends is never an edit — but the store's `dirty` flag stays raw-bytes so the on-disk file is only ever rewritten with real changes.
+
 ### Tabs
 - Open from explorer or File menu → existing tab for that path, or new tab
 - Close tab → confirm if dirty

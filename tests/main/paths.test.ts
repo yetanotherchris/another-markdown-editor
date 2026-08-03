@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { resolveWithinRoot, resolveDirectory, resolveFile, resolveNonExistent } from '../../src/main/fs/paths'
+import { readFile, readDir } from '../../src/main/fs/read'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -203,5 +204,33 @@ describe('resolveNonExistent', () => {
 
   it('rejects a path outside root', () => {
     expect(() => resolveNonExistent(root, '../outside.md')).toThrow()
+  })
+})
+
+describe('fs operations reject absolute paths (what the IPC handlers route through)', () => {
+  // Security hardening (003 review): resolveWithinRoot's absolute-path
+  // rejection is the gate every file:read/file:write/readDir argument passes
+  // through. A handler-level regression — e.g. someone joining
+  // workspace.root + a renderer path — would silently read outside the
+  // workspace unless the fs layer itself refuses absolute inputs.
+  let root: string
+
+  beforeEach(() => {
+    root = createTempDir()
+    fs.writeFileSync(path.join(root, 'file.md'), '# content')
+  })
+
+  afterEach(() => {
+    cleanupTempDir(root)
+  })
+
+  it('readFile rejects an absolute path', () => {
+    expect(() => readFile(root, path.join(root, 'file.md'))).toThrow()
+    expect(() => readFile(root, '/etc/passwd')).toThrow()
+  })
+
+  it('readDir rejects an absolute path', () => {
+    expect(() => readDir(root, root)).toThrow()
+    expect(() => readDir(root, '/etc')).toThrow()
   })
 })

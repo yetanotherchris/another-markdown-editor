@@ -168,7 +168,7 @@ export function setupHandlers(window: BrowserWindow): void {
       workspaceState.open(realRootPath)
 
       const entries = workspaceState.getEntries('.')
-      return ok({ name: workspaceName, entries })
+      return ok({ path: workspaceRoot, name: workspaceName, entries })
     } catch (e: unknown) {
       workspaceRoot = null
       workspaceName = null

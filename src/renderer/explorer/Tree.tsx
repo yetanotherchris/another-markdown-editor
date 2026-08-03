@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Tree as ArboristTree, NodeApi, TreeApi } from 'react-arborist'
 import type { RowRendererProps, NodeRendererProps } from 'react-arborist'
+import { Folder, FolderOpen, FileText, ChevronRight, ChevronDown } from 'lucide-react'
 import type { TreeNode } from '../state/workspace'
 import { findNodeById, parentPathOf } from '../state/workspace'
 import { useElementSize } from '../hooks/useElementSize'
@@ -130,20 +131,31 @@ function TreeNode({ node, style, dragHandle, onRowContextMenu }: TreeNodeProps) 
       }}
     >
       {isDir && (
-        <span
+        <button
+          type="button"
           className="tree-node-toggle"
-          role="button"
           aria-label={node.isOpen ? 'Collapse' : 'Expand'}
+          // The chevron is a mouse/screen-reader affordance, not a keyboard
+          // tab stop: react-arborist's container owns the tree's single Tab
+          // stop and its Tab handler skips everything inside the tree (its
+          // getFocusable filters out contained elements). Keyboard toggling
+          // happens on the focused row (Space / ArrowRight / ArrowLeft), so
+          // this button is removed from the tab order rather than leaving a
+          // phantom stop its FR-013 ring can never reach. Mouse clicks still
+          // focus it; :focus-visible does not match mouse-initiated focus.
+          tabIndex={-1}
           onClick={(e) => {
             e.stopPropagation()
             node.toggle()
           }}
         >
-          {node.isOpen ? '\u25BE' : '\u25B8'}
-        </span>
+          {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
       )}
       <span className="tree-node-icon" aria-hidden="true">
-        {isDir ? (node.isOpen ? '📂' : '📁') : '📄'}
+        {isDir
+          ? (node.isOpen ? <FolderOpen size={14} /> : <Folder size={14} />)
+          : <FileText size={14} />}
       </span>
       {node.isEditing ? (
         <RenameInput node={node} />
@@ -193,7 +205,7 @@ function TreeRow({ node, attrs, innerRef, children, onKeyboardMenu, onRenameKey,
       className={attrs.className}
       tabIndex={attrs.tabIndex}
       role="treeitem"
-      aria-level={node.level}
+      aria-level={node.level + 1}
       aria-selected={node.isSelected}
       aria-expanded={isDir ? node.isOpen : undefined}
       onClick={node.handleClick}
