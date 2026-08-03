@@ -38,18 +38,30 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #888;
+  color: #666;
+  padding: 0;
+  border: none;
+  background: none;
   font-size: 10px;
   user-select: none;
+  border-radius: 3px;
 }
 
 .tree-node-toggle:hover {
-  color: #333;
+  color: #222;
+}
+
+/* Keyboard focus on the expand/collapse control must stay visible (FR-013). */
+.tree-node-toggle:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 1px;
 }
 
 .tree-node-icon {
   font-size: 14px;
   line-height: 1;
+  display: inline-flex;
+  color: #5a5a5a;
 }
 
 .tree-node-name {

@@ -1,6 +1,7 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
 import { Panel, Group, Separator } from 'react-resizable-panels'
 import type { TreeApi } from 'react-arborist'
+import { Plus, FolderOpen } from 'lucide-react'
 import type { MenuCommand, EntryKind, EntryInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
@@ -24,6 +25,7 @@ import EditorPanel from './editor/EditorPanel'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import ConfirmDialog from './dialogs/ConfirmDialog'
+import StatusFooter from './status/StatusFooter'
 import {
   renameTargetPath,
   moveTargetPath,
@@ -672,7 +674,7 @@ export default function App() {
                 type: 'REPLACE',
                 payload: {
                   name: result.value.name,
-                  root: null,
+                  root: result.value.path,
                   entries: result.value.entries
                 }
               })
@@ -778,7 +780,7 @@ export default function App() {
         type: 'REPLACE',
         payload: {
           name: result.value.name,
-          root: null,
+          root: result.value.path,
           entries: result.value.entries
         }
       })
@@ -798,16 +800,14 @@ export default function App() {
   return (
     <div className="app-container">
       <div className="toolbar">
-        <button onClick={handleNew}>New</button>
-        <button onClick={handleOpenFolder}>Open Folder</button>
-        {activeDoc && (
-          <span className="document-title">
-            {activeDoc.title}{activeDoc.dirty ? ' \u2022' : ''}
-          </span>
-        )}
-        {workspace.name && (
-          <span className="workspace-name">{workspace.name}</span>
-        )}
+        <button onClick={handleNew} title="Create a new document">
+          <Plus size={14} aria-hidden="true" />
+          New
+        </button>
+        <button onClick={handleOpenFolder} title="Open a folder in the explorer">
+          <FolderOpen size={14} aria-hidden="true" />
+          Open Folder
+        </button>
       </div>
       <div className="main-area">
         <Group orientation="horizontal" className="panel-group">
@@ -874,6 +874,12 @@ export default function App() {
           </Panel>
         </Group>
       </div>
+
+      <StatusFooter
+        activeDoc={activeDoc}
+        workspaceRoot={workspace.root}
+        workspaceName={workspace.name}
+      />
 
       {quitDirtyDocs ? (
         <ConfirmDialog

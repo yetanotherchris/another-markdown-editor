@@ -62,12 +62,14 @@ describe('IPC contract types', () => {
     expect(permanent.trashed).toBe(false)
   })
 
-  it('WorkspaceInfo contains name and entries', () => {
+  it('WorkspaceInfo contains name, path and entries', () => {
     const info: WorkspaceInfo = {
       name: 'my-workspace',
+      path: '/home/me/projects/my-workspace',
       entries: [{ path: 'readme.md', name: 'readme.md', kind: 'file' }]
     }
     expect(info.name).toBe('my-workspace')
+    expect(info.path).toBe('/home/me/projects/my-workspace')
     expect(info.entries.length).toBe(1)
   })
 })

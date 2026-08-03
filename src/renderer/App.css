@@ -6,7 +6,16 @@
 
 html, body, #root {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Spec 003, US4 (FR-006/007): Inter is bundled locally via @fontsource/inter
+     (OFL-1.1) — no network fetch. System fallbacks cover non-Latin scripts. */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
+
+/* The editor canvas consumes the same sans-serif family as the chrome so the
+   whole interface has one clean desktop-editor appearance (research R2). */
+.milkdown {
+  --crepe-font-default: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --crepe-font-title: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
 }
 
 .app-container {
@@ -26,27 +35,30 @@ html, body, #root {
 }
 
 .toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 12px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
   cursor: pointer;
   font-size: 13px;
+  font-family: inherit;
 }
 
 .toolbar button:hover {
   background: #f0f0f0;
 }
 
-.document-title {
-  font-size: 13px;
-  margin-left: 8px;
+.toolbar button svg {
+  flex-shrink: 0;
 }
 
-.workspace-name {
-  font-size: 13px;
-  color: #666;
-  margin-left: auto;
+/* Keyboard focus on toolbar buttons must stay visible (FR-013). */
+.toolbar button:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 1px;
 }
 
 .main-area {
@@ -374,4 +386,60 @@ html, body, #root {
   height: 100%;
   color: #999;
   font-size: 14px;
+}
+
+/* Spec 003, US3: a persistent status footer with a left active-document region
+   and a right workspace-location region (FR-008). It derives entirely from
+   reducer state, so open/close/replace/rename transitions re-render it in the
+   same frame (FR-012). */
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+  font-size: 12px;
+  color: #555;
+  user-select: none;
+}
+
+/* The active-document label. Keeps the historical class name so prior-phase
+   e2e suites that locate `.document-title` keep passing (research R3), but now
+   lives in the footer, not the header (FR-011). */
+.app-footer .document-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  margin-left: 0;
+}
+
+.footer-workspace-region {
+  min-width: 0;
+  margin-left: auto;
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+.footer-workspace {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: right;
+}
+
+.footer-placeholder {
+  color: #999;
+  font-style: italic;
 }

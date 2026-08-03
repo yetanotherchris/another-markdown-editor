@@ -77,6 +77,23 @@ Same actions can also be reached from the UI (toolbar/buttons) where it makes se
 - Active tab shows in the editor; edits mark the tab **dirty**
 - **Save** / **Save As** write via main process
 
+### Dirty-state model
+
+How "has the file actually changed?" is decided. Two references per open document:
+
+- `baseline` — the **raw bytes on disk** (what "saved" means).
+- `editorBaseline` — **Milkdown's serialization of a pristine copy** (what the file looks like *after* the editor normalizes it: an appended trailing newline, CRLF→LF, re-escaped entities). It exists because Milkdown's output never equals the raw bytes — a raw comparison would flag every file as edited.
+
+The flow:
+
+1. **Open** — raw bytes go into `baseline`/`content`; the editor re-serializes them into `editorBaseline`. `dirty = false`.
+2. **Edit (formatted view)** — Milkdown emits its serialization (200 ms debounce) → `UPDATE_CONTENT`. Dirty is `!markdownSame(content, editorBaseline)` — serialization vs. editor baseline, tolerant of the appended newline / EOL normalization. A real edit is dirty; edit → Ctrl+Z back to the original is clean.
+3. **Edit (source view)** — raw text vs. `baseline`, exact bytes (a newline typed in source is a real edit).
+4. **Close / quit guard** — does not trust the debounced flag alone; also reads the live editor's `getMarkdown()` and compares against `editorBaseline`, so a keystroke inside the 200 ms debounce window is never silently dropped.
+5. **Save** — written bytes become the new `baseline`, `content`, and `editorBaseline`; `dirty = false`.
+
+Rule of thumb: **never compare editor output against raw disk bytes.** Compare it against what the editor would output for a pristine copy (`editorBaseline`). A trailing newline the editor appends is never an edit.
+
 ### Tabs
 - Open from explorer or File menu → existing tab for that path, or new tab
 - Close tab → confirm if dirty

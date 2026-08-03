@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Tree as ArboristTree, NodeApi, TreeApi } from 'react-arborist'
 import type { RowRendererProps, NodeRendererProps } from 'react-arborist'
+import { Folder, FolderOpen, FileText, ChevronRight, ChevronDown } from 'lucide-react'
 import type { TreeNode } from '../state/workspace'
 import { findNodeById, parentPathOf } from '../state/workspace'
 import { useElementSize } from '../hooks/useElementSize'
@@ -130,20 +131,22 @@ function TreeNode({ node, style, dragHandle, onRowContextMenu }: TreeNodeProps) 
       }}
     >
       {isDir && (
-        <span
+        <button
+          type="button"
           className="tree-node-toggle"
-          role="button"
           aria-label={node.isOpen ? 'Collapse' : 'Expand'}
           onClick={(e) => {
             e.stopPropagation()
             node.toggle()
           }}
         >
-          {node.isOpen ? '\u25BE' : '\u25B8'}
-        </span>
+          {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
       )}
       <span className="tree-node-icon" aria-hidden="true">
-        {isDir ? (node.isOpen ? '📂' : '📁') : '📄'}
+        {isDir
+          ? (node.isOpen ? <FolderOpen size={14} /> : <Folder size={14} />)
+          : <FileText size={14} />}
       </span>
       {node.isEditing ? (
         <RenameInput node={node} />
