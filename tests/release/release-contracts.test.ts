@@ -15,6 +15,7 @@ import * as path from 'path'
 const ROOT = path.resolve(__dirname, '..', '..')
 
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'build-release.yml'), 'utf8')
+const ELECTRON_BUILDER = fs.readFileSync(path.join(ROOT, 'electron-builder.yml'), 'utf8')
 const SCOOP_MANIFEST = JSON.parse(
   fs.readFileSync(path.join(ROOT, 'another-markdown-editor.json'), 'utf8')
 )
@@ -135,17 +136,23 @@ describe('release workflow contract (.github/workflows/build-release.yml)', () =
 
 describe('Scoop manifest contract (another-markdown-editor.json)', () => {
   it('is valid JSON with the required fields (contracts §3)', () => {
-    expect(SCOOP_MANIFEST.version).toBe('0.0.83')
+    expect(SCOOP_MANIFEST.version).toBe('0.0.93')
     expect(SCOOP_MANIFEST.homepage).toBe('https://github.com/yetanotherchris/another-markdown-editor')
     expect(typeof SCOOP_MANIFEST.description).toBe('string')
     expect(SCOOP_MANIFEST.license).toBe('MIT')
+  })
+
+  it('maps the packaged ameditor.exe to the ameditor command (spec 009 FR-004/FR-008)', () => {
+    expect(SCOOP_MANIFEST.architecture['64bit'].bin).toEqual([
+      ['ameditor.exe', 'another-markdown-editor']
+    ])
   })
 })
 
 describe('Homebrew formula contract (Formula/another-markdown-editor.rb)', () => {
   it('is a formula (not a cask) with the right class and metadata (FR-006)', () => {
     expect(FORMULA).toMatch(/^class AnotherMarkdownEditor < Formula/)
-    expect(FORMULA).toMatch(/version "0\.0\.83"/)
+    expect(FORMULA).toMatch(/version "0\.0\.93"/)
     expect(FORMULA).toMatch(/homepage "https:\/\/github\.com\/yetanotherchris\/another-markdown-editor"/)
     expect(FORMULA).toMatch(/license "MIT"/)
   })
@@ -162,6 +169,14 @@ describe('Homebrew formula contract (Formula/another-markdown-editor.rb)', () =>
     expect(FORMULA).toMatch(/odie/)
     const shaLines = FORMULA.match(/sha256 "[a-f0-9]{64}"/g) ?? []
     expect(shaLines).toHaveLength(3)
+  })
+})
+
+describe('electron-builder config contract (electron-builder.yml)', () => {
+  it('names the packaged launcher binary ameditor on every platform (spec 009 FR-008)', () => {
+    expect(ELECTRON_BUILDER).toMatch(/executableName:\s*ameditor/)
+    // productName stays the human-facing app identity
+    expect(ELECTRON_BUILDER).toMatch(/productName: Another Markdown Editor/)
   })
 })
 

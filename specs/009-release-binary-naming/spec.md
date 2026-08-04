@@ -89,8 +89,9 @@ set, and the manifest file names; the rename must update them in the same change
   workflow still curates uploads to the `ameditor-*.{exe,zip,dmg,AppImage}`
   installers only.
 - The product name (`Another Markdown Editor`) still appears in-app and in the
-  macOS `.app` / Windows `.exe` bundle names: the rename affects the published
-  **asset file names** only, not the packaged application identity.
+  macOS `.app` bundle name: the rename affects the published **asset file names**
+  and the packaged **launcher binary** (named `ameditor` / `ameditor.exe`), while
+  the in-app product identity is unchanged.
 - Version/os/arch embedding (FR-005 of spec 005) is preserved: the rename
   changes the prefix, not the required `-<version>-<os>-<arch>` suffix.
 
@@ -113,9 +114,9 @@ set, and the manifest file names; the rename must update them in the same change
   renamed asset file names.
 - **FR-007**: The release-contract test suite MUST be updated to assert the
   renamed asset names, and MUST pass.
-- **FR-008**: The packaged application identity (product name, in-app name,
-  bundle `.app` / `.exe` names) MUST remain unchanged; only the published asset
-  file names change.
+- **FR-008**: The packaged launcher binary (the executable users run) MUST be
+  named `ameditor` (`ameditor.exe` on Windows) on every platform. The in-app
+  product name and the macOS `.app` bundle name remain `Another Markdown Editor`.
 
 ### Key Entities
 
@@ -124,8 +125,11 @@ set, and the manifest file names; the rename must update them in the same change
   `ameditor-<version>-<os>-<arch>.<ext>`.
 - **Command name**: the shell command a package-manager install exposes
   (`ameditor`), distinct from the asset file name.
-- **Packaged application identity**: the product name and bundle names users see
-  when the app is installed and launched, which does not change.
+- **Executable name**: the packaged launcher binary inside an install
+  (`ameditor` / `ameditor.exe`), distinct from the asset file name and the
+  product name.
+- **Packaged application identity**: the product name and `.app` bundle name
+  users see when the app is installed and launched, which does not change.
 
 ## Success Criteria *(mandatory)*
 
@@ -140,8 +144,9 @@ set, and the manifest file names; the rename must update them in the same change
 
 ## Assumptions
 
-- **Scope of rename**: Only the published asset file names change. The product
-  name `Another Markdown Editor`, the in-app name, the command/bundle names, and
+- **Scope of rename**: The published asset file names AND the packaged launcher
+  binary change to `ameditor` (`ameditor.exe` on Windows). The product name
+  `Another Markdown Editor`, the in-app name, the macOS `.app` bundle name, and
   the package/repo names (`another-markdown-editor`) are unchanged.
 - **Naming pattern**: The rename substitutes the prefix only; the
   `-<version>-<os>-<arch>.<ext>` suffix established in spec 005 is preserved.
@@ -150,4 +155,8 @@ set, and the manifest file names; the rename must update them in the same change
 
 ## Clarifications
 
-- None.
+- **2026-08-04**: `ameditor` is the name of the packaged binary (the executable
+  users launch), not just the published asset file names. FR-008 amended
+  accordingly: the launcher binary is `ameditor` / `ameditor.exe` on every
+  platform, while the in-app product name and the macOS `.app` bundle name stay
+  `Another Markdown Editor`.

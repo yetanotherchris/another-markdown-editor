@@ -1,5 +1,8 @@
 appId: com.yetanotherchris.another-markdown-editor
 productName: Another Markdown Editor
+# The packaged launcher binary is `ameditor` (ameditor.exe on Windows) on every
+# platform (spec 009 FR-008); productName keeps the human-facing app identity.
+executableName: ameditor
 directories:
   output: dist
 

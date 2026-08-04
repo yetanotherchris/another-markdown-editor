@@ -43,14 +43,17 @@ $content = $content -replace "`r", ""
 
 # The release download URL is deterministic: v<version>/<artifact name>. The
 # `ameditor` prefix has no spaces, so no URL encoding is needed (spec 009). Tag
-# and version share the numeric part (FR-003).
+# and version share the numeric part (FR-003). The filename segment is matched
+# loosely so the rewrite works whether the committed formula still carries the
+# legacy product-name prefix or the current `ameditor` prefix, and always writes
+# the `ameditor-<version>` name.
 $baseUrl = "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v$Version"
 
 $content = $content -replace 'version "[\d\.]+"', "version `"$Version`""
 
-$content = $content -replace 'url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/ameditor-[\d\.]+-macos-arm64\.zip"', "url `"$baseUrl/ameditor-$Version-macos-arm64.zip`""
-$content = $content -replace 'url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/ameditor-[\d\.]+-macos-x64\.zip"', "url `"$baseUrl/ameditor-$Version-macos-x64.zip`""
-$content = $content -replace 'url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/ameditor-[\d\.]+-linux-x64\.AppImage"', "url `"$baseUrl/ameditor-$Version-linux-x64.AppImage`""
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/)[^"]*(macos-arm64\.zip")', "`${1}ameditor-$Version-`${2}"
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/)[^"]*(macos-x64\.zip")', "`${1}ameditor-$Version-`${2}"
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/)[^"]*(linux-x64\.AppImage")', "`${1}ameditor-$Version-`${2}"
 
 # Update the sha256 that follows each known url line (order matches the formula
 # structure in Formula/another-markdown-editor.rb).
@@ -66,8 +69,23 @@ for ($i = 0; $i -lt $lines.Length; $i++) {
 }
 $content = $lines -join "`n"
 
-# The Linux bin.install filename embeds the version.
-$content = $content -replace 'bin\.install "ameditor-[\d\.]+-linux-x64\.AppImage"', "bin.install `"ameditor-$Version-linux-x64.AppImage`""
+# The Linux bin.install filename embeds the version (spec 009 FR-004).
+$content = $content -replace '(bin\.install ")[^"]*(linux-x64\.AppImage")', "`${1}ameditor-$Version-`${2}"
+
+# Guard: every expected rewrite MUST have happened. A silent no-op here is what
+# produced the stale v0.0.83 URLs on main (release review CRITICAL finding) —
+# fail loudly rather than commit a broken formula.
+$expected = @(
+    "ameditor-$Version-macos-arm64.zip",
+    "ameditor-$Version-macos-x64.zip",
+    "ameditor-$Version-linux-x64.AppImage",
+    "bin.install `"ameditor-$Version-linux-x64.AppImage`""
+)
+foreach ($e in $expected) {
+    if (-not $content.Contains($e)) {
+        throw "updatebrew.ps1 failed to rewrite formula to include: $e"
+    }
+}
 
 [System.IO.File]::WriteAllText($formulaPath, $content, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "Updated $formulaPath to v$Version"
