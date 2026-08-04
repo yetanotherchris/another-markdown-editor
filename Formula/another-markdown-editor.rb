@@ -1,16 +1,16 @@
 class AnotherMarkdownEditor < Formula
   desc "A WYSIWYG markdown editor for Windows, macOS, and Linux, built with Electron and Milkdown."
   homepage "https://github.com/yetanotherchris/another-markdown-editor"
-  version "0.0.93"
+  version "0.0.94"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.93/ameditor-0.0.93-macos-arm64.zip"
-      sha256 "a4964fa8d4ed6ae89f82d64f62d64ada1f9ba554e12687757412c8d91ede1e6a"
+      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.93/ameditor-0.0.94-macos-arm64.zip"
+      sha256 "b707f86eea26048853080b3785548cad450a3443dd31794b34c4e6ce550468ff"
     else
-      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.93/ameditor-0.0.93-macos-x64.zip"
-      sha256 "31e2cd0bb88de4db11097ad362d854509eebb65d80cbee40c436301a74439bba"
+      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.93/ameditor-0.0.94-macos-x64.zip"
+      sha256 "9eaf2417b4dc46dbb4d00630276e26efc48b9c63a62bdcf5262cd5ab5876223f"
     end
   end
 
@@ -18,8 +18,8 @@ class AnotherMarkdownEditor < Formula
     if Hardware::CPU.arm?
       odie "Another Markdown Editor does not provide a Linux arm64 build"
     else
-      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.93/ameditor-0.0.93-linux-x64.AppImage"
-      sha256 "3620cbbc3c3822e18d8ceea4d2659ef1401d122896e750f9a0ef27fcae9578d8"
+      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.93/ameditor-0.0.94-linux-x64.AppImage"
+      sha256 "a8ffe5c249324ddfc2447b64371b5f2e39165fdbe918404683e9090863db6329"
     end
   end
 
@@ -27,7 +27,7 @@ class AnotherMarkdownEditor < Formula
     if OS.mac?
       app.install "Another Markdown Editor.app"
     else
-      bin.install "ameditor-0.0.93-linux-x64.AppImage" => "another-markdown-editor"
+      bin.install "ameditor-0.0.94-linux-x64.AppImage" => "another-markdown-editor"
     end
   end
 
