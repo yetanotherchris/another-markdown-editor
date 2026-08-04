@@ -1,0 +1,52 @@
+appId: com.yetanotherchris.another-markdown-editor
+productName: Another Markdown Editor
+directories:
+  output: dist
+
+# electron-vite build output (out/**) is the packaged runtime; package.json is
+# the entry (main: ./out/main/index.js). Production node_modules are included
+# automatically by electron-builder.
+files:
+  - "!**/.vscode/*"
+  - "!src/**"
+  - "!specs/**"
+  - "!docs/**"
+  - "!tests/**"
+  - "!scripts/**"
+  - "!*.config.{ts,mjs}"
+  - "!{tsconfig.json,tsconfig.main.json,tsconfig.preload.json,tsconfig.renderer.json,vitest.workspace.ts}"
+  - "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc,eslint.config.mjs,dev-app-update.yml,CHANGELOG.md,README.md}"
+  - "!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}"
+  - "!{.gitignore,AGENTS.md,CLAUDE.md,LICENSE}"
+  - "!update{scoop,brew}.ps1"
+  - "!Formula/**"
+  - "!scoop/**"
+  - "!.github/**"
+  - "!.specify/**"
+  - "!test-results/**"
+  - "!playwright-report/**"
+
+# Every asset name carries product-version-os-arch (FR-005). The os token is
+# literal per platform so names read windows/macos/linux rather than electron-
+# builder's win/mac/linux abbreviations (contracts/release.md §2).
+win:
+  artifactName: Another Markdown Editor-${version}-windows-${arch}.${ext}
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+
+mac:
+  artifactName: Another Markdown Editor-${version}-macos-${arch}.${ext}
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+
+linux:
+  artifactName: Another Markdown Editor-${version}-linux-${arch}.${ext}
+  target:
+    - target: AppImage
+      arch: [x64]

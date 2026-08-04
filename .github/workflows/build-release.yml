@@ -1,0 +1,295 @@
+name: Build and Release
+
+# Triggered only by stable semantic-version tags. The filter below is a GitHub
+# Actions GLOB pattern, not a regex: `[0-9]` is a character class, `+` means
+# "one or more", and `.` is a literal dot — so `v1.2.3` matches while `v1.2` and
+# `v1.0.0-beta.1` do not. The strict `^v[0-9]+\.[0-9]+\.[0-9]+$` regex is
+# enforced inside the `validate` job, which also checks reachability and that
+# the tag has no existing release before any build leg starts (FR-001, spec
+# Assumptions; research R2).
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# Minimum credentials (FR-013, research R9): read is the default for the whole
+# workflow; the release job alone scopes `contents: write` to itself (creating
+# the release and pushing the package-definition commit). Build/validate legs
+# only need read and run `npm ci` (arbitrary postinstall scripts) and
+# electron-builder.
+permissions:
+  contents: read
+
+jobs:
+  # Cheap preflight that rejects bad tags BEFORE the four build legs start, so a
+  # non-main or already-released tag never burns four build runners (US1
+  # scenarios 3-4, spec Edge Cases).
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # actions/checkout v5
+        with:
+          fetch-depth: 0
+
+      # FR-001: the glob trigger already restricts the shape; this real regex
+      # keeps the strict vMAJOR.MINOR.PATCH guarantee explicit and actionable if
+      # the trigger filter is ever widened.
+      - name: Assert tag matches strict semver
+        shell: bash
+        run: |
+          if ! [[ "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag ${{ github.ref_name }} does not match vMAJOR.MINOR.PATCH (v[0-9]+.[0-9]+.[0-9]+)."
+            exit 1
+          fi
+
+      # FR-002, US1 scenario 4: a valid-shape tag on a revision not reachable
+      # from main is rejected with an explicit message before anything is built
+      # or published. `git fetch origin main` guarantees refs/remotes/origin/main
+      # exists even if checkout's ref filtering did not fetch it.
+      - name: Verify tag is reachable from main
+        run: |
+          git fetch origin main
+          if git merge-base --is-ancestor "${{ github.ref_name }}" refs/remotes/origin/main; then
+            echo "Tag ${{ github.ref_name }} is reachable from main"
+          else
+            echo "::error::Tag ${{ github.ref_name }} is not reachable from main; no release will be created."
+            exit 1
+          fi
+
+      # Spec Edge Case: a valid tag whose version is already released fails
+      # clearly instead of overwriting the existing release or manifest state.
+      - name: Check the tag has no existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "::error::A release for tag ${{ github.ref_name }} already exists; refusing to overwrite it."
+            exit 1
+          fi
+          echo "No existing release for ${{ github.ref_name }}"
+
+  build:
+    # Only run the expensive four-leg matrix once the cheap validation passed.
+    needs: validate
+    # fail-fast: false so one failed leg never cancels the still-running legs
+    # and silently produces a "partial success" matrix (FR-010). There is NO
+    # continue-on-error on any leg: every leg MUST succeed or the release job
+    # never runs (research R1/R4).
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            arch: x64
+            suffix: windows-x64
+          # macos-13 (the plain Intel image) was retired by GitHub in Dec 2025;
+          # macos-15-intel is the dedicated native x64 macOS runner (research R4).
+          - os: macos-15-intel
+            platform: macos
+            arch: x64
+            suffix: macos-x64
+          - os: macos-latest
+            platform: macos
+            arch: arm64
+            suffix: macos-arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            suffix: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # actions/checkout v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # actions/setup-node v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # FR-003: the release version is the numeric portion of the triggering tag.
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Belt-and-braces guard: fail fast with a clear message if package.json's
+      # version drifts from the tag, instead of a confusing missing-artifact
+      # error at the verify step later (release review findings).
+      - name: Assert package.json version matches tag
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$PACKAGE_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "::error::package.json version ($PACKAGE_VERSION) does not match tag version (${{ steps.version.outputs.VERSION }}). Bump package.json before tagging."
+            exit 1
+          fi
+          echo "package.json version $PACKAGE_VERSION matches tag version ${{ steps.version.outputs.VERSION }}"
+
+      - name: Build app
+        run: npm run build
+
+      # FR-003/FR-008: the packaged version (artifact names AND the app version
+      # embedded in the build) comes from the tag, NOT package.json.
+      # --config.extraMetadata.version merges into the app package.json before
+      # AppInfo reads `version`, so artifact names always match the tag even if
+      # `--publish never` runs against a `package.json` holding `0.1.0`.
+      - name: Package (Windows)
+        if: matrix.platform == 'windows'
+        run: npx electron-builder --win --x64 --publish never --config.extraMetadata.version=${{ steps.version.outputs.VERSION }}
+
+      - name: Package (macOS)
+        if: matrix.platform == 'macos'
+        env:
+          # No signing/notarization (spec Assumptions: out of scope) — tell
+          # electron-builder not to auto-discover a signing identity (R5).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never --config.extraMetadata.version=${{ steps.version.outputs.VERSION }}
+
+      - name: Package (Linux)
+        if: matrix.platform == 'linux'
+        run: npx electron-builder --linux --x64 --publish never --config.extraMetadata.version=${{ steps.version.outputs.VERSION }}
+
+      # Curate the upload to the final installers only. electron-builder also
+      # leaves unpacked staging directories (win-unpacked/, linux-unpacked/,
+      # mac/) and config output in dist/; uploading them would bloat the
+      # workflow artifact and could leak into the release (release reviews).
+      # if-no-files-found: error so an empty dist (a failed packaging step that
+      # happened to exit 0) fails the leg instead of uploading nothing (FR-010).
+      - name: Upload artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # actions/upload-artifact v6
+        with:
+          name: artifacts-${{ matrix.suffix }}
+          path: |
+            dist/Another Markdown Editor-*.exe
+            dist/Another Markdown Editor-*.zip
+            dist/Another Markdown Editor-*.dmg
+            dist/Another Markdown Editor-*.AppImage
+          if-no-files-found: error
+
+  release:
+    # Runs only when EVERY build leg succeeded (no continue-on-error above), and
+    # only for a tag push, never a manual dispatch (FR-010, US4 scenario 1).
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # actions/checkout v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # actions/download-artifact v6
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # FR-009/FR-010, US4 scenarios 1-2: verify the FULL required artifact set
+      # (contracts/release.md §2) is present and non-empty before publishing.
+      # Any missing or empty artifact fails the job before the release exists.
+      - name: Verify required artifact set
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-windows-x64.exe"
+            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-windows-x64.zip"
+            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-x64.dmg"
+            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-x64.zip"
+            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-arm64.dmg"
+            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-arm64.zip"
+            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-linux-x64.AppImage"
+          )
+          for f in "${required[@]}"; do
+            if [ ! -s "artifacts/$f" ]; then
+              echo "::error::Required release artifact missing or empty: $f"
+              exit 1
+            fi
+            echo "verified: $f"
+          done
+
+      # FR-004/FR-010: create the GitHub Release as a DRAFT first
+      # (softprops v3 uploads assets before publishing and stays unpublished).
+      # The manifests are then updated and committed to main while the release
+      # is still a draft, and the draft is published only at the very end — so a
+      # PUBLIC release can never exist referencing stale or missing definitions.
+      # fail_on_unmatched_files: true means a missing file in `files` fails the
+      # release creation instead of publishing a partial release (research R8).
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # softprops/action-gh-release v3
+        with:
+          draft: true
+          files: artifacts/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+      # FR-006/007/008: update both package definitions from the downloaded
+      # (verified + hashed) artifacts. Each script throws on a missing file, so
+      # a failed build can never reach the commit. Move off the detached tag
+      # checkout onto main FIRST so the commit at the end can actually be pushed
+      # (release reviews; reference repos do the same via an explicit checkout).
+      - name: Checkout main
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          git pull --rebase origin main
+
+      - name: Update Scoop manifest
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: ./updatescoop.ps1 -Version "$env:RELEASE_VERSION" -ArtifactsDir artifacts
+
+      - name: Update Homebrew formula
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: ./updatebrew.ps1 -Version "$env:RELEASE_VERSION" -ArtifactsDir artifacts
+
+      - name: Commit updated package definitions
+        uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # stefanzweifel/git-auto-commit-action v7
+        with:
+          commit_message: 'chore(release): update package definitions to v${{ steps.version.outputs.VERSION }}'
+          branch: main
+          file_pattern: scoop/another-markdown-editor.json Formula/another-markdown-editor.rb
+          commit_user_name: github-actions[bot]
+          commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
+
+      # Publish the draft now that the manifests referencing this exact version
+      # are committed to main. Omitting `draft` makes softprops publish the
+      # existing draft (research R8).
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # softprops/action-gh-release v3
+        with:
+          tag_name: ${{ github.ref_name }}
