@@ -259,3 +259,10 @@ definition is published for that version.
   filter `'v[0-9]+.[0-9]+.[0-9]+'` is a GitHub Actions glob (`.` literal, `[0-9]`
   character class, `+` one-or-more). The strict `^v[0-9]+\.[0-9]+\.[0-9]+$`
   regex is enforced inside the workflow's `validate` job (FR-001).
+- **2026-08-04 — Asset names use the `ameditor` prefix**: the published
+  installable asset names changed from `Another Markdown Editor-<v>-<os>-<arch>.<ext>`
+  to `ameditor-<v>-<os>-<arch>.<ext>`, superseding the artifact names named
+  throughout this spec (FR-005). The packaged application identity (product
+  name, `.app`/`.exe` bundle names) is unchanged; only the asset file names
+  changed. Recorded in `specs/009-release-binary-naming/` and enforced by
+  `tests/release/release-contracts.test.ts`.
