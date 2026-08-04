@@ -85,7 +85,7 @@ one main-process dialog module. Standard OS file/folder pickers are out of scope
 | I. Process Isolation Is Absolute | Native dialogs are shown from the main process (`dialog.showMessageBox`). The renderer gains one named operation (`showConfirmation`) over a closed request union; the preload exposes no generic `invoke` and no dialog handle | **PASS** |
 | II. Every Path Is Untrusted | Dialog requests carry display strings only (titles, file names, plan summaries) — no filesystem paths cross the boundary. Renderer strings are length-bounded and passed as untrusted text to `showMessageBox`; no path is resolved, so no escape surface is added | **PASS** |
 | III. Never Lose The User's Words | All save/discard/cancel and delete outcomes are preserved verbatim from the current renderer flows; a failed save re-prompts with the failure explained and the document stays open and dirty (US2 scenario 4, FR-007/008/014). Native presentation never weakens a confirmation threshold | **PASS** |
-| IV. Calm, Predictable Editing | Dialogs are user-action-driven and modal; no dialog work happens on the keystroke path. One dialog is shown at a time (modal-to-window), matching the spec's single-decision-surface edge case | **PASS** |
+| IV. Calm, Predictable Editing | Dialogs are user-action-driven and modal; no dialog work happens on the keystroke path. One dialog is shown at a time (modal-to-window), matching the spec's one-prompt-at-a-time edge case | **PASS** |
 | V. Test What Can Corrupt Or Escape | `tests/renderer/nativeDialog.test.ts` asserts the exact per-platform button array, default, cancel and decision mapping for every kind (FR-001/003/005/006); e2e re-stubs `showMessageBox` to drive every decision path and asserts the renderer outcomes incl. failed-save re-prompt | **PASS** |
 
 ## Phase 1 Design decisions
@@ -179,7 +179,7 @@ the returned decision:
   the document(s) stay open and unsaved (US2 scenario 4, research R5).
 - FR-012 (no duplicate completion / no cancel while a destructive action runs):
   the native dialog is modal, so the user cannot double-submit or cancel once a
-  button is clicked and the operation begins; the single decision-surface guard
+  button is clicked and the operation begins; the single-prompt guard
   (`dialogInFlightRef`, held across `describeEntry` + `trashEntry`) blocks a
   second delete dialog while a trash operation is in flight.
 - The quit flow is unchanged in shape: main intercepts window close →
@@ -243,7 +243,7 @@ tests/
     ├── tabs.spec.ts                # close/quit/external-change decisions through the stub
     ├── organize.spec.ts            # delete/trash/permanent-delete/blocked decisions through the stub
     ├── recent.spec.ts              # folder-open confirmation through the stub
-    ├── native.spec.ts              # + external-deleted dialog coverage (gap today)
+    ├── native.spec.ts              # spec-scope smoke tests (focus-ring) through the stub
     ├── source.spec.ts / app.spec.ts# quit/operation-failed paths through the stub
 ```
 
@@ -280,7 +280,8 @@ possible boundary change.
 | One IPC operation (`showConfirmation`) whose request is a nine-kind union, instead of nine named preload methods | The nine surfaces are the same shape (build options → show → map decision) and share one layout module; a single op with an exhaustive, type-checked union keeps the preload surface small while remaining a fixed named list (Principle I) | Nine hand-written preload methods + nine channels (identical plumbing nine times) or a generic `invoke(channel, …)` (forbidden) |
 | Per-platform button arrays authored in a shared module that encodes macOS's reversed visual order | Electron's `NSAlert` renders `buttons[0]` at the far right while Windows/GTK render array order left→right; one literal array cannot be correct on both (FR-003, research R1) | Shipping one cross-platform order (violates FR-003 — imposes one OS's order on another) |
 | Re-prompt (close + reopen) instead of an inline error inside the same dialog | Native message boxes are modal and resolve on click; the old `ConfirmDialog` could stay open with an inline `.dialog-error`. US2 scenario 4 requires the failure to be explained and the work to stay open — a re-shown dialog satisfies it without weakening the outcome | Rendering a custom overlay for the error case (defeats the feature's purpose for exactly the data-loss path) |
-| Keep the single decision-surface guard (`dialogInFlightRef`) held across the whole delete flow including the async trash call | FR-012: while a trash operation runs, a second delete prompt must not open and nothing is cancelable mid-op; holding the guard across `describeEntry`/`trashEntry` closes the window that `deleteBusy` previously covered | Relying on the dialog's modality alone (it is gone once a button is clicked; the async op window is unguarded) |
+| Keep the single-prompt guard (`dialogInFlightRef`) held across the whole delete flow including the async trash call | FR-012: while a trash operation runs, a second delete prompt must not open and nothing is cancelable mid-op; holding the guard across `describeEntry`/`trashEntry` closes the window that `deleteBusy` previously covered | Relying on the dialog's modality alone (it is gone once a button is clicked; the async op window is unguarded) |
+| FR-005's "visually distinct" destructive emphasis is not implemented | `dialog.showMessageBox` exposes no destructive-button styling on any platform (`message_box_win.cc`/`message_box_mac.mm`/`message_box_gtk.cc` expose only label, default, cancel, type), so a red "Delete Permanently" is impossible; the default-placement half (never the default) fully holds, meeting the safety intent | A custom overlay purely for styling would reintroduce non-native presentation for exactly the data-loss path (defeats FR-001) |
 
 ## Decision log (2026-08-04)
 
@@ -314,10 +315,52 @@ possible boundary change.
   dialog window title (and packaging) use the human name, matching
   `src/renderer/index.html`'s `<title>`.
 - Post-review fixes (2026-08-04): the operation-error queue is drained on every
-  release of the decision-surface guard (`releaseDialogSurface`), so an error
+  release of the single-prompt guard (`releaseDialogSurface`), so an error
   raised inside a guarded flow (failed trash after Delete, failed folder commit)
-  is no longer silently dropped; Linux escapes Pango-markup characters in
-  user-influenced names (GTK renders the message as markup, so `<`/`&` in a
-  filename could corrupt the dialog text); and the `delete-blocked` dialog uses
-  the native short instruction "Cannot delete" with the explanation and blocker
-  list in the content, matching `contracts/renderer.md`.
+  is no longer silently dropped; the `delete-blocked` dialog uses the native
+  short instruction "Cannot delete" with the explanation and blocker list in the
+  content, matching `contracts/renderer.md`.
+- The deleted-on-disk e2e coverage ("external deletion of an open dirty document
+  prompts ok/save-as" + OK-keeps-in-memory) landed in `tests/e2e/tabs.spec.ts`
+  rather than `native.spec.ts` as the structure sketch above suggested; the
+  coverage exists and the sketch is the older plan (deviation recorded 2026-08-04).
+- Review round 2 fixes (2026-08-04, corrects an earlier decision): an interim
+  fix escaped Pango-markup characters in user-influenced names on Linux, on the
+  premise that "GTK renders the message as markup". Verified against the pinned
+  Electron 43.2.0 source (`shell/browser/ui/message_box_gtk.cc`) and GTK 3.24
+  (`gtkmessagedialog.c`): Electron builds the box with `gtk_message_dialog_new`
+  and `gtk_message_dialog_format_secondary_text`, both of which set PLAIN text
+  (`use-markup = FALSE`, `gtk_label_set_text`), so no markup is ever interpreted
+  and the escaping only double-escaped names (`R&D.md` → `R&amp;D.md`). The
+  escaping was removed; if a future Electron switches to the `_with_markup`
+  variant the escaping must return.
+- Review round 2 fixes (code): the quit no-dirty fast path now honours the
+  single-prompt guard (previously quitting while a sheet was up could close the
+  window mid-dialog); the quit save-all re-prompt lists only the documents still
+  actually unsaved (the pre-save snapshot is no longer reused); `cleanupAfterDelete`
+  re-checks `isDirtyLive` per document so a clean-at-confirm document that
+  receives a keystroke during the async trash window is left open instead of
+  closed without a prompt (Principle III); an external changed/removed notice
+  arriving while another prompt is up is DEFERRED in a one-slot queue and
+  re-surfaced once the guard releases, instead of being dropped; the main-side
+  `showNativeConfirmation` gained an in-flight latch so a renderer that bypasses
+  the guard cannot stack modal boxes; and `validateNativeDialogRequest` was
+  extracted to an electron-free module so the kind whitelist and length caps are
+  behaviorally unit-tested (`tests/main/dialogValidation.test.ts`).
+- Review round 2 wording: the unsaved-quit default button label changed from
+  "Save All and Quit" to "Save All" (VS Code-style; the preceding prompt already
+  states quitting is in progress, so the label need not repeat it) — subsumed
+  by the "Unsaved-changes wording aligned to the native convention" decision.
+- Known limitation recorded (spec review 2026-08-04): FR-005's "visually
+  distinct" destructive emphasis is not realizable through `dialog.showMessageBox`
+  on any platform (Electron exposes only label/default/cancel/type — no
+  destructive-button styling API), so "Delete Permanently" cannot be rendered red
+  as a native app would. The default-placement half holds (permanent-delete
+  defaults to Cancel everywhere), so the safety intent is met; SC-001's "closest
+  available equivalent" covers the rest.
+- Known limitation recorded (UX review 2026-08-04): the folder-open confirmation
+  no longer names the folder or states it "replaces the current workspace" (the
+  native request carries only the affected-document list); the name is implicit
+  because the user just chose it. Also on macOS the filename sits in the large
+  bold `message`, and long `detail` lists (>50 titles) are capped by `MAX_LIST`;
+  a manual per-OS visual check of long names/lists remains outstanding (T022).

@@ -137,7 +137,7 @@ the native convention (research R3).
   dialog is shown; the renderer surfaces the failure in context and the session
   is unchanged.
 - **One dialog at a time**: `showMessageBox(window)` is modal to the window; the
-  spec's "single decision surface" edge case holds. On macOS the box is a
+  spec's "one prompt at a time" edge case holds. On macOS the box is a
   window-attached sheet.
 - **FR-012**: a `delete`/`delete-permanent` decision closes the dialog and the
   renderer's `deleteBusy` guard prevents a second delete prompt while
@@ -160,6 +160,10 @@ the native convention (research R3).
 - `tests/main/ipc.test.ts` — shape tests: `NativeDialogRequest` union members
   compile, `NativeDialogDecision` is a closed set, `DesktopApi.showConfirmation`
   signature.
+- `tests/main/dialogValidation.test.ts` — behavioral tests for
+  `validateNativeDialogRequest`: every kind accepted, unknown kind rejected,
+  `MAX_STRING`/`MAX_LIST`/`MAX_ERROR` caps, non-string fields rejected
+  ("Malformed request" edge case).
 - `tests/renderer/quit.test.tsx` — updated: drop the `ConfirmDialog` render
   assertions; keep `planClose`/`planQuit` coverage.
 - `tests/e2e/*.spec.ts` — `dialog.showMessageBox` stubbed in main via

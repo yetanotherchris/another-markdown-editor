@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -334,8 +334,11 @@ test('deleting a file asks for confirmation and sends it to trash', async () => 
   await stubMessageBox(app, 'Delete')
   await window.getByRole('menuitem').getByText('Delete').click()
 
-  // The destructive confirmation must actually have been shown.
+  // The destructive confirmation must actually have been shown, and it must be
+  // the delete-to-trash surface (not, say, a blocked-delete box).
   await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
+  const last = await lastMessageBoxOptions(app)
+  expect(last.message).toBe('Delete beta.md?')
   await expect(window.getByRole('treeitem').getByText('beta.md')).toHaveCount(0)
   expect(fs.existsSync(path.join(testFolder, 'beta.md'))).toBe(false)
 })
@@ -365,8 +368,12 @@ test('deleting a file with unsaved changes is refused', async () => {
   await stubMessageBox(app, 'OK')
   await window.getByRole('menuitem').getByText('Delete').click()
 
-  // The blocked-delete acknowledgement must have been shown.
+  // The blocked-delete acknowledgement must have been shown — and it must be
+  // the blocked-delete surface, not a delete-to-trash box (the stub finds no
+  // "Delete" button on a blocked box and would fail loudly).
   await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
+  const last = await lastMessageBoxOptions(app)
+  expect(last.message).toBe('Cannot delete')
 
   // The file is untouched and the tab is still open with the edits.
   expect(fs.existsSync(path.join(testFolder, 'alpha.md'))).toBe(true)
@@ -399,8 +406,12 @@ test('when trash is unavailable, permanent deletion requires a second confirmati
   await stubMessageBox(app, ['Delete', 'Delete Permanently'])
   await window.getByRole('menuitem').getByText('Delete').click()
 
-  // Two confirmations must have fired: delete-to-trash then permanent-delete.
+  // Two confirmations must have fired: delete-to-trash then permanent-delete
+  // ("Trash unavailable" is the permanent-delete message, so the last box is
+  // the irreversible one).
   await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(2)
+  const last = await lastMessageBoxOptions(app)
+  expect(last.message).toBe('Trash unavailable')
   await expect(window.getByRole('treeitem').getByText('beta.md')).toHaveCount(0)
   expect(fs.existsSync(path.join(testFolder, 'beta.md'))).toBe(false)
 })

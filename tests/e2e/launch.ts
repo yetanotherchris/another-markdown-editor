@@ -46,7 +46,18 @@ export async function stubMessageBox(
         response = options.cancelId ?? 0
       } else {
         const idx = (options.buttons ?? []).indexOf(step)
-        response = idx >= 0 ? idx : (options.cancelId ?? 0)
+        if (idx < 0) {
+          // A requested label that no shown dialog has is a test bug, not a
+          // "safe" fallback: fail loudly so a typo (or a label renamed in the
+          // layout module) cannot silently rewrite a test's semantics (test
+          // review 2026-08-04). The rejection surfaces through main's
+          // dialog:show handler as an error Result and the flow aborts, so the
+          // test's outcome assertions fail instead of coincidentally passing.
+          throw new Error(
+            `stubMessageBox: no button "${step}" on this dialog. Available: [${(options.buttons ?? []).join(', ')}]`
+          )
+        }
+        response = idx
       }
       return { response, checkboxChecked: false }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,12 +83,18 @@ export async function lastMessageBoxOptions(app: ElectronApplication): Promise<{
  * Teardown helper: close the app's window and dismiss the (stubbed) native quit
  * confirmation with "Discard and Quit" if dirty documents are left behind.
  * Replaces the old renderer-dialog teardown now that the quit dialog is native
- * (spec 008). Safe when the app has already closed.
+ * (spec 008). Safe when the app has already closed (the evaluate throws, which
+ * the per-spec afterEach catch absorbs).
+ *
+ * A stalled quit round-trip is NOT treated as "closed": swallowing the timeout
+ * would leak a live Electron process into the next test. Throwing lets the
+ * per-spec afterEach catch force-close the app, restoring the guard the shared
+ * helper was meant to preserve (test review 2026-08-04).
  */
 export async function closeAppDiscardingQuit(app: ElectronApplication): Promise<void> {
   await stubMessageBox(app, 'Discard and Quit')
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].close()
   })
-  await app.waitForEvent('close', { timeout: 8000 }).catch(() => {})
+  await app.waitForEvent('close', { timeout: 8000 })
 }

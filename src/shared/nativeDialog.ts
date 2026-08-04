@@ -211,24 +211,18 @@ function joinList(header: string, titles: string[], error: string | undefined): 
   return lines
 }
 
-/** GTK renders a GtkMessageDialog's primary and secondary text as Pango markup,
- *  so a user-influenced name containing `<`, `&` or `>` (legal in filenames)
- *  must be escaped on Linux or it can corrupt/spoof the dialog text (security
- *  review 2026-08-04). Windows/macOS render plain text, so no escaping there. */
-function escapeMarkup(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
 /** The platform-correct `showMessageBox` options for a request. Main passes the
  *  result straight to `dialog.showMessageBox`. The title is left empty so the
  *  OS shows the application name in the window title (the native convention —
  *  Windows fills the app name, macOS ignores the title, GTK shows the app
- *  name); all meaning lives in `message`/`detail` (research R3). */
+ *  name); all meaning lives in `message`/`detail` (research R3).
+ *
+ *  The message/detail are rendered as PLAIN TEXT on every platform (research
+ *  R2): Electron's GTK box is built with `gtk_message_dialog_new` /
+ *  `gtk_message_dialog_format_secondary_text`, which call `gtk_label_set_text`
+ *  with `use-markup = FALSE` — no Pango markup is interpreted, so no escaping
+ *  is applied to user-influenced names (a now-removed `escapeMarkup` double-
+ *  escaped them into visible entities, e.g. `R&D.md` → `R&amp;D.md`). */
 export function buildNativeDialogOptions(platform: string, request: NativeDialogRequest): NativeDialogLayout {
   const p = platformOf(platform)
   const layout = layoutFor(p, request)
@@ -236,8 +230,8 @@ export function buildNativeDialogOptions(platform: string, request: NativeDialog
   return {
     type,
     title: '',
-    message: p === 'linux' ? escapeMarkup(message) : message,
-    detail: p === 'linux' ? escapeMarkup(detail) : detail,
+    message,
+    detail,
     buttons: [...layout.buttons],
     defaultId: layout.defaultId,
     cancelId: layout.cancelId,

@@ -66,19 +66,45 @@ describe('buildNativeDialogOptions — unsaved-close / unsaved-quit / folder-ope
     const r = req('unsaved-quit', { documentTitles: ['a.md', 'b.md'] })
     const win = buildNativeDialogOptions('win32', r)
     expect(win.message).toBe('Do you want to save the changes you made?')
-    expect(win.detail).toContain('a.md')
-    expect(win.detail).toContain('b.md')
-    expect(win.detail).toContain("Your changes will be lost if you don't save them.")
+    expect(win.detail).toBe(
+      'The following documents have unsaved changes:\n• a.md\n• b.md\n' +
+      "Your changes will be lost if you don't save them."
+    )
+    expect(win.type).toBe('warning')
     expect(win.buttons).toEqual(['Save All', 'Discard and Quit', 'Cancel'])
-    expect(buildNativeDialogOptions('darwin', r).buttons).toEqual(['Save All', 'Cancel', 'Discard and Quit'])
-    expect(buildNativeDialogOptions('linux', r).buttons).toEqual(['Cancel', 'Discard and Quit', 'Save All'])
+    expect(win.defaultId).toBe(0)
+    expect(win.cancelId).toBe(2)
+    const darwin = buildNativeDialogOptions('darwin', r)
+    expect(darwin.buttons).toEqual(['Save All', 'Cancel', 'Discard and Quit'])
+    expect(darwin.defaultId).toBe(0)
+    expect(darwin.cancelId).toBe(1)
+    const linux = buildNativeDialogOptions('linux', r)
+    expect(linux.buttons).toEqual(['Cancel', 'Discard and Quit', 'Save All'])
+    expect(linux.defaultId).toBe(2)
+    expect(linux.cancelId).toBe(0)
   })
 
   it('folder-open: same shape with Discard label', () => {
     const r = req('folder-open', { documentTitles: ['a.md'] })
-    expect(buildNativeDialogOptions('win32', r).buttons).toEqual(['Save All', 'Discard', 'Cancel'])
-    expect(buildNativeDialogOptions('darwin', r).buttons).toEqual(['Save All', 'Cancel', 'Discard'])
-    expect(buildNativeDialogOptions('linux', r).buttons).toEqual(['Cancel', 'Discard', 'Save All'])
+    expect(buildNativeDialogOptions('win32', r)).toMatchObject({
+      message: 'Open folder with unsaved changes?',
+      detail: 'The following documents have unsaved changes:\n• a.md\n' +
+        "Your changes will be lost if you don't save them.",
+      buttons: ['Save All', 'Discard', 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+      type: 'warning'
+    })
+    expect(buildNativeDialogOptions('darwin', r)).toMatchObject({
+      buttons: ['Save All', 'Cancel', 'Discard'],
+      defaultId: 0,
+      cancelId: 1
+    })
+    expect(buildNativeDialogOptions('linux', r)).toMatchObject({
+      buttons: ['Cancel', 'Discard', 'Save All'],
+      defaultId: 2,
+      cancelId: 0
+    })
   })
 })
 
@@ -88,13 +114,26 @@ describe('buildNativeDialogOptions — external dialogs', () => {
     for (const p of ['win32', 'darwin', 'linux'] as const) {
       const opts = buildNativeDialogOptions(p, r)
       expect(opts.type).toBe('warning')
-      expect(opts.message).toContain('was modified by another program')
+      expect(opts.message).toBe('a.md was modified by another program. Keep your version, or replace it with the version on disk?')
       expect(opts.buttons).toHaveLength(2)
       expect(new Set(opts.buttons)).toEqual(new Set(['Keep My Version', 'Reload from Disk']))
       expect(opts.cancelId).toBe(opts.defaultId) // Escape = the safe choice
     }
-    expect(buildNativeDialogOptions('win32', r).buttons).toEqual(['Keep My Version', 'Reload from Disk'])
-    expect(buildNativeDialogOptions('linux', r).buttons).toEqual(['Reload from Disk', 'Keep My Version'])
+    expect(buildNativeDialogOptions('win32', r)).toMatchObject({
+      buttons: ['Keep My Version', 'Reload from Disk'],
+      defaultId: 0,
+      cancelId: 0
+    })
+    expect(buildNativeDialogOptions('darwin', r)).toMatchObject({
+      buttons: ['Keep My Version', 'Reload from Disk'],
+      defaultId: 0,
+      cancelId: 0
+    })
+    expect(buildNativeDialogOptions('linux', r)).toMatchObject({
+      buttons: ['Reload from Disk', 'Keep My Version'],
+      defaultId: 1,
+      cancelId: 1
+    })
   })
 
   it('external-removed: Save As is the default; OK is the safe acknowledgement', () => {
@@ -125,11 +164,14 @@ describe('buildNativeDialogOptions — external dialogs', () => {
 describe('buildNativeDialogOptions — destructive dialogs', () => {
   it('delete-to-trash: Delete may be default (recoverable), Cancel is cancelId', () => {
     const r = req('delete-to-trash', { targetName: 'b.md', detail: '', cleanToCloseTitles: [] })
-    expect(buildNativeDialogOptions('win32', r)).toMatchObject({
+    const win = buildNativeDialogOptions('win32', r)
+    expect(win).toMatchObject({
       buttons: ['Delete', 'Cancel'],
       defaultId: 0,
-      cancelId: 1
+      cancelId: 1,
+      message: 'Delete b.md?'
     })
+    expect(win.detail).toContain('It will be moved to the recycle bin or trash.')
     expect(buildNativeDialogOptions('darwin', r)).toMatchObject({
       buttons: ['Delete', 'Cancel'],
       defaultId: 0,
@@ -140,7 +182,13 @@ describe('buildNativeDialogOptions — destructive dialogs', () => {
       defaultId: 1,
       cancelId: 0
     })
-    expect(buildNativeDialogOptions('win32', r).message).toBe('Delete b.md?')
+    // Clean-to-close lines list the documents the delete will close.
+    const withClean = req('delete-to-trash', { targetName: 'dir', detail: 'Folder detail', cleanToCloseTitles: ['a.md', 'b.md'] })
+    const cleanDetail = buildNativeDialogOptions('win32', withClean).detail
+    expect(cleanDetail).toContain('Folder detail')
+    expect(cleanDetail).toContain('This will close a.md.')
+    expect(cleanDetail).toContain('This will close b.md.')
+    expect(cleanDetail).toContain('It will be moved to the recycle bin or trash.')
   })
 
   it('permanent-delete: the irreversible action is NEVER the default (FR-006, US1 sc 4)', () => {
@@ -154,6 +202,10 @@ describe('buildNativeDialogOptions — destructive dialogs', () => {
     expect(buildNativeDialogOptions('win32', r).buttons).toEqual(['Delete Permanently', 'Cancel'])
     expect(buildNativeDialogOptions('darwin', r).buttons).toEqual(['Cancel', 'Delete Permanently'])
     expect(buildNativeDialogOptions('linux', r).buttons).toEqual(['Delete Permanently', 'Cancel'])
+    const win = buildNativeDialogOptions('win32', r)
+    expect(win.message).toBe('Trash unavailable')
+    expect(win.detail).toContain('Deleting it permanently cannot be undone.')
+    expect(win.detail).toContain('Delete permanently anyway?')
   })
 
   it('delete-blocked: single OK acknowledgement listing blockers', () => {
@@ -174,24 +226,13 @@ describe('buildNativeDialogOptions — destructive dialogs', () => {
   })
 })
 
-describe('buildNativeDialogOptions — Linux Pango-markup escaping', () => {
-  it('escapes markup characters in user-influenced names on linux only', () => {
-    const r = req('unsaved-close', { documentTitle: 'x<b>&c.md' })
-    const linux = buildNativeDialogOptions('linux', r)
-    expect(linux.message).toContain('x&lt;b&gt;&amp;c.md')
-    expect(linux.message).not.toContain('x<b>')
-    // Windows/macOS render plain text: no escaping.
-    expect(buildNativeDialogOptions('win32', r).message).toContain('x<b>&c.md')
-    expect(buildNativeDialogOptions('darwin', r).message).toContain('x<b>&c.md')
-  })
-})
-
 describe('buildNativeDialogOptions — operation-failed', () => {
   it('operation-failed: single OK with the error detail', () => {
     const r = req('operation-failed', { message: 'File or directory not found' })
     for (const p of ['win32', 'darwin', 'linux'] as const) {
       expect(buildNativeDialogOptions(p, r)).toMatchObject({
         type: 'error',
+        message: 'Operation failed',
         buttons: ['OK'],
         defaultId: 0,
         cancelId: 0,

@@ -128,7 +128,7 @@ Mapping rules (research R2/R3):
   clears no state, sets the re-prompt `error`, and re-invokes
   `showConfirmation` with the same request + `error` — the dialog re-prompts and
   the document stays dirty (research R5).
-- **destructive in progress (renderer)**: the single decision-surface guard
+- **destructive in progress (renderer)**: the single-prompt guard
   (`dialogInFlightRef`) stays held across `describeEntry` + the whole
   `trashEntry` operation (FR-012): no second delete dialog can open and no
   cancellation is offered while the operation runs. Releasing the guard drains

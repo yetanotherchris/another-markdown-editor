@@ -476,6 +476,11 @@ test('US3 a failing Save All keeps the confirmation open and does not commit', a
     await clickRecentItem('other')
     await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(2)
 
+    // The re-prompt must EXPLAIN the failure, not just re-appear (FR-010, US2
+    // scenario 4): assert the native detail carries the explanation.
+    const last = await lastMessageBoxOptions(app)
+    expect(last.detail).toContain('Could not save alpha.md')
+
     // The failed save does NOT commit (no delta.md in the tree) and the session
     // stays on the current folder.
     await expect(window.getByRole('treeitem').getByText('delta.md')).toHaveCount(0)

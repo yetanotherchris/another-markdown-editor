@@ -64,31 +64,46 @@ export default function App() {
   const workspaceRef = useRef(workspace)
   workspaceRef.current = workspace
   // Spec 008: native confirmation boxes are modal and the renderer awaits the
-  // decision over IPC. Only ONE decision surface may be in flight at a time
+  // decision over IPC. Only ONE confirmation prompt may be in flight at a time
   // (spec edge case), so every prompt entry point guards on this ref — a second
   // trigger while a dialog is open is ignored rather than stacked.
   const dialogInFlightRef = useRef(false)
   // The prepared-but-unconfirmed folder open (spec 004 FR-009/FR-010); a ref so
   // overlapping open flows cannot clobber the pending slot.
   const pendingFolderOpenRef = useRef<WorkspaceInfo | null>(null)
-  // An operation-failed prompt queued while another decision surface is up.
+  // An operation-failed prompt queued while another prompt is up.
   const pendingErrorRef = useRef<string | null>(null)
+  // An external changed/removed notice queued while another prompt is up. A
+  // single slot, like the error queue: a notice arriving while a dialog is open
+  // is DEFERRED (never dropped) and re-surfaced once the guard releases (review
+  // 2026-08-04: the old ConfirmDialog-era code deferred these too).
+  const pendingExternalPromptRef = useRef<{ path: string; kind: 'changed' | 'removed' } | null>(null)
 
-  // The single place the decision-surface guard is released. Also drains a
-  // queued operation error, so an error raised while a guarded flow held the
-  // surface (e.g. a failed trash after "Delete", or a failed folder commit) is
-  // still surfaced once that flow finishes (review finding: the queue was never
-  // drained when the guard was released by a different flow).
+  // The single place the single-prompt guard is released. Also drains what was
+  // queued while the guard was held, so nothing is silently dropped: a deferred
+  // external changed/removed notice first (it is a real decision the user must
+  // make), then a queued operation error (e.g. a failed trash after "Delete", or
+  // a failed folder commit). Each drained item re-acquires the guard
+  // synchronously and its own release drains the next.
   const releaseDialogSurface = useCallback(() => {
     dialogInFlightRef.current = false
-    const queued = pendingErrorRef.current
+    const queuedPrompt = pendingExternalPromptRef.current
+    const queuedError = pendingErrorRef.current
+    pendingExternalPromptRef.current = null
     pendingErrorRef.current = null
-    if (queued) showOperationErrorRef.current(queued)
+    if (queuedPrompt) {
+      const doc = sessionRef.current.documents.find(d => d.path === queuedPrompt.path)
+      // handleExternalChange returns true when it opens a confirmation prompt;
+      // its own release then drains the queued error. If the document is gone or
+      // the notice resolved via auto-reload (no prompt), fall through to the error.
+      if (doc && handleExternalChangeRef.current(doc, queuedPrompt.kind)) return
+    }
+    if (queuedError) showOperationErrorRef.current(queuedError)
   }, [])
 
   // Spec 008 US4: surface a failed operation through the native error box. If
-  // another decision surface is already up, the error is queued and shown once
-  // the guard releases (one decision surface at a time, spec edge case).
+  // another prompt is already up, the error is queued and shown once the guard
+  // releases (one prompt at a time, spec edge case).
   const showOperationError = useCallback(async (message: string) => {
     if (dialogInFlightRef.current) {
       pendingErrorRef.current = message
@@ -245,7 +260,7 @@ export default function App() {
       doClose(id)
       return
     }
-    // Spec 008: show the native unsaved-changes box. Only one decision surface
+    // Spec 008: show the native unsaved-changes box. Only one prompt at a time
     // at a time (spec edge case); a second trigger while one is open is ignored.
     if (dialogInFlightRef.current) return
     dialogInFlightRef.current = true
@@ -300,6 +315,12 @@ export default function App() {
   }, [isDirtyLive])
 
   const handleQuitRequest = useCallback(async () => {
+    // A second trigger while any prompt is open is ignored (one prompt at a
+    // time). Checked BEFORE the no-dirty fast path: quitting while
+    // a sheet is up (e.g. an external-removed rescue for a clean document) must
+    // not close the window and abandon the in-memory content it was offering
+    // (review 2026-08-04).
+    if (dialogInFlightRef.current) return
     const current = sessionRef.current
     flushLiveContent()
     const dirtyDocs = current.documents.filter(d => isDirtyLive(d))
@@ -307,14 +328,17 @@ export default function App() {
       window.api.confirmQuit('quit')
       return
     }
-    if (dialogInFlightRef.current) return
     dialogInFlightRef.current = true
     try {
       let error: string | undefined
+      // The still-unsaved set shrinks as saves succeed, so a re-prompt lists
+      // (and a second Save All re-saves) only the documents that are actually
+      // still unsaved — not a stale pre-save snapshot (review 2026-08-04).
+      const remaining = [...dirtyDocs]
       for (;;) {
         const result = await window.api.showConfirmation({
           kind: 'unsaved-quit',
-          documentTitles: dirtyDocs.map(d => d.title),
+          documentTitles: remaining.map(d => d.title),
           ...(error ? { error } : {})
         })
         if (!result.ok) return
@@ -326,15 +350,17 @@ export default function App() {
         }
         // save-all
         let allSaved = true
-        for (const doc of dirtyDocs) {
+        for (const doc of [...remaining]) {
           const saved = await saveDocument(doc)
-          if (saved !== 'saved') {
-            if (saved === 'failed') {
-              error = `Could not save ${doc.title}. The application stays open.`
-            }
-            allSaved = false
-            break
+          if (saved === 'saved') {
+            remaining.splice(remaining.indexOf(doc), 1)
+            continue
           }
+          if (saved === 'failed') {
+            error = `Could not save ${doc.title}. The application stays open.`
+          }
+          allSaved = false
+          break
         }
         if (allSaved) {
           window.api.confirmQuit('quit')
@@ -388,6 +414,23 @@ export default function App() {
       releaseDialogSurface()
     }
   }, [reloadDocument, releaseDialogSurface, saveDocument])
+
+  // Route an external changed/removed event to its handling. Returns true when a
+  // confirmation prompt is opened — used by releaseDialogSurface so a deferred
+  // notice that instead resolves via auto-reload (a clean document) still lets a
+  // queued operation error show.
+  const handleExternalChange = useCallback((doc: DocumentState, kind: 'changed' | 'removed'): boolean => {
+    if (kind === 'changed' && !doc.dirty && !isDirtyLive(doc)) {
+      reloadDocument(doc)
+      return false
+    }
+    flushLiveContent()
+    void handleExternalPrompt({ id: doc.id, kind })
+    return true
+  }, [flushLiveContent, handleExternalPrompt, isDirtyLive, reloadDocument])
+
+  const handleExternalChangeRef = useRef(handleExternalChange)
+  handleExternalChangeRef.current = handleExternalChange
 
   const handleActivate = useCallback((id: string) => {
     const current = sessionRef.current
@@ -661,6 +704,13 @@ export default function App() {
 
   const cleanupAfterDelete = useCallback((node: TreeNode, plan: DeletePlan) => {
     for (const doc of plan.cleanToClose) {
+      // FR-012: the native box is gone once "Delete" is clicked, so the async
+      // trash window is input-open. A document that was clean at confirm time
+      // may have received a keystroke while the trash ran — closing it now
+      // would discard that edit without a prompt (Principle III, review
+      // 2026-08-04). Re-check and leave any document that became dirty open.
+      const fresh = sessionRef.current.documents.find(d => d.id === doc.id)
+      if (fresh && isDirtyLive(fresh)) continue
       doClose(doc.id)
     }
     dispatchWorkspace({ type: 'REMOVE_ENTRY', payload: { id: node.id } })
@@ -670,12 +720,12 @@ export default function App() {
     if (selected === node.id || (selected !== null && selected.startsWith(node.id + '/'))) {
       dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
     }
-  }, [doClose])
+  }, [doClose, isDirtyLive])
 
   // Spec 008 delete flow, driven by the native message boxes: describe → plan →
   // (delete-blocked | delete-to-trash) → trash; on TRASH_UNAVAILABLE → an
   // explicit permanent-delete confirmation. The whole flow — including the
-  // async describe — holds the single decision-surface guard (FR-012): no
+  // async describe — holds the single-prompt guard (FR-012): no
   // second prompt can open and no cancellation is offered while the trash
   // operation runs.
   const runDeleteConfirmation = useCallback(async (node: TreeNode) => {
@@ -692,11 +742,14 @@ export default function App() {
       const info = result.value
       const plan = planDelete(sessionRef.current.documents, node.id, isDirtyLive)
       if (plan.dirtyBlockers.length > 0) {
-        await window.api.showConfirmation({
+        const blocked = await window.api.showConfirmation({
           kind: 'delete-blocked',
           targetName: node.name,
           blockerTitles: plan.dirtyBlockers.map(d => d.title)
         })
+        // An IPC failure here is invisible otherwise; surface it like the other
+        // flows (queued, then shown once the guard releases).
+        if (!blocked.ok) void showOperationError(blocked.message)
         return
       }
       const deleteDecision = await window.api.showConfirmation({
@@ -922,14 +975,14 @@ export default function App() {
       const doc = sessionRef.current.documents.find(d => d.path === e.path)
       if (!doc) return
       dispatch({ type: 'EXTERNAL_CHANGE', payload: { path: e.path, kind: e.kind } })
-      // One decision surface at a time: never prompt over a dialog that is up.
-      if (dialogInFlightRef.current) return
-      if (e.kind === 'changed' && !doc.dirty && !isDirtyLive(doc)) {
-        reloadDocument(doc)
+      // One prompt at a time: never prompt over a dialog that is up.
+      // DEFER, don't drop — the notice is re-surfaced once the guard releases
+      // (releaseDialogSurface drains it, matching the operation-error queue).
+      if (dialogInFlightRef.current) {
+        pendingExternalPromptRef.current = { path: e.path, kind: e.kind }
         return
       }
-      flushLiveContent()
-      void handleExternalPrompt({ id: doc.id, kind: e.kind })
+      handleExternalChange(doc, e.kind)
     })
 
     const unsubWorkspace = window.api.onWorkspaceChanged((e) => {
@@ -959,7 +1012,7 @@ export default function App() {
       unsubRecentOk()
       unsubQuit()
     }
-  }, [enforcePoolCap, flushLiveContent, handleCloseRequest, handleExternalPrompt, handleNew, handleQuitRequest, isDirtyLive, reloadDocument, runFolderOpenFlow, saveDocument])
+  }, [enforcePoolCap, handleCloseRequest, handleExternalChange, handleNew, handleQuitRequest, runFolderOpenFlow, saveDocument])
 
   useEffect(() => {
     return () => {

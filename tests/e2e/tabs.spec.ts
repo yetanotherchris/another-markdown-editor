@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -195,6 +195,10 @@ test('closing a dirty tab with a failing save re-prompts and keeps the tab open 
     // The re-prompt is proven by the stub receiving a second call; the tab
     // stays open and dirty, and nothing was written to disk.
     await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(2)
+    // The re-prompt must EXPLAIN the failure, not just re-appear (FR-007/008,
+    // US2 scenario 4): assert the native detail carries the explanation.
+    const last = await lastMessageBoxOptions(app)
+    expect(last.detail).toContain('Could not save alpha.md')
     await expect(window.getByRole('tab', { name: /alpha\.md/ })).toBeVisible()
     await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toBeVisible()
     expect(fs.readFileSync(alphaPath, 'utf-8')).not.toContain('EXTRA')
@@ -226,6 +230,30 @@ test('quitting with Discard and Quit closes the application', async () => {
     BrowserWindow.getAllWindows()[0].close()
   })
   await closed
+})
+
+test('quitting with Save All writes every dirty document and closes the app', async () => {
+  await openFolderAndFile('alpha.md')
+  await openSecondFile('beta.md')
+
+  // Dirty both documents. typeInEditor targets the FIRST contenteditable in the
+  // DOM, so activate the tab being typed into first (the active editor is the
+  // visible one; the others stay mounted but hidden).
+  await window.getByRole('tab', { name: /alpha\.md/ }).click()
+  await typeInEditor(' ALPHA')
+  await window.getByRole('tab', { name: /beta\.md/ }).click()
+  await window.locator('[contenteditable="true"]:visible').click()
+  await window.keyboard.type(' BETA')
+
+  const closed = app.waitForEvent('close')
+  await stubMessageBox(app, 'Save All')
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].close()
+  })
+  await closed
+  // Save All wrote both dirty documents to disk before quitting.
+  expect(fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')).toContain('ALPHA')
+  expect(fs.readFileSync(path.join(testFolder, 'beta.md'), 'utf-8')).toContain('BETA')
 })
 
 test('external change to a clean document auto-reloads it', async () => {

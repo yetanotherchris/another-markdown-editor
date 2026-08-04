@@ -161,7 +161,7 @@ The feature applies to these existing dialog surfaces:
   confirmation prompt by a platform-standard method: the operation is cancelled
   whenever cancelling is safe and available.
 - A dialog is opened while another dialog is already present: the application
-  shows one decision surface at a time and does not let actions apply to an
+  shows one confirmation prompt at a time and does not let actions apply to an
   obscured or stale dialog.
 - A long file name, folder name, or list of affected documents must be shown: the
   dialog remains readable, identifies the affected items accurately, and keeps
@@ -218,7 +218,7 @@ The feature applies to these existing dialog surfaces:
 
 ### Key Entities
 
-- **Confirmation dialog**: A decision surface that requires explicit user choice
+- **Confirmation dialog**: A prompt that requires explicit user choice
   before an operation can discard, replace, delete, permanently delete, or close
   user work.
 - **Native dialog convention**: The active operating system's expected dialog
