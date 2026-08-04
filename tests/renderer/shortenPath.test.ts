@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shortenPath } from '../../src/renderer/status/shortenPath'
+import { shortenPath } from '../../src/shared/shortenPath'
 
 describe('shortenPath', () => {
   it('returns the full path when it fits', () => {

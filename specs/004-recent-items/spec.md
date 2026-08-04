@@ -54,8 +54,8 @@ open action.
 **Acceptance Scenarios**:
 
 1. **Given** Recent Items includes both files and folders, **When** the user
-   views an entry, **Then** its label and visual treatment distinguish a file from
-   a folder.
+   views an entry, **Then** the folders-above-files grouping and the entry's
+   name let them tell a file from a folder before selecting it.
 2. **Given** the user selects a recent file, **When** it opens successfully,
    **Then** it follows the existing single-file open behavior.
 3. **Given** the user selects a recent folder, **When** it opens successfully,
@@ -93,6 +93,30 @@ current session remains intact and the unavailable entry is removed.
 
 ---
 
+### User Story 4 - Clear recent items (Priority: P2)
+
+A writer can remove the entire recent-items history in one action instead of
+clearing entries one at a time or editing the config file by hand.
+
+**Why this priority**: A stale or privacy-sensitive history should be erasable
+without the user editing the config file directly.
+
+**Independent Test**: Record a file and a folder, invoke Clear Recent Items, and
+verify the menu reverts to the empty "no recent items" state while the open
+document session is unchanged.
+
+**Acceptance Scenarios**:
+
+1. **Given** Recent Items contains at least one entry, **When** the user
+   invokes Clear Recent Items, **Then** all entries are removed and the menu
+   shows the disabled "No Recent Items" state.
+2. **Given** the user invokes Clear Recent Items, **When** the clearing
+   completes, **Then** the currently open documents and workspace are unchanged.
+3. **Given** the user has cleared Recent Items, **When** the application is
+   restarted, **Then** the history remains empty.
+
+---
+
 ### Edge Cases
 
 - No qualifying file or folder has been opened: File > Recent Items clearly
@@ -105,11 +129,19 @@ current session remains intact and the unavailable entry is removed.
   persistence problem in a quiet, actionable way when appropriate.
 - A file is opened from the workspace explorer rather than through the File menu:
   it does not enter the file portion of Recent Items.
-- More than the supported number of recent items are opened: the oldest entries
-  are removed while the most recently used entries remain.
+- More than 5 files or more than 5 folders are opened: only the 5 most recent
+  entries of each type remain, and entries of the other type are unaffected.
 - A file or folder path contains non-Latin characters, whitespace, or a path that
   is long enough to require visual shortening: the entry remains unambiguous and
   selectable.
+- Only folders or only files are recorded: the absent group is simply omitted
+  (no empty section, no dangling separator).
+- The user invokes Clear Recent Items with entries present: the list is emptied
+  and the menu reverts to the "no recent items" state. With an empty list no
+  Clear action is offered.
+- Clearing Recent Items is a menu action that must not disturb the open
+  document/workspace session; a persistence failure while clearing is reported
+  quietly and is non-fatal.
 
 ## Requirements *(mandatory)*
 
@@ -135,7 +167,11 @@ current session remains intact and the unavailable entry is removed.
   behavior; selecting a recent folder MUST use the existing workspace-opening
   behavior.
 - **FR-008**: Each Recent Items entry MUST make its file or folder type clear
-  before selection.
+  before selection. The folders-above-files grouping (FR-015) conveys the type —
+  folder entries are listed first as a group, then file entries — and the entry
+  name (a folder's directory name vs a `.md`/`.markdown` filename) reinforces
+  it. Entries are NOT prefixed with `File:`/`Folder:` (see the 2026-08-04
+  clarification).
 - **FR-009**: When a recent item cannot be opened because its target is missing,
   unreadable, unsupported, or no longer valid, the system MUST leave the current
   session unchanged, explain the failure in context, and remove that entry from
@@ -146,12 +182,18 @@ current session remains intact and the unavailable entry is removed.
 - **FR-011**: The system MUST tolerate a missing, unreadable, or malformed
   recent-items configuration without preventing application startup or access to
   File menu actions.
-- **FR-012**: The system MUST limit Recent Items to the 10 most recently used
-  entries, removing the least recent entry when a new qualifying entry exceeds
-  that limit.
+- **FR-012**: The system MUST limit Recent Items to at most 5 files and at most
+  5 folders, removing the least-recent entry of that type when a new qualifying
+  entry of the same type exceeds the limit.
 - **FR-013**: The system MUST NOT add files opened only through the workspace
   explorer to Recent Items unless they were also successfully opened through the
   File menu.
+- **FR-014**: The File menu MUST provide a **Clear Recent Items** action, at the
+  bottom of the Recent Items submenu after a separator, that removes all recent
+  files and folders when invoked.
+- **FR-015**: Within Recent Items, folder entries MUST be listed first (most
+  recent first), followed by a separator, then file entries (most recent first);
+  a final separator precedes the Clear Recent Items action.
 
 ### Key Entities
 
@@ -173,8 +215,8 @@ current session remains intact and the unavailable entry is removed.
 - **SC-002**: In 100% of persistence tests, a successfully opened qualifying
   file or folder remains available in Recent Items after application restart.
 - **SC-003**: In 100% of ordering tests, reopening an existing entry moves it to
-  the first position without creating a duplicate, and the list never exceeds 10
-  entries.
+  the first position within its group without creating a duplicate, and the list
+  never exceeds 5 entries of each type.
 - **SC-004**: In 100% of unavailable-entry tests, selecting a missing or
   unreadable item preserves the current session and removes the unusable entry.
 - **SC-005**: In 100% of malformed-configuration tests, the application starts
@@ -190,13 +232,44 @@ current session remains intact and the unavailable entry is removed.
 - **Qualifying folders**: Every folder successfully opened as a workspace is a
   qualifying recent folder, whether opened from the standard folder action or a
   future equivalent File menu action.
-- **List size**: A 10-item limit is the reasonable default for a compact File
-  menu. The cap applies to the combined file-and-folder list.
+- **List size**: A 5-per-type cap (5 files, 5 folders) is the reasonable default
+  for a compact File menu. The cap applies independently to each type, so the
+  combined list never exceeds 10 entries.
+- **Grouping**: Folder entries always appear above file entries regardless of
+  recency; recency orders entries within each group. Sections that have no
+  entries are omitted entirely (including their separators).
+- **Clear action**: The Clear Recent Items action is offered only when the list
+  is non-empty (an empty list already shows the disabled "No Recent Items"
+  entry). Clearing is a main-process menu action and never touches the open
+  document/workspace session.
 - **Unavailable entries**: An item is removed only after an attempted open proves
   it unavailable or invalid. Cancelling an unsaved-work confirmation is not a
   failed open and preserves the entry.
 - **Configuration ownership**: Recent-items data is local to the operating-system
   user, is not synchronized or shared, and contains no document contents.
-- **Out of scope**: Clearing or pinning recent entries, cross-device sync,
-  automatic reopening on startup, and history for files opened solely from the
-  workspace explorer are not included.
+- **Out of scope**: Pinning recent entries, cross-device sync, automatic
+  reopening on startup, and history for files opened solely from the workspace
+  explorer are not included.
+
+## Clarifications
+
+- 2026-08-03 — List cap is per type (max 5 files, max 5 folders) rather than a
+  combined 10; folders are grouped above files with a separator; a **Clear
+  Recent Items** action sits at the bottom of the submenu (FR-012/014/015).
+  These supersede the earlier combined-10 phrasing.
+- 2026-08-04 — Recent Items menu labels carry NO `File:`/`Folder:` prefix. The
+  type is inferred from the item: folder entries are grouped above file entries
+  (FR-015) and a folder entry is a directory name while a file entry ends in
+  `.md`/`.markdown`. This supersedes any earlier per-label type-tag wording in
+  FR-008/US2 (SC-006 still requires the type to be identifiable before
+  selection).
+- 2026-08-04 — The folder-open unsaved-work confirmation (FR-010/US3 scenario
+  3) applies to **workspace-relative documents with unsaved changes** only.
+  Documents whose paths are absolute (opened from outside the workspace) are
+  not affected by a workspace swap and do not trigger the confirmation.
+- 2026-08-04 — "A stored recent entry … is not a supported markdown file … it
+  is ignored safely" means **structurally tolerated**: entries are validated on
+  load for shape (absolute path, known kind, name, finite timestamp) but NOT for
+  a `.md`/`.markdown` extension. A hand-edited non-markdown `file` entry is
+  still listed and is dropped only if (and when) an open attempt fails. It never
+  prevents startup or hides valid entries.

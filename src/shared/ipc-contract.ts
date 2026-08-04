@@ -66,9 +66,28 @@ export interface DocumentChangeEvent {
   kind: 'changed' | 'removed'
 }
 
+/** Recent-entry type: a markdown file or a workspace folder (spec 004). */
+export type RecentKind = 'file' | 'folder'
+
+/** A persisted recent item (spec 004, FR-001…013). `path` is absolute. */
+export interface RecentItem {
+  path: string
+  kind: RecentKind
+  name: string
+  lastOpenedAt: number
+}
+
+/** A quiet persistence warning from main (spec 004, FR-011): the recent-items
+ *  config could not be written. Non-fatal — the operation it accompanied
+ *  already succeeded. */
+export interface RecentItemsWarning {
+  message: string
+}
+
 export type MenuCommand =
   | 'open-file' | 'open-folder' | 'save' | 'save-as'
   | 'close-tab' | 'new-file'
+  | { type: 'open-recent'; path: string; kind: RecentKind }
 
 export interface Settings {
   sidebarWidth: number
@@ -76,10 +95,25 @@ export interface Settings {
 }
 
 export interface DesktopApi {
-  openFolderDialog(): Promise<Result<WorkspaceInfo | null>>
+  /**
+   * Phase 1 of folder open (spec 004, FR-009/FR-010): with `path` undefined,
+   * shows the OS folder picker; with `path`, opens only a recorded recent
+   * folder (rejected with `OUTSIDE_WORKSPACE` otherwise). Validates the target
+   * and returns its entries WITHOUT touching the current workspace — the swap
+   * happens only on `commitFolderOpen`, so a cancelled or failed open leaves
+   * the current workspace and session unchanged. Returns `null` when the picker
+   * is cancelled.
+   */
+  prepareFolderOpen(path?: string): Promise<Result<WorkspaceInfo | null>>
+  /** Phase 2 of folder open: commit the prepared folder as the active
+   *  workspace and record it in Recent Items. */
+  commitFolderOpen(): Promise<Result<WorkspaceInfo>>
+  /** Abandon a prepared folder open (no workspace change). */
+  cancelFolderOpen(): Promise<Result<null>>
   readDir(relativePath: string): Promise<Result<DirEntry[]>>
   openFileDialog(): Promise<Result<OpenedFile | null>>
   readFile(relativePath: string): Promise<Result<OpenedFile>>
+  openRecentFile(path: string): Promise<Result<OpenedFile>>
   writeFile(relativePath: string, content: string): Promise<Result<WriteReceipt>>
   saveFileDialog(suggestedName: string, content: string): Promise<Result<OpenedFile | null>>
   createEntry(parentRelativePath: string, name: string, kind: EntryKind): Promise<Result<DirEntry>>
@@ -91,6 +125,8 @@ export interface DesktopApi {
   onWorkspaceChanged(cb: (e: WatchEvent) => void): () => void
   onDocumentChanged(cb: (e: DocumentChangeEvent) => void): () => void
   onMenuCommand(cb: (c: MenuCommand) => void): () => void
+  onRecentItemsWarning(cb: (w: RecentItemsWarning) => void): () => void
+  onRecentItemsOk(cb: () => void): () => void
   onQuitRequested(cb: () => void): () => void
   confirmQuit(decision: 'quit' | 'cancel'): void
 }

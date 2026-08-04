@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
-  WriteReceipt, TrashReceipt, ErrorCode
+  WriteReceipt, TrashReceipt, ErrorCode, MenuCommand, RecentItem,
+  DesktopApi
 } from '../../src/shared/ipc-contract'
 
 describe('IPC contract types', () => {
@@ -71,5 +72,40 @@ describe('IPC contract types', () => {
     expect(info.name).toBe('my-workspace')
     expect(info.path).toBe('/home/me/projects/my-workspace')
     expect(info.entries.length).toBe(1)
+  })
+
+  it('RecentItem carries an absolute path, kind, name and timestamp', () => {
+    const file: RecentItem = { path: '/home/me/notes/a.md', kind: 'file', name: 'a.md', lastOpenedAt: 1000 }
+    const folder: RecentItem = { path: '/home/me/notes', kind: 'folder', name: 'notes', lastOpenedAt: 2000 }
+    expect(file.kind).toBe('file')
+    expect(folder.kind).toBe('folder')
+    expect(folder.lastOpenedAt).toBeGreaterThan(file.lastOpenedAt)
+  })
+
+  it('MenuCommand includes the open-recent object form', () => {
+    const cmd: MenuCommand = { type: 'open-recent', path: '/home/me/notes/a.md', kind: 'file' }
+    expect(cmd).toMatchObject({ type: 'open-recent' })
+  })
+})
+
+describe('DesktopApi recent-items operations', () => {
+  it('types the two-phase folder-open operations', () => {
+    // Type-level: each assignment compiles only if DesktopApi exposes the
+    // operation with the documented signature.
+    const prepare: DesktopApi['prepareFolderOpen'] = () => Promise.resolve({ ok: true, value: null })
+    const commit: DesktopApi['commitFolderOpen'] = () => Promise.resolve({ ok: false, code: 'NO_WORKSPACE', message: 'none' })
+    const cancel: DesktopApi['cancelFolderOpen'] = () => Promise.resolve({ ok: true, value: null })
+    expect(typeof prepare).toBe('function')
+    expect(typeof commit).toBe('function')
+    expect(typeof cancel).toBe('function')
+  })
+
+  it('types the recent-file open and the warning/ok events', () => {
+    const open: DesktopApi['openRecentFile'] = () => Promise.resolve({ ok: false, code: 'NOT_FOUND', message: 'none' })
+    const warn: DesktopApi['onRecentItemsWarning'] = () => () => {}
+    const ok: DesktopApi['onRecentItemsOk'] = () => () => {}
+    expect(typeof open).toBe('function')
+    expect(typeof warn).toBe('function')
+    expect(typeof ok).toBe('function')
   })
 })
