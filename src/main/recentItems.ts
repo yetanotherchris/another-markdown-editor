@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { atomicWrite } from './fs/atomicWrite'
 import type { RecentItem, RecentKind } from '../shared/ipc-contract'
 
 /**
@@ -15,19 +16,43 @@ import type { RecentItem, RecentKind } from '../shared/ipc-contract'
  * Entries with a relative path, an unknown kind, or a non-number timestamp are
  * dropped.
  */
-export const RECENT_ITEMS_LIMIT = 10
+export const RECENT_ITEMS_LIMIT_PER_KIND = 5
+
+/**
+ * Dedupe/remove key for an entry. On Windows the filesystem compares paths
+ * case-insensitively, so the key folds case — otherwise `C:\Notes` and
+ * `c:\notes` would survive as two entries for one location (FR-006). The fold
+ * is win32-only because on macOS/Linux realpath (canonicalPath in the
+ * handlers) is what dedupes case-variant spellings of a LIVE target — the key
+ * fold only matters for recorded-but-missing paths on case-insensitive mounts.
+ */
+export function dedupeKey(path_: string, kind: RecentKind): string {
+  const normalized = process.platform === 'win32' ? path_.toLowerCase() : path_
+  return `${kind}\u0000${normalized}`
+}
 
 export function recordRecentItem(items: RecentItem[], item: RecentItem): RecentItem[] {
-  const withoutOld = items.filter(
-    (existing) => !(existing.path === item.path && existing.kind === item.kind)
-  )
-  return [item, ...withoutOld].slice(0, RECENT_ITEMS_LIMIT)
+  const key = dedupeKey(item.path, item.kind)
+  const withoutOld = items.filter((existing) => dedupeKey(existing.path, existing.kind) !== key)
+  // Per-type cap (FR-012): a new entry may evict the least recent of ITS OWN
+  // type, never an entry of the other type.
+  const others = withoutOld.filter((existing) => existing.kind !== item.kind)
+  const sameKind = withoutOld
+    .filter((existing) => existing.kind === item.kind)
+    .slice(0, RECENT_ITEMS_LIMIT_PER_KIND - 1)
+  // Canonicalize folders-first, matching normalizeRecentItems, so the on-disk
+  // order does not flip-flop on every record/load cycle (the menu re-sorts, but
+  // a record-then-load would otherwise reshuffle the persisted list each time).
+  const merged = [item, ...others, ...sameKind]
+  return [
+    ...merged.filter((existing) => existing.kind === 'folder'),
+    ...merged.filter((existing) => existing.kind === 'file')
+  ]
 }
 
 export function removeRecentItem(items: RecentItem[], path_: string, kind: RecentKind): RecentItem[] {
-  return items.filter(
-    (existing) => !(existing.path === path_ && existing.kind === kind)
-  )
+  const key = dedupeKey(path_, kind)
+  return items.filter((existing) => dedupeKey(existing.path, existing.kind) !== key)
 }
 
 /** Recover a list from arbitrary loaded JSON, dropping anything malformed. */
@@ -52,17 +77,21 @@ export function normalizeRecentItems(raw: unknown): RecentItem[] {
     })
   }
   // Most-recent-first; dedupe by (path, kind) keeping the most recent copy
-  // (a hand-edited config may hold duplicates).
+  // (a hand-edited config may hold duplicates); cap per type (FR-012) while
+  // preserving global recency order within each type.
   const seen = new Set<string>()
-  return valid
+  const deduped = valid
     .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
     .filter((item) => {
-      const key = `${item.kind}\u0000${item.path}`
+      const key = dedupeKey(item.path, item.kind)
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
-    .slice(0, RECENT_ITEMS_LIMIT)
+  return [
+    ...deduped.filter((i) => i.kind === 'folder').slice(0, RECENT_ITEMS_LIMIT_PER_KIND),
+    ...deduped.filter((i) => i.kind === 'file').slice(0, RECENT_ITEMS_LIMIT_PER_KIND)
+  ]
 }
 
 export function loadRecentItems(filePath: string): RecentItem[] {
@@ -75,17 +104,16 @@ export function loadRecentItems(filePath: string): RecentItem[] {
   return normalizeRecentItems(raw)
 }
 
-/** Atomic write: temp file in the same directory, then rename (Principle III). */
+/**
+ * Atomic write (temp file in the same directory, then rename — Principle III)
+ * via the shared `atomicWrite` helper, with an explicit `0o600` mode so the
+ * config (which records absolute paths) is not world-readable on multi-user
+ * systems. The parent directory is created on demand; a failure to create it
+ * or to write the temp propagates to the caller, which must treat the
+ * persistence failure as non-fatal (FR-011).
+ */
 export function saveRecentItems(filePath: string, items: RecentItem[]): void {
   const dir = path.dirname(filePath)
-  const base = path.basename(filePath)
-  const tempPath = path.join(dir, `.${base}.tmp-${process.pid}-${Date.now().toString(36)}`)
-  try {
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(tempPath, JSON.stringify({ recentItems: items }, null, 2), 'utf-8')
-    fs.renameSync(tempPath, filePath)
-  } catch (e: unknown) {
-    try { fs.unlinkSync(tempPath) } catch { /* best-effort cleanup */ }
-    throw e
-  }
+  fs.mkdirSync(dir, { recursive: true })
+  atomicWrite(filePath, JSON.stringify({ recentItems: items }, null, 2), 0o600)
 }

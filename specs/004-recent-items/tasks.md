@@ -45,18 +45,23 @@ shared location.
 - [X] T003 Extend `src/shared/ipc-contract.ts`: `RecentKind = 'file' | 'folder'`,
       `RecentItem { path, kind, name, lastOpenedAt }`, `MenuCommand` gains the
       object form `{ type: 'open-recent'; path: string; kind: RecentKind }`, and
-      `DesktopApi` gains `openRecentFile(path)` / `openRecentFolder(path)`
+      `DesktopApi` gains `openRecentFile(path)` plus the two-phase folder-open
+      ops `prepareFolderOpen(path?)` / `commitFolderOpen()` /
+      `cancelFolderOpen()` and the `onRecentItemsWarning` / `onRecentItemsOk`
+      events
 - [X] T004 Implement `src/main/recentItems.ts` — a pure, electron-free store:
       `loadRecentItems(filePath)` (tolerant parse, sort by `lastOpenedAt` desc,
-      dedupe by `(path, kind)`, cap 10), `saveRecentItems(filePath, items)`
-      (atomic temp+rename), `recordRecentItem(items, item)` (upsert-to-front,
-      cap), `removeRecentItem(items, path, kind)` (research R1)
+      dedupe by `(path, kind)`, per-type cap 5/5), `saveRecentItems(filePath,
+      items)` (atomic temp+rename), `recordRecentItem(items, item)`
+      (upsert-to-front, per-type cap, folders-first canonical order),
+      `removeRecentItem(items, path, kind)` (research R1)
 - [X] T005 [P] Write `tests/main/recentItems.test.ts`: missing/unreadable/
       malformed/garbage-entry tolerance, ordering, dedupe by `(path, kind)`,
-      cap-of-10 least-recent eviction, remove, atomic save leaves no partial
-      file on failure
+      per-type 5/5 least-recent eviction (own type only), remove, atomic save
+      leaves no partial file on failure
 - [X] T006 [P] Extend `tests/main/ipc.test.ts` — shape tests for the `open-recent`
-      MenuCommand object form and the two new `DesktopApi` operation signatures
+      MenuCommand object form and the new `DesktopApi` operation signatures
+      (folder-open ops and the recent-items events)
 
 **Checkpoint**: `npm run test` main + renderer projects pass with the new
 contract and store.
@@ -83,18 +88,21 @@ surviving restarts (FR-001…003, 005, 006, 012, 013).
       kind: 'file', name: basename })`; after `workspace:openDialog` returns a
       workspace, `recordRecentItem({ path: realRootPath, kind: 'folder', name:
       basename })`; call `refreshApplicationMenu` after each (FR-002/003/013)
-- [X] T009 [US1] `src/main/ipc/handlers.ts` — `recent:openFile` /
-      `recent:openFolder` handlers: reject paths not in the stored list
+- [X] T009 [US1] `src/main/ipc/handlers.ts` — `recent:openFile` handler and the
+      `workspace:prepareFolderOpen(path)` recent-folder leg (folder opens are
+      two-phase, research R5): reject paths not in the stored list
       (`OUTSIDE_WORKSPACE`), realpath-resolve, open like the dialog handlers
-      (relative path + watchDir when inside the workspace; `WorkspaceState`
-      replacement for folders), `recordRecentItem` to bump to front, return the
-      result (research R4, FR-006)
+      (relative path + watchDir when inside the workspace), `recordRecentItem`
+      to bump to front, return the result (research R4, FR-006)
 - [X] T010 [US1] `src/preload/index.ts` — wire `openRecentFile` →
-      `recent:openFile` and `openRecentFolder` → `recent:openFolder`
+      `recent:openFile`, and `prepareFolderOpen`/`commitFolderOpen`/
+      `cancelFolderOpen` → the `workspace:*` channels, plus the
+      `onRecentItemsWarning` / `onRecentItemsOk` events
 - [X] T011 [US1] `src/renderer/App.tsx` — handle the `open-recent` MenuCommand:
-      file → `openRecentFile` → `OPEN_EXISTING`; folder → `openRecentFolder` →
-      `REPLACE`; failures surface via the existing `operationError` dialog with
-      the session untouched (FR-007/009/010)
+      file → `openRecentFile` → `OPEN_EXISTING`; folder → the prepare →
+      (unsaved-work confirm) → commit flow → `REPLACE`; failures surface via the
+      existing `operationError` dialog with the session untouched
+      (FR-007/009/010)
 - [X] T012 [US1] Write `tests/e2e/recent.spec.ts` US1 scenarios: open a file
       via the File menu (dialog stubbed via `electronApp.evaluate`) then reopen
       from Recent Items; open a folder then reopen it as the workspace;
@@ -147,15 +155,44 @@ from Recent Items.
 ## Phase 6: Cross-cutting — edges, polish, gates
 
 - [X] T015 [P] `tests/e2e/recent.spec.ts` edges + guards: explorer-opened files
-      never appear (FR-013); more than 10 qualifying opens keep only the 10 most
-      recent (FR-012); a long / non-Latin path shortens with `…` keeping the
-      final name (spec edge); corrupt config file → app starts with an empty
-      list (FR-011)
+      never appear (FR-013); more than 5 qualifying opens of a type keep only
+      the 5 most recent of that type (FR-012); a long / non-Latin path shortens
+      with `…` keeping the final name (spec edge); corrupt config file → app
+      starts with an empty list (FR-011)
 - [X] T016 [P] Run quickstart.md smoke and full `npm run lint`,
       `npm run typecheck`, `npm run test`, `npm run test:e2e`; review
       plan/research/data-model/contracts consistency
 
 **Checkpoint**: `npm run test:e2e` all green alongside lint/typecheck/vitest.
+
+---
+
+## Phase 7: US4 — Clear Recent Items + grouped menu + per-type cap (P2)
+
+**Goal**: a Clear Recent Items action (FR-014), folders grouped above files in
+the submenu (FR-015), and a per-type 5/5 cap instead of a combined 10
+(FR-012).
+
+### Implementation
+
+- [ ] T017 [US4] `src/main/recentItems.ts` — per-type cap: `recordRecentItem`
+      evicts only the least-recent entry of the item's own type (5 max per
+      type); `normalizeRecentItems` caps and canonicalizes folders-first
+- [ ] T018 [US4] `src/main/menu.ts` — Recent Items submenu becomes folders →
+      separator → files → separator → **Clear Recent Items** (groups with no
+      entries are omitted); the Clear action writes an empty list (best-effort,
+      FR-011) and rebuilds the menu without touching the renderer
+- [ ] T019 [US4] `src/main/recentItemsWarning.ts` — extract the shared quiet
+      footer-warning helper (FR-011) used by both `handlers.ts` and `menu.ts`
+- [ ] T020 [US4] `tests/main/recentItems.test.ts` — per-type cap (own-type
+      eviction only), folders-first canonicalization, clear (save-empty)
+- [ ] T021 [US4] `tests/e2e/recent.spec.ts` — grouping order + Clear placement
+      (FR-015), US4 clear empties the menu, leaves the session untouched, and
+      persists across restart; per-type caps for files and folders (FR-012)
+
+**Acceptance**: the menu lists folders before files, caps each type at 5, and
+offers Clear Recent Items at the bottom; clearing empties the history without
+disturbing the session and survives restart.
 
 ---
 
@@ -168,7 +205,8 @@ from Recent Items.
 | 3 US1 (P1) | 2 | 4–6 |
 | 4 US2 (P2) | 3 (labels) | 6 |
 | 5 US3 (P2) | 3 (open handlers) | 6 |
-| 6 Polish | all | — |
+| 6 Polish | all | 7 |
+| 7 US4 + grouping (P2) | 6 | — |
 
 ### Parallel Opportunities
 

@@ -1,15 +1,17 @@
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
-import * as crypto from 'crypto'
 import { resolveWithinRoot } from '../fs/paths'
 import { readDir, readFile, describeEntry } from '../fs/read'
 import { writeFile } from '../fs/write'
+import { atomicWrite } from '../fs/atomicWrite'
 import { mkdir, createFile, moveEntry, trashEntry } from '../fs/mutate'
 import { loadSettings, saveSettings } from '../settings'
 import { WorkspaceState } from '../workspace'
 import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem } from '../recentItems'
 import { recentItemsConfigPath } from '../recentItemsPath'
+import { reportRecentItemsWarning, notifyRecentItemsOk } from '../recentItemsWarning'
+import { scrubAbsolutePaths } from '../scrubPaths'
 import { refreshApplicationMenu } from '../menu'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
@@ -19,7 +21,6 @@ import type {
 
 let workspaceState: WorkspaceState | null = null
 let workspaceRoot: string | null = null
-let workspaceName: string | null = null
 let allowClose = false
 
 function ok<T>(value: T): Result<T> {
@@ -39,7 +40,12 @@ function sanitizeError(e: unknown, workspaceRootPath: string | null): string {
       '<workspace>'
     )
   }
-  return msg
+  // Principle II: NEVER leak an absolute path into a renderer-visible error —
+  // run the absolute-path scrub unconditionally. With a workspace open only
+  // the CURRENT root is otherwise scrubbed, so a failure while preparing a
+  // dialog-chosen folder or committing a recent folder located elsewhere
+  // (EACCES/ENOENT on `C:\Users\...\secret`) would pass the raw path through.
+  return scrubAbsolutePaths(msg)
 }
 
 function toAppError(e: unknown): { code: ErrorCode; message: string } {
@@ -88,24 +94,6 @@ function resolveAbsolutePath(root: string, absolutePath: string): string | null 
     return relative.split(path.sep).join('/')
   } catch {
     return null
-  }
-}
-
-function atomicWriteAbsolute(filePath: string, content: string): void {
-  const dir = path.dirname(filePath)
-  const base = path.basename(filePath)
-  const randomSuffix = crypto.randomBytes(6).toString('hex')
-  const tempPath = path.join(dir, `.${base}.tmp-${randomSuffix}`)
-
-  try {
-    fs.writeFileSync(tempPath, content, { encoding: 'utf-8', flag: 'wx' })
-    const fd = fs.openSync(tempPath, 'r+')
-    fs.fsyncSync(fd)
-    fs.closeSync(fd)
-    fs.renameSync(tempPath, filePath)
-  } catch (e: unknown) {
-    try { fs.unlinkSync(tempPath) } catch { /* cleanup */ }
-    throw e
   }
 }
 
@@ -158,20 +146,45 @@ export function setupHandlers(window: BrowserWindow): void {
     )
   }
 
+  // FR-011: a persistence failure must NEVER fail the open it follows
+  // (FR-002/003) or delete a still-valid entry. Record/remove are best-effort —
+  // on a save failure the in-memory list cannot be persisted, the failure is
+  // reported quietly, and the open continues.
   function recordRecent(path_: string, kind: RecentKind, name: string): void {
     const configPath = recentItemsConfigPath()
     const items = loadRecentItems(configPath)
-    saveRecentItems(configPath, recordRecentItem(items, {
-      path: path_, kind, name, lastOpenedAt: Date.now()
-    }))
-    refreshApplicationMenu(window)
+    try {
+      saveRecentItems(configPath, recordRecentItem(items, {
+        path: path_, kind, name, lastOpenedAt: Date.now()
+      }))
+      notifyRecentItemsOk()
+    } catch (e: unknown) {
+      reportRecentItemsWarning(e, 'save')
+    }
+    refreshApplicationMenu()
   }
 
   function removeRecent(path_: string, kind: RecentKind): void {
     const configPath = recentItemsConfigPath()
     const items = loadRecentItems(configPath)
-    saveRecentItems(configPath, removeRecentItem(items, path_, kind))
-    refreshApplicationMenu(window)
+    try {
+      saveRecentItems(configPath, removeRecentItem(items, path_, kind))
+      notifyRecentItemsOk()
+    } catch (e: unknown) {
+      reportRecentItemsWarning(e, 'save')
+    }
+    refreshApplicationMenu()
+  }
+
+  /** Realpath-canonical form of an absolute path for recording (FR-006: raw
+   *  dialog spellings and realpath-resolved spellings of the same file must
+   *  dedupe). Falls back to `path.resolve` when the target is already gone. */
+  function canonicalPath(p: string): string {
+    try {
+      return fs.realpathSync(p)
+    } catch {
+      return path.resolve(p)
+    }
   }
 
   // Opens a file by absolute path, mirroring the dialog handler: when the file
@@ -179,6 +192,14 @@ export function setupHandlers(window: BrowserWindow): void {
   // relative path and the parent is watched; otherwise the content is read
   // directly with a `path: null` response.
   function openFileFromPath(filePath: string): OpenedFile {
+    // Research R4 step 2: confirm the target still exists and has the right
+    // type — a recorded 'file' whose path was replaced by a directory must not
+    // be read as text (EISDIR would otherwise surface as a bare IO error).
+    const stat = fs.statSync(filePath)
+    if (!stat.isFile()) {
+      throw Object.assign(new Error('Target is not a file'), { code: 'NOT_TEXT' as ErrorCode })
+    }
+
     if (workspaceRoot) {
       const relativePath = resolveAbsolutePath(workspaceRoot, filePath)
       if (relativePath) {
@@ -203,58 +224,139 @@ export function setupHandlers(window: BrowserWindow): void {
       path: null,
       name: path.basename(filePath),
       content: buffer.toString('utf-8'),
-      mtimeMs: fs.statSync(filePath).mtimeMs,
-      size: fs.statSync(filePath).size
+      mtimeMs: stat.mtimeMs,
+      size: stat.size
     }
   }
 
-  // Opens a folder as the workspace by absolute path, mirroring the dialog
-  // handler. On failure the workspace state is reset and the error propagates
-  // so the caller can classify it and drop a dead recent entry (FR-009).
-  function openFolderFromPath(rootPath: string): WorkspaceInfo {
+  // ---- spec-004 folder open is two-phase (FR-009/FR-010) ----
+
+  // A folder open is split into *prepare* (validate the target and read its
+  // entries WITHOUT touching the live workspace) and *commit* (swap the
+  // workspace only once the renderer has confirmed). This is what makes
+  // FR-009 ("leaves the current workspace and document session unchanged" when
+  // the target cannot be opened) and FR-010 (the renderer's unsaved-work
+  // confirmation cancels cleanly) actually hold: main never destroys the live
+  // workspace unless and until the renderer commits.
+  let pendingFolderOpen: { root: string; name: string; entries: DirEntry[] } | null = null
+
+  ipcMain.handle('workspace:prepareFolderOpen', async (_e, args: unknown): Promise<Result<WorkspaceInfo | null>> => {
+    let requestedPath: string | null = null
+    let isRecentRequest = false
     try {
-      const realRootPath = fs.realpathSync(rootPath)
-
-      workspaceRoot = realRootPath
-      workspaceName = path.basename(realRootPath) || realRootPath
-
-      workspaceState?.close()
-      workspaceState = new WorkspaceState(
-        (e: WatchEvent) => window.webContents.send('workspace:changed', e),
-        (e) => window.webContents.send('document:externallyChanged', e)
-      )
-      workspaceState.open(realRootPath)
-
-      const entries = workspaceState.getEntries('.')
-      return { path: workspaceRoot, name: workspaceName, entries }
-    } catch (e: unknown) {
-      workspaceRoot = null
-      workspaceName = null
-      workspaceState?.close()
-      workspaceState = null
-      throw e
-    }
-  }
-
-  ipcMain.handle('workspace:openDialog', async (): Promise<Result<WorkspaceInfo | null>> => {
-    try {
-      const result = await dialog.showOpenDialog({
-        properties: ['openDirectory']
-      })
-
-      if (result.canceled || result.filePaths.length === 0) {
-        return ok(null)
+      // Single in-flight guard: while a prepared folder awaits the renderer's
+      // confirm, a second prepare (toolbar button, native menu, or a
+      // double-clicked recent folder) must NOT overwrite the slot — the first
+      // flow's commit would otherwise swap to the second flow's folder, or the
+      // second flow would error with "No folder open is pending". Reject the
+      // new flow instead; the renderer surfaces the error in context.
+      if (pendingFolderOpen) {
+        return err('IO', 'A folder open is already in progress')
+      }
+      if (args !== undefined && args !== null) {
+        validateShape(args, ['path'])
+        ensureString((args as { path: unknown }).path, 'path')
+        requestedPath = (args as { path: string }).path
+        isRecentRequest = true
+        // Research R4: only open a path main itself recorded.
+        if (!isRecentEntry(requestedPath, 'folder')) {
+          return err('OUTSIDE_WORKSPACE', 'Path is not a recorded recent folder')
+        }
+      } else {
+        const result = await dialog.showOpenDialog({
+          properties: ['openDirectory']
+        })
+        if (result.canceled || result.filePaths.length === 0) {
+          return ok(null)
+        }
+        requestedPath = result.filePaths[0]
       }
 
-      const info = openFolderFromPath(result.filePaths[0])
-      // FR-003: a folder successfully opened as a workspace is a recent folder.
-      // Store the resolved realpath so reopen and containment agree (R4).
-      recordRecent(workspaceRoot!, 'folder', path.basename(workspaceRoot!))
-      return ok(info)
+      // Validate the target without committing it. readDir (not
+      // WorkspaceState.getEntries, which swallows errors) is used so an
+      // unreadable root throws here instead of masquerading as an empty
+      // workspace (FR-009).
+      const realRootPath = fs.realpathSync(requestedPath)
+      if (!fs.statSync(realRootPath).isDirectory()) {
+        throw Object.assign(new Error('Target is not a directory'), { code: 'NOT_FOUND' as ErrorCode })
+      }
+      const entries = readDir(realRootPath, '.')
+      const name = path.basename(realRootPath) || realRootPath
+      pendingFolderOpen = { root: realRootPath, name, entries }
+      return ok({ path: realRootPath, name, entries })
     } catch (e: unknown) {
+      pendingFolderOpen = null
+      // FR-009: a recent folder that cannot be opened drops the dead entry.
+      if (isRecentRequest && requestedPath !== null) {
+        removeRecent(requestedPath, 'folder')
+      }
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
+  })
+
+  ipcMain.handle('workspace:commitFolderOpen', (): Result<WorkspaceInfo> => {
+    const pending = pendingFolderOpen
+    if (!pending) {
+      return err('NO_WORKSPACE', 'No folder open is pending')
+    }
+
+    // FR-009: the prepare→commit window can outlive the target (the renderer's
+    // unsaved-work confirmation may stay open arbitrarily long), so re-validate
+    // the root here. chokidar reports a missing root via an async `error`
+    // event, not a synchronous throw — without this check a folder deleted in
+    // that window would silently commit to a dead workspace. A re-validation
+    // failure PROVES the target unavailable, so the entry is dropped (FR-009).
+    try {
+      const real = fs.realpathSync(pending.root)
+      if (!fs.statSync(real).isDirectory()) {
+        throw Object.assign(new Error('Target is not a directory'), { code: 'NOT_FOUND' as ErrorCode })
+      }
+    } catch (e: unknown) {
+      pendingFolderOpen = null
+      removeRecent(pending.root, 'folder')
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
+    }
+
+    // Open into a local candidate: a watcher-start failure must destroy only
+    // the candidate, never the live workspace (FR-009).
+    let candidate: WorkspaceState | null = null
+    try {
+      candidate = new WorkspaceState(
+        (e: WatchEvent) => window.webContents.send('workspace:changed', e),
+        (e) => window.webContents.send('document:externallyChanged', e)
+      )
+      candidate.open(pending.root)
+
+      workspaceState?.close()
+      workspaceState = candidate
+      candidate = null
+      const root = pending.root
+      const name = pending.name
+      workspaceRoot = root
+      pendingFolderOpen = null
+
+      // FR-003/006: only a folder that was successfully opened is recorded /
+      // bumped to the front. Best-effort (FR-011).
+      recordRecent(root, 'folder', name)
+      return ok({ path: root, name, entries: pending.entries })
+    } catch (e: unknown) {
+      candidate?.close()
+      pendingFolderOpen = null
+      // FR-009: a failure here (e.g. a watcher/environmental EMFILE/EPERM)
+      // does NOT prove the folder invalid — the spec removes an entry only
+      // after an attempted open proves it unavailable or invalid, so a still-
+      // valid folder keeps its history entry. (The re-validation above is the
+      // only place invalidity is proven in commit.)
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
+    }
+  })
+
+  ipcMain.handle('workspace:cancelFolderOpen', (): Result<null> => {
+    pendingFolderOpen = null
+    return ok(null)
   })
 
   ipcMain.handle('workspace:readDir', (_e, args: unknown): Result<DirEntry[]> => {
@@ -286,7 +388,13 @@ export function setupHandlers(window: BrowserWindow): void {
       const opened = openFileFromPath(result.filePaths[0])
       // FR-002: a markdown file successfully opened through the File menu is a
       // recent file. FR-013: explorer opens use file:read and never record.
-      recordRecent(opened.path ? path.resolve(workspaceRoot!, opened.path) : result.filePaths[0], 'file', opened.name)
+      // The stored path is realpath-canonical so a symlink/case spelling of an
+      // already-recorded file does not duplicate the entry (FR-006).
+      recordRecent(
+        canonicalPath(opened.path ? path.resolve(workspaceRoot!, opened.path) : result.filePaths[0]),
+        'file',
+        opened.name
+      )
       return ok(opened)
     } catch (e: unknown) {
       const appErr = toAppError(e)
@@ -308,39 +416,17 @@ export function setupHandlers(window: BrowserWindow): void {
 
       try {
         const opened = openFileFromPath(requestedPath)
-        // FR-006: a successful reopen moves the entry to the front.
-        recordRecent(opened.path ? path.resolve(workspaceRoot!, opened.path) : requestedPath, 'file', opened.name)
+        // FR-006: a successful reopen moves the entry to the front. The stored
+        // path is canonical so reopen and first-open spellings agree (FR-006).
+        recordRecent(
+          canonicalPath(opened.path ? path.resolve(workspaceRoot!, opened.path) : requestedPath),
+          'file',
+          opened.name
+        )
         return ok(opened)
       } catch (e: unknown) {
         // FR-009: the target is unavailable — drop the entry, then report.
         removeRecent(requestedPath, 'file')
-        const appErr = toAppError(e)
-        return err(appErr.code, sanitizeError(e, workspaceRoot))
-      }
-    } catch (e: unknown) {
-      const appErr = toAppError(e)
-      return err(appErr.code, sanitizeError(e, workspaceRoot))
-    }
-  })
-
-  ipcMain.handle('recent:openFolder', (_e, args: unknown): Result<WorkspaceInfo> => {
-    try {
-      validateShape(args, ['path'])
-      ensureString((args as { path: unknown }).path, 'path')
-      const requestedPath = (args as { path: string }).path
-
-      if (!isRecentEntry(requestedPath, 'folder')) {
-        return err('OUTSIDE_WORKSPACE', 'Path is not a recorded recent folder')
-      }
-
-      try {
-        const info = openFolderFromPath(requestedPath)
-        // FR-006: reopen moves the folder to the front (store the realpath).
-        recordRecent(workspaceRoot!, 'folder', path.basename(workspaceRoot!))
-        return ok(info)
-      } catch (e: unknown) {
-        // FR-009: unavailable — drop the entry, then report.
-        removeRecent(requestedPath, 'folder')
         const appErr = toAppError(e)
         return err(appErr.code, sanitizeError(e, workspaceRoot))
       }
@@ -401,7 +487,7 @@ export function setupHandlers(window: BrowserWindow): void {
         return ok(null)
       }
 
-      atomicWriteAbsolute(result.filePath, content)
+      atomicWrite(result.filePath, content)
       const stat = fs.statSync(result.filePath)
 
       let relPath: string | null = null

@@ -16,11 +16,15 @@ A persisted reference to a successfully opened markdown file or workspace folder
 Rules:
 
 - Dedupe key is `(path, kind)`: reopening a file or folder moves the existing
-  entry to the front instead of adding a duplicate (FR-006).
-- Combined file+folder list capped at 10 (FR-012); the least-recent entry is
-  dropped when a new qualifying open exceeds the cap.
+  entry to the front of its group instead of adding a duplicate (FR-006).
+- Per-type cap of 5 files and 5 folders (FR-012): a new qualifying entry evicts
+  the least-recent entry of the *same* type when that type already has 5;
+  entries of the other type are unaffected.
 - Ordering is most-recent-first by `lastOpenedAt`; load normalizes/sorts even if
-  a hand-edited config is unordered.
+  a hand-edited config is unordered. The list is canonicalized folders-first —
+  both `recordRecentItem` and load — so the menu's FR-015 grouping (folders
+  above files) falls out of the stored order and the on-disk order is stable
+  across record/load cycles; recency orders entries within each group.
 - Only files opened through File > Open File (FR-002) and folders opened as a
   workspace (FR-003) become entries. Explorer-opened files never do (FR-013).
 
@@ -63,25 +67,42 @@ it names the exact recorded path and type to open.
 | Method | Returns | Maps to channel |
 |--------|---------|-----------------|
 | `openRecentFile(path: string)` | `Promise<Result<OpenedFile>>` | `recent:openFile` |
-| `openRecentFolder(path: string)` | `Promise<Result<WorkspaceInfo>>` | `recent:openFolder` |
+| `prepareFolderOpen(path?: string)` | `Promise<Result<WorkspaceInfo \| null>>` | `workspace:prepareFolderOpen` |
+| `commitFolderOpen()` | `Promise<Result<WorkspaceInfo>>` | `workspace:commitFolderOpen` |
+| `cancelFolderOpen()` | `Promise<Result<null>>` | `workspace:cancelFolderOpen` |
+| `onRecentItemsWarning(cb)` | `() => void` | `recentItems:warning` (event) |
 
-Both are validated in main against the stored recent-items list before disk
-access (research R4); on an unavailable target the entry is removed, the menu
-rebuilt, and a typed error returned (FR-009).
+Folder open is two-phase (research R5): `prepareFolderOpen` validates the target
+and reads its entries without touching the live workspace (`null` when the
+picker is cancelled); `commitFolderOpen` swaps the workspace and records the
+folder; `cancelFolderOpen` abandons the prepared open. With a `path` argument
+the folder must be a recorded recent entry, validated before disk access
+(research R4); on an unavailable target the entry is removed, the menu rebuilt,
+and a typed error returned (FR-009).
 
 ## Derived / state transitions
 
 - **record (main)**: successful `file:openDialog` → `recordRecentItem({ path,
-  kind: 'file', name })`; successful `workspace:openDialog` →
+  kind: 'file', name })`; successful `workspace:commitFolderOpen` →
   `recordRecentItem({ path: resolvedRoot, kind: 'folder', name })`. Then rebuild
   the menu (research R3).
-- **touch (main)**: successful `recent:openFile` / `recent:openFolder` →
+- **touch (main)**: successful `recent:openFile` / `commitFolderOpen` →
   `recordRecentItem(…)` again (moves entry to front, FR-006). Then rebuild.
-- **remove (main)**: `recent:openFile` / `recent:openFolder` failure
-  (NOT_FOUND / NOT_TEXT / PERMISSION / wrong type) → `removeRecentItem(path,
-  kind)`, rebuild menu, return the typed error. The renderer shows the error
-  in-context and leaves its session unchanged.
+- **remove (main)**: `recent:openFile` / `workspace:prepareFolderOpen(path)`
+  failure (NOT_FOUND / NOT_TEXT / PERMISSION / wrong type) →
+  `removeRecentItem(path, kind)`, rebuild menu, return the typed error. The
+  renderer shows the error in-context and leaves its session unchanged.
 - **renderer open of a recent file**: `openRecentFile` success →
   `OPEN_EXISTING` dispatch (identical to File > Open File).
-- **renderer open of a recent folder**: `openRecentFolder` success → `REPLACE`
-  dispatch (identical to File > Open Folder).
+- **renderer open of a recent folder**: the same prepare → (confirm) → commit
+  flow as File > Open Folder, ending in `REPLACE`. When workspace-relative
+  documents have unsaved changes a confirmation (Save All / Discard / Cancel)
+  runs before `commitFolderOpen`; cancel calls `cancelFolderOpen` and leaves the
+  session and the recent entry unchanged (FR-010, US3 scenario 3).
+- **persistence failure (main)**: a config write failure is caught, reported via
+  `recentItems:warning`, and never fails the open it follows (FR-011). The
+  renderer shows the message as a quiet footer note.
+- **clear (main, menu action)**: Clear Recent Items writes an empty list
+  (best-effort; a persistence failure reports the quiet warning and is
+  non-fatal), rebuilds the menu to the "No Recent Items" state, and never
+  touches the open document/workspace session (FR-014).

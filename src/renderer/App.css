@@ -454,3 +454,16 @@ button, input, select, textarea {
   color: #737373;
   font-style: italic;
 }
+
+/* Quiet, actionable notice for non-fatal problems (FR-011). Amber text keeps it
+   distinguishable from the neutral labels without escalating to an error
+   dialog; a long message truncates instead of crowding the workspace path.
+   #8a6a1a on #fafafa = 4.6:1 — WCAG AA for 12px text. */
+.footer-note {
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8a6a1a;
+}

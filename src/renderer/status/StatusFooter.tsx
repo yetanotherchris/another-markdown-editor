@@ -6,6 +6,8 @@ import { shortenPath } from '../../shared/shortenPath'
 interface StatusFooterProps {
   activeDoc: DocumentState | null
   workspaceRoot: string | null
+  /** Quiet, actionable notice for non-fatal problems (e.g. a persistence failure). */
+  note?: string | null
 }
 
 /** Character-width estimate for Inter at the footer's ~12px size. */
@@ -26,7 +28,7 @@ const CHAR_WIDTH_PX = 8
  * 0), not the text span — measuring the span itself is a feedback loop, since
  * the shortened text shrinks the span it was sized against (research R4).
  */
-export default function StatusFooter({ activeDoc, workspaceRoot }: StatusFooterProps) {
+export default function StatusFooter({ activeDoc, workspaceRoot, note }: StatusFooterProps) {
   const [regionRef, regionSize] = useElementSize<HTMLDivElement>()
   const hasWorkspace = workspaceRoot !== null
 
@@ -64,6 +66,11 @@ export default function StatusFooter({ activeDoc, workspaceRoot }: StatusFooterP
           {hasWorkspace ? displayPath() : <span className="footer-placeholder">No folder open</span>}
         </span>
       </div>
+      {note && (
+        <span className="footer-note" data-testid="footer-note" title={note}>
+          {note}
+        </span>
+      )}
     </footer>
   )
 }

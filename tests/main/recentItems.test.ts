@@ -8,7 +8,8 @@ import {
   normalizeRecentItems,
   loadRecentItems,
   saveRecentItems,
-  RECENT_ITEMS_LIMIT
+  dedupeKey,
+  RECENT_ITEMS_LIMIT_PER_KIND
 } from '../../src/main/recentItems'
 import type { RecentItem, RecentKind } from '../../src/shared/ipc-contract'
 
@@ -57,15 +58,54 @@ describe('recordRecentItem', () => {
     expect(result[1].kind).toBe('file')
   })
 
-  it('caps the list at 10, evicting the least recent', () => {
+  it('caps each type at 5, evicting the least recent of that type only', () => {
     let items: RecentItem[] = []
-    for (let i = 0; i < RECENT_ITEMS_LIMIT + 3; i++) {
+    for (let i = 0; i < RECENT_ITEMS_LIMIT_PER_KIND + 3; i++) {
       items = recordRecentItem(items, item(`/file-${i}.md`, 'file', i))
     }
-    expect(items).toHaveLength(RECENT_ITEMS_LIMIT)
-    // Newest three survive; the oldest three are evicted.
-    expect(items[0].path).toBe(`/file-${RECENT_ITEMS_LIMIT + 2}.md`)
+    expect(items).toHaveLength(RECENT_ITEMS_LIMIT_PER_KIND)
+    // Newest survive; the oldest of the SAME type are evicted.
+    expect(items[0].path).toBe(`/file-${RECENT_ITEMS_LIMIT_PER_KIND + 2}.md`)
     expect(items.some(i => i.path === '/file-0.md')).toBe(false)
+  })
+
+  it('does not evict the other type when one type hits its cap', () => {
+    let items: RecentItem[] = []
+    for (let i = 0; i < RECENT_ITEMS_LIMIT_PER_KIND; i++) {
+      items = recordRecentItem(items, item(`/folder-${i}`, 'folder', i))
+    }
+    // 6 files on top of 5 folders: folders stay, 6th file evicts oldest file.
+    for (let i = 0; i < RECENT_ITEMS_LIMIT_PER_KIND + 1; i++) {
+      items = recordRecentItem(items, item(`/file-${i}.md`, 'file', i))
+    }
+    expect(items.filter(i => i.kind === 'folder')).toHaveLength(RECENT_ITEMS_LIMIT_PER_KIND)
+    expect(items.filter(i => i.kind === 'file')).toHaveLength(RECENT_ITEMS_LIMIT_PER_KIND)
+    expect(items.some(i => i.path === '/file-0.md')).toBe(false)
+    expect(items.some(i => i.path === '/folder-0')).toBe(true)
+  })
+
+  it('canonicalizes folders-first so record and load agree', () => {
+    // The persisted order must not flip-flop between [new, …others, …sameKind]
+    // after a record and folders-first after a load.
+    let items: RecentItem[] = []
+    items = recordRecentItem(items, item('/f-a.md', 'file', 1))
+    items = recordRecentItem(items, item('/f-b.md', 'file', 2))
+    items = recordRecentItem(items, item('/dir-a', 'folder', 3))
+    expect(items.map(i => i.kind)).toEqual(['folder', 'file', 'file'])
+    // A record that lands the newest entry in a kind keeps the groups stable.
+    items = recordRecentItem(items, item('/dir-b', 'folder', 4))
+    expect(items.map(i => i.kind)).toEqual(['folder', 'folder', 'file', 'file'])
+    expect(items.map(i => i.path)).toEqual(['/dir-b', '/dir-a', '/f-b.md', '/f-a.md'])
+  })
+
+  it('folds path case in the dedupe key on win32 only', () => {
+    const key = dedupeKey('C:\\Notes', 'file')
+    const folded = dedupeKey('c:\\notes', 'file')
+    if (process.platform === 'win32') {
+      expect(key).toBe(folded)
+    } else {
+      expect(key).not.toBe(folded)
+    }
   })
 })
 
@@ -145,11 +185,17 @@ describe('normalizeRecentItems', () => {
     expect(result[0].lastOpenedAt).toBe(7)
   })
 
-  it('caps the normalized list at 10', () => {
-    const entries = Array.from({ length: 15 }, (_, i) => item(`/f-${i}.md`, 'file', i))
-    const result = normalizeRecentItems({ recentItems: entries })
-    expect(result).toHaveLength(RECENT_ITEMS_LIMIT)
-    expect(result[0].path).toBe('/f-14.md')
+  it('caps the normalized list at 5 per type, folders first', () => {
+    const files = Array.from({ length: RECENT_ITEMS_LIMIT_PER_KIND + 3 }, (_, i) => item(`/f-${i}.md`, 'file', i))
+    const folders = Array.from({ length: RECENT_ITEMS_LIMIT_PER_KIND + 1 }, (_, i) => item(`/d-${i}`, 'folder', i))
+    const result = normalizeRecentItems({ recentItems: [...files, ...folders] })
+    expect(result.filter(i => i.kind === 'file')).toHaveLength(RECENT_ITEMS_LIMIT_PER_KIND)
+    expect(result.filter(i => i.kind === 'folder')).toHaveLength(RECENT_ITEMS_LIMIT_PER_KIND)
+    // Folders come before files; newest first within each group.
+    expect(result[0].kind).toBe('folder')
+    expect(result[0].path).toBe(`/d-${RECENT_ITEMS_LIMIT_PER_KIND}`)
+    expect(result.find(i => i.kind === 'file')!.path).toBe(`/f-${RECENT_ITEMS_LIMIT_PER_KIND + 2}.md`)
+    expect(result.some(i => i.path === '/f-0.md')).toBe(false)
   })
 })
 
@@ -175,16 +221,35 @@ describe('loadRecentItems / saveRecentItems', () => {
     expect(loadRecentItems(filePath)).toEqual([])
   })
 
-  it('round-trips a saved list', () => {
+  it('round-trips a saved list (canonicalized folders-first)', () => {
     const items = [item('/b.md', 'file', 2), item('/a.md', 'folder', 1)]
     saveRecentItems(filePath, items)
-    expect(loadRecentItems(filePath)).toEqual(items)
+    expect(loadRecentItems(filePath)).toEqual([
+      item('/a.md', 'folder', 1),
+      item('/b.md', 'file', 2)
+    ])
+  })
+
+  it('record → save → load preserves the on-disk order (no flip-flop)', () => {
+    let items: RecentItem[] = []
+    items = recordRecentItem(items, item('/f-a.md', 'file', 1))
+    items = recordRecentItem(items, item('/dir-a', 'folder', 2))
+    saveRecentItems(filePath, items)
+    // recordRecentItem already emits folders-first, so load returns the same
+    // list instead of reshuffling it.
+    expect(loadRecentItems(filePath).map(i => i.kind)).toEqual(['folder', 'file'])
   })
 
   it('overwrites an existing list', () => {
     saveRecentItems(filePath, [item('/a.md', 'file', 1)])
     saveRecentItems(filePath, [item('/b.md', 'file', 2)])
     expect(loadRecentItems(filePath).map(i => i.path)).toEqual(['/b.md'])
+  })
+
+  it('clears the list (Clear Recent Items writes an empty array)', () => {
+    saveRecentItems(filePath, [item('/a.md', 'file', 1), item('/b', 'folder', 2)])
+    saveRecentItems(filePath, [])
+    expect(loadRecentItems(filePath)).toEqual([])
   })
 
   it('does not leave a temp file behind after a successful write', () => {

@@ -2,7 +2,7 @@ import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
 import { Panel, Group, Separator } from 'react-resizable-panels'
 import type { TreeApi } from 'react-arborist'
 import { Plus, FolderOpen } from 'lucide-react'
-import type { MenuCommand, EntryKind, EntryInfo } from '@shared/ipc-contract'
+import type { MenuCommand, EntryKind, EntryInfo, WorkspaceInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
   documentsReducer,
@@ -64,6 +64,8 @@ export default function App() {
   const [deleteRefused, setDeleteRefused] = useState<{ node: TreeNode; blockers: DocumentState[] } | null>(null)
   const [permanentDelete, setPermanentDelete] = useState<{ node: TreeNode; plan: DeletePlan } | null>(null)
   const [operationError, setOperationError] = useState<string | null>(null)
+  const [pendingFolderOpen, setPendingFolderOpen] = useState<WorkspaceInfo | null>(null)
+  const [footerNote, setFooterNote] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const pendingCreateRef = useRef(new Set<string>())
   const createCounterRef = useRef(0)
@@ -654,6 +656,92 @@ export default function App() {
     window.api.updateSettings({ sidebarWidth: size.asPercentage }).catch(() => { /* ignore */ })
   }, [])
 
+  // Spec 004, FR-010: a folder switch rebinds the workspace-relative paths of
+  // open documents to the new root. Before committing a folder open (which
+  // swaps main's workspace), confirm when those documents have unsaved changes.
+  const dirtyWorkspaceRelativeDocs = useCallback(
+    () => sessionRef.current.documents.filter(
+      d => isDirtyLive(d) && !!d.path && isWorkspaceRelative(d.path)
+    ),
+    [isDirtyLive]
+  )
+
+  const commitFolderOpen = useCallback(async () => {
+    const result = await window.api.commitFolderOpen()
+    if (!result.ok) {
+      setOperationError(result.message)
+      return
+    }
+    dispatchWorkspace({
+      type: 'REPLACE',
+      payload: {
+        name: result.value.name,
+        root: result.value.path,
+        entries: result.value.entries
+      }
+    })
+  }, [])
+
+  // Both entry points (File > Open Folder and a recent-folder open, FR-007)
+  // route through the same prepare → (confirm) → commit flow. A second folder
+  // open while the confirmation is up is ignored here (main also rejects new
+  // prepares while one is pending) so the in-flight flow cannot be clobbered.
+  const runFolderOpenFlow = useCallback(async (requestPath?: string) => {
+    if (pendingFolderOpen) return
+    const prepared = requestPath === undefined
+      ? await window.api.prepareFolderOpen()
+      : await window.api.prepareFolderOpen(requestPath)
+    if (!prepared.ok) {
+      setOperationError(prepared.message)
+      return
+    }
+    if (!prepared.value) return // dialog cancelled — nothing pending
+    if (dirtyWorkspaceRelativeDocs().length === 0) {
+      await commitFolderOpen()
+      return
+    }
+    setPendingFolderOpen(prepared.value)
+  }, [commitFolderOpen, dirtyWorkspaceRelativeDocs, pendingFolderOpen])
+
+  const handleFolderOpenDecision = useCallback(async (decision: 'save-all' | 'discard' | 'cancel') => {
+    if (!pendingFolderOpen) return
+    if (decision === 'cancel') {
+      // FR-010: cancel keeps the session and the recent entry unchanged.
+      setPendingFolderOpen(null)
+      await window.api.cancelFolderOpen()
+      return
+    }
+    if (decision === 'discard') {
+      // FR-010 "Discard": the user chose to throw the unsaved changes away, so
+      // the dirty workspace-relative documents are CLOSED (their edits
+      // dropped). They must not stay open: after the workspace swap their
+      // relative paths rebind to the new root, and a later Ctrl+S would write
+      // old-root content over whatever file shares the path there.
+      for (const doc of dirtyWorkspaceRelativeDocs()) {
+        doClose(doc.id)
+      }
+      setPendingFolderOpen(null)
+      await commitFolderOpen()
+      return
+    }
+    for (const doc of dirtyWorkspaceRelativeDocs()) {
+      const result = await saveDocument(doc)
+      if (result !== 'saved') {
+        if (result === 'failed') {
+          setDialogError(`Could not save ${doc.title}.`)
+        }
+        // Keep the confirmation open; the prepared folder was not committed.
+        return
+      }
+    }
+    setPendingFolderOpen(null)
+    await commitFolderOpen()
+  }, [pendingFolderOpen, dirtyWorkspaceRelativeDocs, saveDocument, commitFolderOpen, doClose])
+
+  const handleOpenFolder = useCallback(() => {
+    void runFolderOpenFlow()
+  }, [runFolderOpenFlow])
+
   useEffect(() => {
     const unsubMenu = window.api.onMenuCommand((command: MenuCommand) => {
       const active = getActiveDocument(sessionRef.current)
@@ -672,20 +760,9 @@ export default function App() {
               }
             })
           } else {
-            window.api.openRecentFolder(command.path).then((result) => {
-              if (result.ok) {
-                dispatchWorkspace({
-                  type: 'REPLACE',
-                  payload: {
-                    name: result.value.name,
-                    root: result.value.path,
-                    entries: result.value.entries
-                  }
-                })
-              } else {
-                setOperationError(result.message)
-              }
-            })
+            // Recent-folder open shares the prepare → (confirm) → commit flow
+            // with File > Open Folder (FR-007/FR-010).
+            void runFolderOpenFlow(command.path)
           }
         }
         return
@@ -696,23 +773,14 @@ export default function App() {
             if (result.ok && result.value) {
               dispatch({ type: 'OPEN_EXISTING', payload: result.value })
               enforcePoolCap(sessionRef.current.activeId)
+            } else if (!result.ok) {
+              setOperationError(result.message)
             }
           })
           break
         }
         case 'open-folder': {
-          window.api.openFolderDialog().then((result) => {
-            if (result.ok && result.value) {
-              dispatchWorkspace({
-                type: 'REPLACE',
-                payload: {
-                  name: result.value.name,
-                  root: result.value.path,
-                  entries: result.value.entries
-                }
-              })
-            }
-          })
+          void runFolderOpenFlow()
           break
         }
         case 'save': {
@@ -766,13 +834,26 @@ export default function App() {
       setQuitDirtyDocs(dirtyDocs)
     })
 
+    // Spec 004, FR-011: a persistence failure is non-fatal to the open it
+    // followed, but is reported quietly in the footer for actionability. A
+    // later successful persistence write clears the note so it does not linger
+    // after the cause has resolved.
+    const unsubRecentWarning = window.api.onRecentItemsWarning((w) => {
+      setFooterNote(w.message)
+    })
+    const unsubRecentOk = window.api.onRecentItemsOk(() => {
+      setFooterNote(null)
+    })
+
     return () => {
       unsubMenu()
       unsubDocument()
       unsubWorkspace()
+      unsubRecentWarning()
+      unsubRecentOk()
       unsubQuit()
     }
-  }, [enforcePoolCap, flushLiveContent, handleCloseRequest, handleNew, isDirtyLive, reloadDocument, saveDocument])
+  }, [enforcePoolCap, flushLiveContent, handleCloseRequest, handleNew, isDirtyLive, reloadDocument, runFolderOpenFlow, saveDocument])
 
   useEffect(() => {
     return () => {
@@ -805,20 +886,6 @@ export default function App() {
       api.scrollTo(path)
     }
   }, [workspaceActiveId, workspace.name, workspace.nodes])
-
-  const handleOpenFolder = useCallback(async () => {
-    const result = await window.api.openFolderDialog()
-    if (result.ok && result.value) {
-      dispatchWorkspace({
-        type: 'REPLACE',
-        payload: {
-          name: result.value.name,
-          root: result.value.path,
-          entries: result.value.entries
-        }
-      })
-    }
-  }, [])
 
   const pendingCloseDoc = pendingCloseId
     ? session.documents.find(d => d.id === pendingCloseId) ?? null
@@ -911,6 +978,7 @@ export default function App() {
       <StatusFooter
         activeDoc={activeDoc}
         workspaceRoot={workspace.root}
+        note={footerNote}
       />
 
       {quitDirtyDocs ? (
@@ -975,6 +1043,28 @@ export default function App() {
             </p>
           </ConfirmDialog>
         )
+        ) : pendingFolderOpen ? (
+          <ConfirmDialog
+            title="Open folder with unsaved changes?"
+            error={dialogError}
+            onCancel={() => handleFolderOpenDecision('cancel')}
+            buttons={[
+              { label: 'Cancel', onClick: () => handleFolderOpenDecision('cancel') },
+              { label: 'Discard', kind: 'danger', onClick: () => handleFolderOpenDecision('discard') },
+              { label: 'Save All', kind: 'primary', onClick: () => handleFolderOpenDecision('save-all') }
+            ]}
+          >
+            <p>
+              Opening {pendingFolderOpen.name} will replace the current workspace. Save the
+              documents with unsaved changes to the current folder first, discard the changes,
+              or cancel.
+            </p>
+            <ul>
+              {dirtyWorkspaceRelativeDocs().map((doc) => (
+                <li key={doc.id}>{doc.title}</li>
+              ))}
+            </ul>
+          </ConfirmDialog>
         ) : deleteRefused ? (
           <ConfirmDialog
             title="Cannot delete"

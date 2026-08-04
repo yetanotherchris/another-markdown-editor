@@ -2,16 +2,18 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   DesktopApi, Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, EntryKind, TrashReceipt, Settings,
-  WatchEvent, DocumentChangeEvent, MenuCommand, EntryInfo
+  WatchEvent, DocumentChangeEvent, MenuCommand, EntryInfo, RecentItemsWarning
 } from '../shared/ipc-contract'
 
 const api: DesktopApi = {
-  openFolderDialog: () => ipcRenderer.invoke('workspace:openDialog') as Promise<Result<WorkspaceInfo | null>>,
+  prepareFolderOpen: (path?: string) =>
+    ipcRenderer.invoke('workspace:prepareFolderOpen', path === undefined ? undefined : { path }) as Promise<Result<WorkspaceInfo | null>>,
+  commitFolderOpen: () => ipcRenderer.invoke('workspace:commitFolderOpen') as Promise<Result<WorkspaceInfo>>,
+  cancelFolderOpen: () => ipcRenderer.invoke('workspace:cancelFolderOpen') as Promise<Result<null>>,
   readDir: (relativePath: string) => ipcRenderer.invoke('workspace:readDir', { path: relativePath }) as Promise<Result<DirEntry[]>>,
   openFileDialog: () => ipcRenderer.invoke('file:openDialog') as Promise<Result<OpenedFile | null>>,
   readFile: (relativePath: string) => ipcRenderer.invoke('file:read', { path: relativePath }) as Promise<Result<OpenedFile>>,
   openRecentFile: (path: string) => ipcRenderer.invoke('recent:openFile', { path }) as Promise<Result<OpenedFile>>,
-  openRecentFolder: (path: string) => ipcRenderer.invoke('recent:openFolder', { path }) as Promise<Result<WorkspaceInfo>>,
   writeFile: (relativePath: string, content: string) => ipcRenderer.invoke('file:write', { path: relativePath, content }) as Promise<Result<WriteReceipt>>,
   saveFileDialog: (suggestedName: string, content: string) => ipcRenderer.invoke('file:saveDialog', { suggestedName, content }) as Promise<Result<OpenedFile | null>>,
   createEntry: (parentRelativePath: string, name: string, kind: EntryKind) => ipcRenderer.invoke('entry:create', { parentPath: parentRelativePath, name, kind }) as Promise<Result<DirEntry>>,
@@ -37,6 +39,18 @@ const api: DesktopApi = {
     const handler = (_e: Electron.IpcRendererEvent, command: MenuCommand) => cb(command)
     ipcRenderer.on('menu:command', handler)
     return () => ipcRenderer.removeListener('menu:command', handler)
+  },
+
+  onRecentItemsWarning: (cb: (w: RecentItemsWarning) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, warning: RecentItemsWarning) => cb(warning)
+    ipcRenderer.on('recentItems:warning', handler)
+    return () => ipcRenderer.removeListener('recentItems:warning', handler)
+  },
+
+  onRecentItemsOk: (cb: () => void): (() => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('recentItems:ok', handler)
+    return () => ipcRenderer.removeListener('recentItems:ok', handler)
   },
 
   onQuitRequested: (cb: () => void): (() => void) => {
