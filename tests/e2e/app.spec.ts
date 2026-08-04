@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -30,10 +30,16 @@ test.beforeEach(async () => {
       filePaths: [folder as string]
     })
   }, testFolder)
+
+  await stubMessageBox(app)
 })
 
 test.afterEach(async () => {
-  await app.close()
+  try {
+    await closeAppDiscardingQuit(app)
+  } catch {
+    await app.close().catch(() => {})
+  }
 })
 
 test.afterAll(async () => {

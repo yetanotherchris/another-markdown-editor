@@ -2,12 +2,11 @@ import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
 import { Panel, Group, Separator } from 'react-resizable-panels'
 import type { TreeApi } from 'react-arborist'
 import { Plus, FolderOpen } from 'lucide-react'
-import type { MenuCommand, EntryKind, EntryInfo, WorkspaceInfo } from '@shared/ipc-contract'
+import type { MenuCommand, EntryKind, WorkspaceInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
   documentsReducer,
   getActiveDocument,
-  getDirtyDocuments,
   planClose,
   DocumentState,
   markdownSame,
@@ -24,7 +23,6 @@ import { instancePool } from './editor/instancePool'
 import EditorPanel from './editor/EditorPanel'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
-import ConfirmDialog from './dialogs/ConfirmDialog'
 import StatusFooter from './status/StatusFooter'
 import {
   renameTargetPath,
@@ -55,18 +53,8 @@ type SaveResult = 'saved' | 'cancelled' | 'failed'
 export default function App() {
   const [session, dispatch] = useReducer(documentsReducer, initialSession)
   const [workspace, dispatchWorkspace] = useReducer(workspaceReducer, initialWorkspaceState)
-  const [pendingCloseId, setPendingCloseId] = useState<string | null>(null)
-  const [quitDirtyDocs, setQuitDirtyDocs] = useState<DocumentState[] | null>(null)
-  const [externalPrompt, setExternalPrompt] = useState<{ id: string; kind: 'changed' | 'removed' } | null>(null)
-  const [dialogError, setDialogError] = useState<string | null>(null)
   const [pendingEditId, setPendingEditId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ node: TreeNode; info: EntryInfo; plan: DeletePlan } | null>(null)
-  const [deleteRefused, setDeleteRefused] = useState<{ node: TreeNode; blockers: DocumentState[] } | null>(null)
-  const [permanentDelete, setPermanentDelete] = useState<{ node: TreeNode; plan: DeletePlan } | null>(null)
-  const [operationError, setOperationError] = useState<string | null>(null)
-  const [pendingFolderOpen, setPendingFolderOpen] = useState<WorkspaceInfo | null>(null)
   const [footerNote, setFooterNote] = useState<string | null>(null)
-  const [deleteBusy, setDeleteBusy] = useState(false)
   const pendingCreateRef = useRef(new Set<string>())
   const createCounterRef = useRef(0)
   const treeApiRef = useRef<TreeApi<TreeNode> | null>(null)
@@ -75,8 +63,62 @@ export default function App() {
   sessionRef.current = session
   const workspaceRef = useRef(workspace)
   workspaceRef.current = workspace
-  const quitDirtyDocsRef = useRef(quitDirtyDocs)
-  quitDirtyDocsRef.current = quitDirtyDocs
+  // Spec 008: native confirmation boxes are modal and the renderer awaits the
+  // decision over IPC. Only ONE confirmation prompt may be in flight at a time
+  // (spec edge case), so every prompt entry point guards on this ref — a second
+  // trigger while a dialog is open is ignored rather than stacked.
+  const dialogInFlightRef = useRef(false)
+  // The prepared-but-unconfirmed folder open (spec 004 FR-009/FR-010); a ref so
+  // overlapping open flows cannot clobber the pending slot.
+  const pendingFolderOpenRef = useRef<WorkspaceInfo | null>(null)
+  // An operation-failed prompt queued while another prompt is up.
+  const pendingErrorRef = useRef<string | null>(null)
+  // An external changed/removed notice queued while another prompt is up. A
+  // single slot, like the error queue: a notice arriving while a dialog is open
+  // is DEFERRED (never dropped) and re-surfaced once the guard releases (review
+  // 2026-08-04: the old ConfirmDialog-era code deferred these too).
+  const pendingExternalPromptRef = useRef<{ path: string; kind: 'changed' | 'removed' } | null>(null)
+
+  // The single place the single-prompt guard is released. Also drains what was
+  // queued while the guard was held, so nothing is silently dropped: a deferred
+  // external changed/removed notice first (it is a real decision the user must
+  // make), then a queued operation error (e.g. a failed trash after "Delete", or
+  // a failed folder commit). Each drained item re-acquires the guard
+  // synchronously and its own release drains the next.
+  const releaseDialogSurface = useCallback(() => {
+    dialogInFlightRef.current = false
+    const queuedPrompt = pendingExternalPromptRef.current
+    const queuedError = pendingErrorRef.current
+    pendingExternalPromptRef.current = null
+    pendingErrorRef.current = null
+    if (queuedPrompt) {
+      const doc = sessionRef.current.documents.find(d => d.path === queuedPrompt.path)
+      // handleExternalChange returns true when it opens a confirmation prompt;
+      // its own release then drains the queued error. If the document is gone or
+      // the notice resolved via auto-reload (no prompt), fall through to the error.
+      if (doc && handleExternalChangeRef.current(doc, queuedPrompt.kind)) return
+    }
+    if (queuedError) showOperationErrorRef.current(queuedError)
+  }, [])
+
+  // Spec 008 US4: surface a failed operation through the native error box. If
+  // another prompt is already up, the error is queued and shown once the guard
+  // releases (one prompt at a time, spec edge case).
+  const showOperationError = useCallback(async (message: string) => {
+    if (dialogInFlightRef.current) {
+      pendingErrorRef.current = message
+      return
+    }
+    dialogInFlightRef.current = true
+    try {
+      await window.api.showConfirmation({ kind: 'operation-failed', message })
+    } finally {
+      releaseDialogSurface()
+    }
+  }, [releaseDialogSurface])
+
+  const showOperationErrorRef = useRef(showOperationError)
+  showOperationErrorRef.current = showOperationError
 
   useEffect(() => {
     loadSettingsFromMain()
@@ -211,43 +253,52 @@ export default function App() {
     instancePool.remove(id)
   }, [])
 
-  const handleCloseRequest = useCallback((id: string) => {
+  const handleCloseRequest = useCallback(async (id: string) => {
     const doc = sessionRef.current.documents.find(d => d.id === id)
     if (!doc) return
     if (planClose(sessionRef.current, id) === 'close' && !isDirtyLive(doc)) {
       doClose(id)
       return
     }
+    // Spec 008: show the native unsaved-changes box. Only one prompt at a time
+    // at a time (spec edge case); a second trigger while one is open is ignored.
+    if (dialogInFlightRef.current) return
+    dialogInFlightRef.current = true
     flushLiveContent()
-    setDialogError(null)
-    setPendingCloseId(id)
-  }, [doClose, flushLiveContent, isDirtyLive])
-
-  const handleCloseDecision = useCallback(async (decision: 'save' | 'discard' | 'cancel') => {
-    if (!pendingCloseId) return
-    const id = pendingCloseId
-    if (decision === 'cancel') {
-      setPendingCloseId(null)
-      return
+    try {
+      let error: string | undefined
+      for (;;) {
+        const result = await window.api.showConfirmation({
+          kind: 'unsaved-close',
+          documentTitle: doc.title,
+          ...(error ? { error } : {})
+        })
+        if (!result.ok) return
+        const decision = result.value
+        if (decision === 'cancel') return
+        if (decision === 'discard') {
+          doClose(doc.id)
+          return
+        }
+        // save
+        const saved = await saveDocument(doc)
+        if (saved === 'saved') {
+          doClose(doc.id)
+          return
+        }
+        if (saved === 'failed') {
+          // Research R5: a failed save re-prompts with the failure explained and
+          // the document stays open and dirty (US2 scenario 4).
+          error = `Could not save ${doc.title}. The document stays open.`
+          continue
+        }
+        // Save-As dialog cancelled → re-prompt; the tab stays open.
+        continue
+      }
+    } finally {
+      releaseDialogSurface()
     }
-    if (decision === 'discard') {
-      setPendingCloseId(null)
-      doClose(id)
-      return
-    }
-    const doc = sessionRef.current.documents.find(d => d.id === id)
-    if (!doc) {
-      setPendingCloseId(null)
-      return
-    }
-    const result = await saveDocument(doc)
-    if (result === 'saved') {
-      setPendingCloseId(null)
-      doClose(id)
-    } else if (result === 'failed') {
-      setDialogError(`Could not save ${doc.title}. The document stays open.`)
-    }
-  }, [pendingCloseId, saveDocument, doClose])
+  }, [doClose, flushLiveContent, isDirtyLive, releaseDialogSurface, saveDocument])
 
   const reloadDocument = useCallback(async (doc: DocumentState, force = false) => {
     if (!doc.path) return
@@ -263,45 +314,123 @@ export default function App() {
     dispatch({ type: 'RELOAD', payload: { id: doc.id, content: result.value.content } })
   }, [isDirtyLive])
 
-  const handleQuitDecision = useCallback(async (decision: 'save-all' | 'discard' | 'cancel') => {
-    if (decision === 'cancel') {
-      setQuitDirtyDocs(null)
-      return
-    }
-    if (decision === 'discard') {
+  const handleQuitRequest = useCallback(async () => {
+    // A second trigger while any prompt is open is ignored (one prompt at a
+    // time). Checked BEFORE the no-dirty fast path: quitting while
+    // a sheet is up (e.g. an external-removed rescue for a clean document) must
+    // not close the window and abandon the in-memory content it was offering
+    // (review 2026-08-04).
+    if (dialogInFlightRef.current) return
+    const current = sessionRef.current
+    flushLiveContent()
+    const dirtyDocs = current.documents.filter(d => isDirtyLive(d))
+    if (dirtyDocs.length === 0) {
       window.api.confirmQuit('quit')
       return
     }
-    for (const doc of getDirtyDocuments(sessionRef.current)) {
-      const result = await saveDocument(doc)
-      if (result !== 'saved') {
-        if (result === 'failed') {
-          setDialogError(`Could not save ${doc.title}. The application stays open.`)
+    dialogInFlightRef.current = true
+    try {
+      let error: string | undefined
+      // The still-unsaved set shrinks as saves succeed, so a re-prompt lists
+      // (and a second Save All re-saves) only the documents that are actually
+      // still unsaved — not a stale pre-save snapshot (review 2026-08-04).
+      const remaining = [...dirtyDocs]
+      for (;;) {
+        const result = await window.api.showConfirmation({
+          kind: 'unsaved-quit',
+          documentTitles: remaining.map(d => d.title),
+          ...(error ? { error } : {})
+        })
+        if (!result.ok) return
+        const decision = result.value
+        if (decision === 'cancel') return
+        if (decision === 'discard-all') {
+          window.api.confirmQuit('quit')
+          return
+        }
+        // save-all
+        let allSaved = true
+        for (const doc of [...remaining]) {
+          const saved = await saveDocument(doc)
+          if (saved === 'saved') {
+            remaining.splice(remaining.indexOf(doc), 1)
+            continue
+          }
+          if (saved === 'failed') {
+            error = `Could not save ${doc.title}. The application stays open.`
+          }
+          allSaved = false
+          break
+        }
+        if (allSaved) {
+          window.api.confirmQuit('quit')
+          return
+        }
+        // A save failed or was cancelled — re-prompt with the failure explained
+        // (US2 scenario 4); the application stays open.
+      }
+    } finally {
+      releaseDialogSurface()
+    }
+  }, [flushLiveContent, isDirtyLive, releaseDialogSurface, saveDocument])
+
+  const handleExternalPrompt = useCallback(async (prompt: { id: string; kind: 'changed' | 'removed' }) => {
+    const doc = sessionRef.current.documents.find(d => d.id === prompt.id)
+    if (!doc) return
+    if (dialogInFlightRef.current) return
+    dialogInFlightRef.current = true
+    try {
+      if (prompt.kind === 'changed') {
+        const result = await window.api.showConfirmation({
+          kind: 'external-changed',
+          documentTitle: doc.title
+        })
+        if (result.ok && result.value === 'reload') {
+          // The user explicitly chose to replace their version with the disk
+          // version, so the pre-existing dirty state must not block the reload.
+          await reloadDocument(doc, true)
         }
         return
       }
-    }
-    window.api.confirmQuit('quit')
-  }, [saveDocument])
-
-  const handleExternalDecision = useCallback(async (decision: 'keep' | 'reload' | 'ok' | 'save-as') => {
-    if (!externalPrompt) return
-    const doc = sessionRef.current.documents.find(d => d.id === externalPrompt.id)
-    const prompt = externalPrompt
-    setExternalPrompt(null)
-    if (!doc) return
-    if (decision === 'reload') {
-      // The user explicitly chose to replace their version with the disk
-      // version, so the pre-existing dirty state must not block the reload.
-      await reloadDocument(doc, true)
-    } else if (decision === 'save-as') {
-      const result = await saveDocument(doc, true)
-      if (result === 'failed' && prompt.kind === 'removed') {
-        setDialogError(`Could not save ${doc.title}.`)
-        setExternalPrompt(prompt)
+      // removed — the content is still open in memory; OK keeps it, Save As
+      // writes it to a new location. A failed save re-prompts (research R5).
+      let error: string | undefined
+      for (;;) {
+        const result = await window.api.showConfirmation({
+          kind: 'external-removed',
+          documentTitle: doc.title,
+          ...(error ? { error } : {})
+        })
+        if (!result.ok) return
+        if (result.value === 'ok') return
+        const saved = await saveDocument(doc, true)
+        if (saved === 'failed') {
+          error = `Could not save ${doc.title}.`
+          continue
+        }
+        return
       }
+    } finally {
+      releaseDialogSurface()
     }
-  }, [externalPrompt, reloadDocument, saveDocument])
+  }, [reloadDocument, releaseDialogSurface, saveDocument])
+
+  // Route an external changed/removed event to its handling. Returns true when a
+  // confirmation prompt is opened — used by releaseDialogSurface so a deferred
+  // notice that instead resolves via auto-reload (a clean document) still lets a
+  // queued operation error show.
+  const handleExternalChange = useCallback((doc: DocumentState, kind: 'changed' | 'removed'): boolean => {
+    if (kind === 'changed' && !doc.dirty && !isDirtyLive(doc)) {
+      reloadDocument(doc)
+      return false
+    }
+    flushLiveContent()
+    void handleExternalPrompt({ id: doc.id, kind })
+    return true
+  }, [flushLiveContent, handleExternalPrompt, isDirtyLive, reloadDocument])
+
+  const handleExternalChangeRef = useRef(handleExternalChange)
+  handleExternalChangeRef.current = handleExternalChange
 
   const handleActivate = useCallback((id: string) => {
     const current = sessionRef.current
@@ -480,7 +609,7 @@ export default function App() {
   const applyMove = useCallback(async (fromPath: string, toPath: string) => {
     const result = await window.api.moveEntry(fromPath, toPath)
     if (!result.ok) {
-      setOperationError(result.message)
+      void showOperationError(result.message)
       return false
     }
     // The watcher event for this mutation is suppressed in main (FR-037), so
@@ -495,7 +624,7 @@ export default function App() {
   const handleRename = useCallback(async (node: TreeNode, newName: string): Promise<boolean> => {
     const error = validateEntryName(node.kind, node.name, newName)
     if (error) {
-      setOperationError(error)
+      void showOperationError(error)
       return false
     }
     const fromPath = node.id
@@ -525,7 +654,7 @@ export default function App() {
       // (which confirms), or remove it manually — but a silent failure would
       // break the clarification's promise that cancelling removes the file.
       const name = entryName(id)
-      setOperationError(`Could not remove "${name}". It is still on disk — right-click and delete it, or remove it manually.`)
+      void showOperationError(`Could not remove "${name}". It is still on disk — right-click and delete it, or remove it manually.`)
     })
   }, [])
 
@@ -560,7 +689,7 @@ export default function App() {
       }
     }
     if (!result || !result.ok) {
-      setOperationError(result?.message ?? 'Could not create the new entry')
+      void showOperationError(result?.message ?? 'Could not create the new entry')
       return
     }
     const entry = result.value
@@ -573,23 +702,15 @@ export default function App() {
     setPendingEditId(entry.path)
   }, [])
 
-  const handleDeleteRequest = useCallback(async (node: TreeNode) => {
-    setDialogError(null)
-    const result = await window.api.describeEntry(node.id)
-    if (!result.ok) {
-      setOperationError(result.message)
-      return
-    }
-    const plan = planDelete(sessionRef.current.documents, node.id, isDirtyLive)
-    if (plan.dirtyBlockers.length > 0) {
-      setDeleteRefused({ node, blockers: plan.dirtyBlockers })
-      return
-    }
-    setDeleteTarget({ node, info: result.value, plan })
-  }, [isDirtyLive])
-
   const cleanupAfterDelete = useCallback((node: TreeNode, plan: DeletePlan) => {
     for (const doc of plan.cleanToClose) {
+      // FR-012: the native box is gone once "Delete" is clicked, so the async
+      // trash window is input-open. A document that was clean at confirm time
+      // may have received a keystroke while the trash ran — closing it now
+      // would discard that edit without a prompt (Principle III, review
+      // 2026-08-04). Re-check and leave any document that became dirty open.
+      const fresh = sessionRef.current.documents.find(d => d.id === doc.id)
+      if (fresh && isDirtyLive(fresh)) continue
       doClose(doc.id)
     }
     dispatchWorkspace({ type: 'REMOVE_ENTRY', payload: { id: node.id } })
@@ -599,50 +720,73 @@ export default function App() {
     if (selected === node.id || (selected !== null && selected.startsWith(node.id + '/'))) {
       dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
     }
-  }, [doClose])
+  }, [doClose, isDirtyLive])
 
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTarget || deleteBusy) return
-    setDeleteBusy(true)
+  // Spec 008 delete flow, driven by the native message boxes: describe → plan →
+  // (delete-blocked | delete-to-trash) → trash; on TRASH_UNAVAILABLE → an
+  // explicit permanent-delete confirmation. The whole flow — including the
+  // async describe — holds the single-prompt guard (FR-012): no
+  // second prompt can open and no cancellation is offered while the trash
+  // operation runs.
+  const runDeleteConfirmation = useCallback(async (node: TreeNode) => {
+    if (dialogInFlightRef.current) return
+    dialogInFlightRef.current = true
     try {
-      const { node, plan } = deleteTarget
-      const result = await window.api.trashEntry(node.id)
-      if (result.ok) {
-        cleanupAfterDelete(node, plan)
-        setDeleteTarget(null)
+      const result = await window.api.describeEntry(node.id)
+      if (!result.ok) {
+        // The guard is held, so the error is queued and shown once the flow
+        // releases it (showOperationError's single-surface queue).
+        void showOperationError(result.message)
         return
       }
-      if (result.code === 'TRASH_UNAVAILABLE') {
+      const info = result.value
+      const plan = planDelete(sessionRef.current.documents, node.id, isDirtyLive)
+      if (plan.dirtyBlockers.length > 0) {
+        const blocked = await window.api.showConfirmation({
+          kind: 'delete-blocked',
+          targetName: node.name,
+          blockerTitles: plan.dirtyBlockers.map(d => d.title)
+        })
+        // An IPC failure here is invisible otherwise; surface it like the other
+        // flows (queued, then shown once the guard releases).
+        if (!blocked.ok) void showOperationError(blocked.message)
+        return
+      }
+      const deleteDecision = await window.api.showConfirmation({
+        kind: 'delete-to-trash',
+        targetName: node.name,
+        detail: deleteDescription(info),
+        cleanToCloseTitles: plan.cleanToClose.map(d => d.title)
+      })
+      if (!deleteDecision.ok || deleteDecision.value !== 'delete') return
+      const trashed = await window.api.trashEntry(node.id)
+      if (trashed.ok) {
+        cleanupAfterDelete(node, plan)
+        return
+      }
+      if (trashed.code === 'TRASH_UNAVAILABLE') {
         // FR-029a: trash is not available — offer permanent deletion only as an
         // explicit second confirmation.
-        setDeleteTarget(null)
-        setPermanentDelete({ node, plan })
+        const permanent = await window.api.showConfirmation({
+          kind: 'permanent-delete',
+          targetName: node.name,
+          detail: deleteDescription(info),
+          cleanToCloseTitles: plan.cleanToClose.map(d => d.title)
+        })
+        if (!permanent.ok || permanent.value !== 'delete-permanent') return
+        const deleted = await window.api.trashEntry(node.id, true)
+        if (deleted.ok) {
+          cleanupAfterDelete(node, plan)
+          return
+        }
+        void showOperationError(deleted.message)
         return
       }
-      setOperationError(result.message)
-      setDeleteTarget(null)
+      void showOperationError(trashed.message)
     } finally {
-      setDeleteBusy(false)
+      releaseDialogSurface()
     }
-  }, [deleteTarget, deleteBusy, cleanupAfterDelete])
-
-  const handleDeletePermanent = useCallback(async () => {
-    if (!permanentDelete || deleteBusy) return
-    setDeleteBusy(true)
-    try {
-      const { node, plan } = permanentDelete
-      const result = await window.api.trashEntry(node.id, true)
-      if (result.ok) {
-        cleanupAfterDelete(node, plan)
-        setPermanentDelete(null)
-        return
-      }
-      setOperationError(result.message)
-      setPermanentDelete(null)
-    } finally {
-      setDeleteBusy(false)
-    }
-  }, [permanentDelete, deleteBusy, cleanupAfterDelete])
+  }, [cleanupAfterDelete, isDirtyLive, releaseDialogSurface])
 
   // T059: drag-and-drop move between folders.
   const handleTreeMove = useCallback((id: string, targetParentId: string) => {
@@ -669,7 +813,7 @@ export default function App() {
   const commitFolderOpen = useCallback(async () => {
     const result = await window.api.commitFolderOpen()
     if (!result.ok) {
-      setOperationError(result.message)
+      void showOperationError(result.message)
       return
     }
     dispatchWorkspace({
@@ -687,12 +831,12 @@ export default function App() {
   // open while the confirmation is up is ignored here (main also rejects new
   // prepares while one is pending) so the in-flight flow cannot be clobbered.
   const runFolderOpenFlow = useCallback(async (requestPath?: string) => {
-    if (pendingFolderOpen) return
+    if (pendingFolderOpenRef.current) return
     const prepared = requestPath === undefined
       ? await window.api.prepareFolderOpen()
       : await window.api.prepareFolderOpen(requestPath)
     if (!prepared.ok) {
-      setOperationError(prepared.message)
+      void showOperationError(prepared.message)
       return
     }
     if (!prepared.value) return // dialog cancelled — nothing pending
@@ -700,43 +844,66 @@ export default function App() {
       await commitFolderOpen()
       return
     }
-    setPendingFolderOpen(prepared.value)
-  }, [commitFolderOpen, dirtyWorkspaceRelativeDocs, pendingFolderOpen])
-
-  const handleFolderOpenDecision = useCallback(async (decision: 'save-all' | 'discard' | 'cancel') => {
-    if (!pendingFolderOpen) return
-    if (decision === 'cancel') {
-      // FR-010: cancel keeps the session and the recent entry unchanged.
-      setPendingFolderOpen(null)
+    if (dialogInFlightRef.current) {
       await window.api.cancelFolderOpen()
       return
     }
-    if (decision === 'discard') {
-      // FR-010 "Discard": the user chose to throw the unsaved changes away, so
-      // the dirty workspace-relative documents are CLOSED (their edits
-      // dropped). They must not stay open: after the workspace swap their
-      // relative paths rebind to the new root, and a later Ctrl+S would write
-      // old-root content over whatever file shares the path there.
-      for (const doc of dirtyWorkspaceRelativeDocs()) {
-        doClose(doc.id)
-      }
-      setPendingFolderOpen(null)
-      await commitFolderOpen()
-      return
-    }
-    for (const doc of dirtyWorkspaceRelativeDocs()) {
-      const result = await saveDocument(doc)
-      if (result !== 'saved') {
-        if (result === 'failed') {
-          setDialogError(`Could not save ${doc.title}.`)
+    dialogInFlightRef.current = true
+    pendingFolderOpenRef.current = prepared.value
+    try {
+      let error: string | undefined
+      for (;;) {
+        const result = await window.api.showConfirmation({
+          kind: 'folder-open',
+          documentTitles: dirtyWorkspaceRelativeDocs().map(d => d.title),
+          ...(error ? { error } : {})
+        })
+        if (!result.ok) {
+          await window.api.cancelFolderOpen()
+          return
         }
-        // Keep the confirmation open; the prepared folder was not committed.
-        return
+        const decision = result.value
+        if (decision === 'cancel') {
+          // FR-010: cancel keeps the session and the recent entry unchanged.
+          await window.api.cancelFolderOpen()
+          return
+        }
+        if (decision === 'discard-all') {
+          // FR-010 "Discard": the user chose to throw the unsaved changes away, so
+          // the dirty workspace-relative documents are CLOSED (their edits
+          // dropped). They must not stay open: after the workspace swap their
+          // relative paths rebind to the new root, and a later Ctrl+S would write
+          // old-root content over whatever file shares the path there.
+          for (const doc of dirtyWorkspaceRelativeDocs()) {
+            doClose(doc.id)
+          }
+          await commitFolderOpen()
+          return
+        }
+        // save-all
+        let allSaved = true
+        for (const doc of dirtyWorkspaceRelativeDocs()) {
+          const saved = await saveDocument(doc)
+          if (saved !== 'saved') {
+            if (saved === 'failed') {
+              error = `Could not save ${doc.title}.`
+            }
+            allSaved = false
+            break
+          }
+        }
+        if (allSaved) {
+          await commitFolderOpen()
+          return
+        }
+        // A save failed or was cancelled — keep the confirmation open (the
+        // prepared folder was not committed) and re-prompt.
       }
+    } finally {
+      pendingFolderOpenRef.current = null
+      releaseDialogSurface()
     }
-    setPendingFolderOpen(null)
-    await commitFolderOpen()
-  }, [pendingFolderOpen, dirtyWorkspaceRelativeDocs, saveDocument, commitFolderOpen, doClose])
+  }, [commitFolderOpen, dirtyWorkspaceRelativeDocs, doClose, releaseDialogSurface, saveDocument])
 
   const handleOpenFolder = useCallback(() => {
     void runFolderOpenFlow()
@@ -756,7 +923,7 @@ export default function App() {
                 dispatch({ type: 'OPEN_EXISTING', payload: result.value })
                 enforcePoolCap(sessionRef.current.activeId)
               } else {
-                setOperationError(result.message)
+                void showOperationError(result.message)
               }
             })
           } else {
@@ -774,7 +941,7 @@ export default function App() {
               dispatch({ type: 'OPEN_EXISTING', payload: result.value })
               enforcePoolCap(sessionRef.current.activeId)
             } else if (!result.ok) {
-              setOperationError(result.message)
+              void showOperationError(result.message)
             }
           })
           break
@@ -808,14 +975,14 @@ export default function App() {
       const doc = sessionRef.current.documents.find(d => d.path === e.path)
       if (!doc) return
       dispatch({ type: 'EXTERNAL_CHANGE', payload: { path: e.path, kind: e.kind } })
-      if (quitDirtyDocsRef.current) return
-      if (e.kind === 'changed' && !doc.dirty && !isDirtyLive(doc)) {
-        reloadDocument(doc)
+      // One prompt at a time: never prompt over a dialog that is up.
+      // DEFER, don't drop — the notice is re-surfaced once the guard releases
+      // (releaseDialogSurface drains it, matching the operation-error queue).
+      if (dialogInFlightRef.current) {
+        pendingExternalPromptRef.current = { path: e.path, kind: e.kind }
         return
       }
-      flushLiveContent()
-      setDialogError(null)
-      setExternalPrompt({ id: doc.id, kind: e.kind })
+      handleExternalChange(doc, e.kind)
     })
 
     const unsubWorkspace = window.api.onWorkspaceChanged((e) => {
@@ -823,15 +990,7 @@ export default function App() {
     })
 
     const unsubQuit = window.api.onQuitRequested(() => {
-      const current = sessionRef.current
-      flushLiveContent()
-      const dirtyDocs = current.documents.filter(d => isDirtyLive(d))
-      if (dirtyDocs.length === 0) {
-        window.api.confirmQuit('quit')
-        return
-      }
-      setDialogError(null)
-      setQuitDirtyDocs(dirtyDocs)
+      void handleQuitRequest()
     })
 
     // Spec 004, FR-011: a persistence failure is non-fatal to the open it
@@ -853,7 +1012,7 @@ export default function App() {
       unsubRecentOk()
       unsubQuit()
     }
-  }, [enforcePoolCap, flushLiveContent, handleCloseRequest, handleNew, isDirtyLive, reloadDocument, runFolderOpenFlow, saveDocument])
+  }, [enforcePoolCap, handleCloseRequest, handleExternalChange, handleNew, handleQuitRequest, runFolderOpenFlow, saveDocument])
 
   useEffect(() => {
     return () => {
@@ -886,13 +1045,6 @@ export default function App() {
       api.scrollTo(path)
     }
   }, [workspaceActiveId, workspace.name, workspace.nodes])
-
-  const pendingCloseDoc = pendingCloseId
-    ? session.documents.find(d => d.id === pendingCloseId) ?? null
-    : null
-  const externalDoc = externalPrompt
-    ? session.documents.find(d => d.id === externalPrompt.id) ?? null
-    : null
 
   const sidebarWidth = getSettings().sidebarWidth
   const hasWorkspace = workspace.name !== null
@@ -933,7 +1085,7 @@ export default function App() {
                     pendingEditId={pendingEditId}
                     onRename={handleRename}
                     onEditingCancelled={handleEditingCancelled}
-                    onDeleteRequest={handleDeleteRequest}
+                    onDeleteRequest={runDeleteConfirmation}
                     onCreateRequest={handleCreate}
                     onMove={handleTreeMove}
                     onOpen={handleOpen}
@@ -980,161 +1132,6 @@ export default function App() {
         workspaceRoot={workspace.root}
         note={footerNote}
       />
-
-      {quitDirtyDocs ? (
-        <ConfirmDialog
-          title="Quit with unsaved changes?"
-          error={dialogError}
-          onCancel={() => handleQuitDecision('cancel')}
-          buttons={[
-            { label: 'Cancel', onClick: () => handleQuitDecision('cancel') },
-            { label: 'Discard and Quit', kind: 'danger', onClick: () => handleQuitDecision('discard') },
-            { label: 'Save All and Quit', kind: 'primary', onClick: () => handleQuitDecision('save-all') }
-          ]}
-        >
-          <p>The following documents have unsaved changes:</p>
-          <ul>
-            {quitDirtyDocs.map((doc) => (
-              <li key={doc.id}>{doc.title}</li>
-            ))}
-          </ul>
-        </ConfirmDialog>
-      ) : pendingCloseDoc ? (
-        <ConfirmDialog
-          title="Unsaved changes"
-          error={dialogError}
-          onCancel={() => handleCloseDecision('cancel')}
-          buttons={[
-            { label: 'Cancel', onClick: () => handleCloseDecision('cancel') },
-            { label: 'Discard', kind: 'danger', onClick: () => handleCloseDecision('discard') },
-            { label: 'Save', kind: 'primary', onClick: () => handleCloseDecision('save') }
-          ]}
-        >
-          <p>{pendingCloseDoc.title} has unsaved changes. What would you like to do?</p>
-        </ConfirmDialog>
-      ) : externalPrompt && externalDoc ? (
-        externalPrompt.kind === 'removed' ? (
-          <ConfirmDialog
-            title="File deleted on disk"
-            error={dialogError}
-            onCancel={() => handleExternalDecision('ok')}
-            buttons={[
-              { label: 'OK', onClick: () => handleExternalDecision('ok') },
-              { label: 'Save As...', kind: 'primary', onClick: () => handleExternalDecision('save-as') }
-            ]}
-          >
-            <p>
-              {externalDoc.title} was deleted or renamed on disk. Its content is still open here;
-              you can save it to a new location.
-            </p>
-          </ConfirmDialog>
-        ) : (
-          <ConfirmDialog
-            title="File changed on disk"
-            onCancel={() => handleExternalDecision('keep')}
-            buttons={[
-              { label: 'Keep My Version', onClick: () => handleExternalDecision('keep') },
-              { label: 'Reload from Disk', kind: 'primary', onClick: () => handleExternalDecision('reload') }
-            ]}
-          >
-            <p>
-              {externalDoc.title} was modified by another program. Keep your version, or replace it
-              with the version on disk?
-            </p>
-          </ConfirmDialog>
-        )
-        ) : pendingFolderOpen ? (
-          <ConfirmDialog
-            title="Open folder with unsaved changes?"
-            error={dialogError}
-            onCancel={() => handleFolderOpenDecision('cancel')}
-            buttons={[
-              { label: 'Cancel', onClick: () => handleFolderOpenDecision('cancel') },
-              { label: 'Discard', kind: 'danger', onClick: () => handleFolderOpenDecision('discard') },
-              { label: 'Save All', kind: 'primary', onClick: () => handleFolderOpenDecision('save-all') }
-            ]}
-          >
-            <p>
-              Opening {pendingFolderOpen.name} will replace the current workspace. Save the
-              documents with unsaved changes to the current folder first, discard the changes,
-              or cancel.
-            </p>
-            <ul>
-              {dirtyWorkspaceRelativeDocs().map((doc) => (
-                <li key={doc.id}>{doc.title}</li>
-              ))}
-            </ul>
-          </ConfirmDialog>
-        ) : deleteRefused ? (
-          <ConfirmDialog
-            title="Cannot delete"
-            busy={deleteBusy}
-            onCancel={() => setDeleteRefused(null)}
-            buttons={[{ label: 'OK', kind: 'primary', onClick: () => setDeleteRefused(null) }]}
-          >
-            <p>
-              {deleteRefused.node.name} has unsaved changes in the editor. Save or close{' '}
-              {deleteRefused.blockers.length > 1 ? 'those documents' : 'the document'} before
-              deleting it.
-            </p>
-            <ul>
-              {deleteRefused.blockers.map((doc) => (
-                <li key={doc.id}>{doc.title}</li>
-              ))}
-            </ul>
-          </ConfirmDialog>
-        ) : deleteTarget ? (
-          <ConfirmDialog
-            title={`Delete ${deleteTarget.node.name}?`}
-            error={dialogError}
-            busy={deleteBusy}
-            onCancel={() => setDeleteTarget(null)}
-            buttons={[
-              { label: 'Cancel', onClick: () => setDeleteTarget(null) },
-              { label: 'Delete', kind: 'danger', onClick: handleDeleteConfirm }
-            ]}
-          >
-            <p>{deleteDescription(deleteTarget.info)}</p>
-            {deleteTarget.plan.cleanToClose.length > 0 && (
-              <p>
-                The open document{deleteTarget.plan.cleanToClose.length > 1 ? 's' : ''}{' '}
-                {deleteTarget.plan.cleanToClose.map(d => d.title).join(', ')} will close.
-              </p>
-            )}
-            <p>It will be moved to the recycle bin or trash.</p>
-          </ConfirmDialog>
-        ) : permanentDelete ? (
-          <ConfirmDialog
-            title="Trash unavailable"
-            error={dialogError}
-            busy={deleteBusy}
-            onCancel={() => setPermanentDelete(null)}
-            buttons={[
-              { label: 'Cancel', onClick: () => setPermanentDelete(null) },
-              { label: 'Delete Permanently', kind: 'danger', onClick: handleDeletePermanent }
-            ]}
-          >
-            <p>
-              {permanentDelete.node.name} could not be moved to the recycle bin or trash on this
-              system. Deleting it permanently cannot be undone.
-            </p>
-            {permanentDelete.plan.cleanToClose.length > 0 && (
-              <p>
-                The open document{permanentDelete.plan.cleanToClose.length > 1 ? 's' : ''}{' '}
-                {permanentDelete.plan.cleanToClose.map(d => d.title).join(', ')} will close.
-              </p>
-            )}
-            <p>Delete permanently anyway?</p>
-          </ConfirmDialog>
-        ) : operationError ? (
-          <ConfirmDialog
-            title="Operation failed"
-            onCancel={() => setOperationError(null)}
-            buttons={[{ label: 'OK', kind: 'primary', onClick: () => setOperationError(null) }]}
-          >
-            <p>{operationError}</p>
-          </ConfirmDialog>
-        ) : null}
     </div>
   )
 }

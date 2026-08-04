@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -42,21 +42,13 @@ test.beforeEach(async () => {
 
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
+
+  await stubMessageBox(app)
 })
 
 test.afterEach(async () => {
   try {
-    const closed = app.waitForEvent('close', { timeout: 8000 }).catch(() => {})
-    const quitButton = window.getByRole('button', { name: 'Discard and Quit' })
-    const dialogShown = expect(quitButton).toBeVisible({ timeout: 5000 }).catch(() => {})
-    await app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0].close()
-    })
-    await Promise.race([dialogShown, closed])
-    if (await quitButton.isVisible().catch(() => false)) {
-      await quitButton.click()
-    }
-    await closed
+    await closeAppDiscardingQuit(app)
   } catch {
     await app.close().catch(() => {})
   }
@@ -103,9 +95,10 @@ test('view source slides in, takes the tab, and returns (US1)', async () => {
   await expect(window.getByTestId('source-view')).toHaveCount(0)
   await expect(window.locator('.document-title')).toContainText('\u2022')
 
-  // Saving writes the edited text back to disk.
+  // Saving writes the edited text back to disk (the dirty-tab close prompts
+  // through the stubbed native box: answer "Save").
+  await stubMessageBox(app, 'Save')
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
-  await window.getByRole('button', { name: 'Save' }).click()
   const disk = fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')
   expect(disk).toContain('Edited in source.')
 })
@@ -243,8 +236,8 @@ test('FR-12: a construct Crepe normalises is preserved verbatim through a round 
   await expect(window.getByTestId('source-view')).toHaveCount(0)
 
   // The raw text survived into the document and saves verbatim.
+  await stubMessageBox(app, 'Save')
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
-  await window.getByRole('button', { name: 'Save' }).click()
   const disk = fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')
   expect(disk).toContain('http://example.com/path')
 })
@@ -264,9 +257,8 @@ test('a no-edit view-source round trip does not mark a normalising file as chang
   // No dirty dot, and closing the tab does NOT prompt for unsaved changes.
   await expect(window.locator('.document-title')).not.toContainText('\u2022')
   await window.getByRole('button', { name: 'Close link.md' }).click()
-  const promptVisible = await window.getByRole('button', { name: 'Save' })
-    .isVisible({ timeout: 4000 }).catch(() => false)
-  expect(promptVisible).toBe(false)
+  // The native prompt must not have fired.
+  await expect.poll(() => messageBoxCallCount(app)).toBe(0)
   await expect(window.getByRole('button', { name: 'Open Folder' })).toBeVisible()
 })
 
@@ -279,9 +271,7 @@ test('saving a pristine normalising file from the formatted view keeps its bytes
   // A pristine normalising file is not treated as having unsaved changes: no
   // save prompt on close, and the bytes on disk stay identical.
   await window.getByRole('button', { name: 'Close link.md' }).click()
-  const promptVisible = await window.getByRole('button', { name: 'Save' })
-    .isVisible({ timeout: 4000 }).catch(() => false)
-  expect(promptVisible).toBe(false)
+  await expect.poll(() => messageBoxCallCount(app)).toBe(0)
   const disk = fs.readFileSync(path.join(testFolder, 'link.md'), 'utf-8')
   expect(disk).toBe('# Alpha\n\nhttp://example.com/path')
 })
@@ -296,8 +286,8 @@ test('source-view save writes the exact raw bytes, never adding a trailing newli
   // Edit AND save while still in source view: the disk write must be the raw
   // store bytes — neither a re-serialized editor output nor an added `\n`.
   await window.getByTestId('source-textarea').fill('Edited raw source, no newline')
+  await stubMessageBox(app, 'Save')
   await window.getByRole('button', { name: 'Close no-newline.md' }).click()
-  await window.getByRole('button', { name: 'Save' }).click()
 
   const disk = fs.readFileSync(path.join(testFolder, 'no-newline.md'), 'utf-8')
   expect(disk).toBe('Edited raw source, no newline')

@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -29,21 +29,13 @@ test.beforeEach(async () => {
       filePaths: [folder as string]
     })
   }, testFolder)
+
+  await stubMessageBox(app)
 })
 
 test.afterEach(async () => {
   try {
-    const closed = app.waitForEvent('close', { timeout: 8000 }).catch(() => {})
-    const quitButton = window.getByRole('button', { name: 'Discard and Quit' })
-    const dialogShown = expect(quitButton).toBeVisible({ timeout: 5000 }).catch(() => {})
-    await app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0].close()
-    })
-    await Promise.race([dialogShown, closed])
-    if (await quitButton.isVisible().catch(() => false)) {
-      await quitButton.click()
-    }
-    await closed
+    await closeAppDiscardingQuit(app)
   } catch {
     await app.close().catch(() => {})
   }

@@ -13,10 +13,12 @@ import { recentItemsConfigPath } from '../recentItemsPath'
 import { reportRecentItemsWarning, notifyRecentItemsOk } from '../recentItemsWarning'
 import { scrubAbsolutePaths } from '../scrubPaths'
 import { refreshApplicationMenu } from '../menu'
+import { showNativeConfirmation } from '../dialogs'
+import { validateNativeDialogRequest } from './dialogValidation'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, TrashReceipt, Settings, EntryKind, ErrorCode,
-  WatchEvent, EntryInfo, RecentKind
+  WatchEvent, EntryInfo, RecentKind, NativeDialogDecision
 } from '../../shared/ipc-contract'
 
 let workspaceState: WorkspaceState | null = null
@@ -107,6 +109,10 @@ function validateShape(obj: unknown, requiredKeys: string[]): void {
     }
   }
 }
+
+// Spec 008: a malformed dialog request fails closed — no dialog is shown
+// (Principle II). Validation lives in dialogValidation.ts (electron-free, unit-
+// tested) so the nine-kind whitelist and length caps are behaviorally pinned.
 
 function tryCloseWindow(): void {
   allowClose = true
@@ -622,6 +628,17 @@ export function setupHandlers(window: BrowserWindow): void {
       return ok(updated)
     } catch (e: unknown) {
       return err('IO', sanitizeError(e, null))
+    }
+  })
+
+  ipcMain.handle('dialog:show', async (_e, args: unknown): Promise<Result<NativeDialogDecision>> => {
+    try {
+      const request = validateNativeDialogRequest(args)
+      const decision = await showNativeConfirmation(window, request)
+      return ok(decision)
+    } catch (e: unknown) {
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
   })
 

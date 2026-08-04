@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -32,27 +32,20 @@ test.beforeEach(async () => {
     })
   }, testFolder)
 
+  // Native dialogs are stubbed in main (AGENTS.md); default to the safe
+  // cancellation decision so an unexpected prompt never blocks a test.
+  await stubMessageBox(app)
+
   // Reset the fixture file in case a previous test modified it.
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
 })
 
 test.afterEach(async () => {
-  // Playwright's window close triggers the application's real quit guard:
-  // when a test leaves dirty documents behind, a "Quit with unsaved changes"
-  // dialog appears and blocks the close. Dismiss it the same way a user would.
+  // Native quit confirmation is stubbed to "Discard and Quit" so a dirty
+  // document left behind cannot block the window close.
   try {
-    const closed = app.waitForEvent('close', { timeout: 8000 }).catch(() => {})
-    const quitButton = window.getByRole('button', { name: 'Discard and Quit' })
-    const dialogShown = expect(quitButton).toBeVisible({ timeout: 5000 }).catch(() => {})
-    await app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0].close()
-    })
-    await Promise.race([dialogShown, closed])
-    if (await quitButton.isVisible().catch(() => false)) {
-      await quitButton.click()
-    }
-    await closed
+    await closeAppDiscardingQuit(app)
   } catch {
     await app.close().catch(() => {})
   }
@@ -148,7 +141,8 @@ test('closing a clean tab closes it without a prompt', async () => {
 
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
   await expect(window.getByRole('tab')).toHaveCount(1)
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+  // No native prompt may fire for a clean close.
+  await expect.poll(() => messageBoxCallCount(app)).toBe(0)
   await expect(window.locator('.document-title')).toContainText('beta.md')
 })
 
@@ -156,13 +150,10 @@ test('closing a dirty tab prompts; cancel keeps it open', async () => {
   await openFolderAndFile('alpha.md')
   await typeInEditor(' EXTRA')
 
+  // The native box is stubbed to the safe cancellation decision.
+  await stubMessageBox(app, 'Cancel')
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
-  await expect(window.getByRole('dialog')).toBeVisible()
-  await expect(window.getByRole('dialog')).toContainText('alpha.md')
-  await expect(window.getByRole('dialog')).toContainText('Unsaved changes')
 
-  await window.getByRole('button', { name: 'Cancel' }).click()
-  await expect(window.getByRole('dialog')).toHaveCount(0)
   await expect(window.getByRole('tab', { name: /alpha\.md/ })).toBeVisible()
 })
 
@@ -170,8 +161,8 @@ test('closing a dirty tab with Discard removes it', async () => {
   await openFolderAndFile('alpha.md')
   await typeInEditor(' EXTRA')
 
+  await stubMessageBox(app, "Don't Save")
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
-  await window.getByRole('button', { name: 'Discard' }).click()
 
   await expect(window.getByRole('tab')).toHaveCount(0)
   await expect(window.locator('.empty-state')).toBeVisible()
@@ -181,29 +172,51 @@ test('closing a dirty tab with Save writes the file and closes it', async () => 
   await openFolderAndFile('alpha.md')
   await typeInEditor(' EXTRA')
 
+  await stubMessageBox(app, 'Save')
   await window.getByRole('button', { name: 'Close alpha.md' }).click()
-  await window.getByRole('button', { name: 'Save' }).click()
 
   await expect(window.getByRole('tab')).toHaveCount(0)
   const disk = fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')
   expect(disk).toContain('EXTRA')
 })
 
+test('closing a dirty tab with a failing save re-prompts and keeps the tab open and unsaved', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' EXTRA')
+
+  // Make the save fail (read-only): the first "Save" fails, the native box
+  // re-prompts (US2 scenario 4), and the second response cancels.
+  const alphaPath = path.join(testFolder, 'alpha.md')
+  fs.chmodSync(alphaPath, 0o444)
+  try {
+    await stubMessageBox(app, ['Save', 'cancel'])
+    await window.getByRole('button', { name: 'Close alpha.md' }).click()
+
+    // The re-prompt is proven by the stub receiving a second call; the tab
+    // stays open and dirty, and nothing was written to disk.
+    await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(2)
+    // The re-prompt must EXPLAIN the failure, not just re-appear (FR-007/008,
+    // US2 scenario 4): assert the native detail carries the explanation.
+    const last = await lastMessageBoxOptions(app)
+    expect(last.detail).toContain('Could not save alpha.md')
+    await expect(window.getByRole('tab', { name: /alpha\.md/ })).toBeVisible()
+    await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toBeVisible()
+    expect(fs.readFileSync(alphaPath, 'utf-8')).not.toContain('EXTRA')
+  } finally {
+    fs.chmodSync(alphaPath, 0o666)
+  }
+})
+
 test('quitting with dirty documents prompts, and cancel keeps the app open', async () => {
   await openFolderAndFile('alpha.md')
   await typeInEditor(' EXTRA')
 
+  await stubMessageBox(app, 'Cancel')
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].close()
   })
 
-  await expect(window.getByRole('dialog')).toBeVisible()
-  await expect(window.getByRole('dialog')).toContainText('alpha.md')
-  await expect(window.getByRole('button', { name: 'Discard and Quit' })).toBeVisible()
-  await expect(window.getByRole('button', { name: 'Save All and Quit' })).toBeVisible()
-
-  await window.getByRole('button', { name: 'Cancel' }).click()
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
   await expect(window.locator('.document-title')).toContainText('alpha.md')
 })
 
@@ -212,12 +225,35 @@ test('quitting with Discard and Quit closes the application', async () => {
   await typeInEditor(' EXTRA')
 
   const closed = app.waitForEvent('close')
+  await stubMessageBox(app, 'Discard and Quit')
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].close()
   })
-  await expect(window.getByRole('dialog')).toBeVisible()
-  await window.getByRole('button', { name: 'Discard and Quit' }).click()
   await closed
+})
+
+test('quitting with Save All writes every dirty document and closes the app', async () => {
+  await openFolderAndFile('alpha.md')
+  await openSecondFile('beta.md')
+
+  // Dirty both documents. typeInEditor targets the FIRST contenteditable in the
+  // DOM, so activate the tab being typed into first (the active editor is the
+  // visible one; the others stay mounted but hidden).
+  await window.getByRole('tab', { name: /alpha\.md/ }).click()
+  await typeInEditor(' ALPHA')
+  await window.getByRole('tab', { name: /beta\.md/ }).click()
+  await window.locator('[contenteditable="true"]:visible').click()
+  await window.keyboard.type(' BETA')
+
+  const closed = app.waitForEvent('close')
+  await stubMessageBox(app, 'Save All')
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].close()
+  })
+  await closed
+  // Save All wrote both dirty documents to disk before quitting.
+  expect(fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')).toContain('ALPHA')
+  expect(fs.readFileSync(path.join(testFolder, 'beta.md'), 'utf-8')).toContain('BETA')
 })
 
 test('external change to a clean document auto-reloads it', async () => {
@@ -232,25 +268,22 @@ test('external change to a clean document auto-reloads it', async () => {
   await expect(window.locator('.ProseMirror')).toContainText('Changed by another program.', {
     timeout: 15_000
   })
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+  // A clean document auto-reloads with no prompt.
+  await expect.poll(() => messageBoxCallCount(app)).toBe(0)
 })
 
-test('external change to a dirty document prompts keep-or-reload', async () => {
+test('external change to a dirty document: Keep My Version keeps the edit', async () => {
   await openFolderAndFile('alpha.md')
   await typeInEditor(' MYEDIT')
 
+  // The native keep-or-reload box is stubbed to the safe choice (Keep).
+  await stubMessageBox(app, 'Keep My Version')
   fs.writeFileSync(
     path.join(testFolder, 'alpha.md'),
     '# Alpha\n\nChanged by another program.'
   )
 
-  await expect(window.getByRole('dialog')).toBeVisible({ timeout: 15_000 })
-  await expect(window.getByRole('dialog')).toContainText('File changed on disk')
-  await expect(window.getByRole('button', { name: 'Keep My Version' })).toBeVisible()
-  await expect(window.getByRole('button', { name: 'Reload from Disk' })).toBeVisible()
-
-  await window.getByRole('button', { name: 'Keep My Version' }).click()
-  await expect(window.locator('.ProseMirror:visible')).toContainText('MYEDIT')
+  await expect(window.locator('.ProseMirror:visible')).toContainText('MYEDIT', { timeout: 15_000 })
   await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toBeVisible()
 })
 
@@ -258,13 +291,11 @@ test('external change to a dirty document: Reload from Disk replaces the edit', 
   await openFolderAndFile('alpha.md')
   await typeInEditor(' MYEDIT')
 
+  await stubMessageBox(app, 'Reload from Disk')
   fs.writeFileSync(
     path.join(testFolder, 'alpha.md'),
     '# Alpha\n\nChanged by another program.'
   )
-
-  await expect(window.getByRole('dialog')).toBeVisible({ timeout: 15_000 })
-  await window.getByRole('button', { name: 'Reload from Disk' }).click()
 
   await expect(window.locator('.ProseMirror:visible')).toContainText(
     'Changed by another program.',
@@ -272,7 +303,40 @@ test('external change to a dirty document: Reload from Disk replaces the edit', 
   )
   await expect(window.locator('.ProseMirror:visible')).not.toContainText('MYEDIT')
   await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toHaveCount(0)
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+})
+
+test('external deletion of an open dirty document prompts ok/save-as', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' MYEDIT')
+
+  // Save As keeps the content by writing it to a new location; the tab stays
+  // open because its backing file is gone.
+  const savedPath = path.join(testFolder, 'alpha-saved.md')
+  await app.evaluate(({ dialog }, p) => {
+    dialog.showSaveDialog = async () => ({
+      canceled: false,
+      filePath: p as string
+    })
+  }, savedPath)
+  await stubMessageBox(app, 'Save As...')
+  fs.rmSync(path.join(testFolder, 'alpha.md'))
+
+  await expect(window.getByRole('tab', { name: /alpha\.md/ })).toBeVisible({ timeout: 15_000 })
+  await expect(async () => {
+    expect(fs.readFileSync(savedPath, 'utf-8')).toContain('MYEDIT')
+  }).toPass({ timeout: 10_000 })
+})
+
+test('external deletion of an open document: OK keeps it in memory', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' MYEDIT')
+
+  await stubMessageBox(app, 'OK')
+  fs.rmSync(path.join(testFolder, 'alpha.md'))
+
+  await expect(window.getByRole('tab', { name: /alpha\.md/ })).toBeVisible({ timeout: 15_000 })
+  await expect(window.locator('.ProseMirror:visible')).toContainText('MYEDIT')
+  await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-warning')).toBeVisible()
 })
 
 test('switching to the oldest tab at the instance cap keeps its editor alive', async () => {

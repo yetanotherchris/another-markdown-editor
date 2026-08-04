@@ -147,6 +147,11 @@ The feature applies to these existing dialog surfaces:
    documents with unsaved work; lists blockers and offers acknowledgement.
 8. **Operation failed**: Shown for a failed application operation; explains the
    failure and offers acknowledgement.
+9. **Open folder with unsaved changes**: Shown before opening a new workspace
+   while workspace-relative documents have unsaved changes; lists the affected
+   documents and offers save all, discard, and cancel (2026-08-04 clarification
+   — existing surface from spec 004, FR-010, added to the inventory so the
+   whole application converts consistently).
 
 ### Edge Cases
 
@@ -156,7 +161,7 @@ The feature applies to these existing dialog surfaces:
   confirmation prompt by a platform-standard method: the operation is cancelled
   whenever cancelling is safe and available.
 - A dialog is opened while another dialog is already present: the application
-  shows one decision surface at a time and does not let actions apply to an
+  shows one confirmation prompt at a time and does not let actions apply to an
   obscured or stale dialog.
 - A long file name, folder name, or list of affected documents must be shown: the
   dialog remains readable, identifies the affected items accurately, and keeps
@@ -213,7 +218,7 @@ The feature applies to these existing dialog surfaces:
 
 ### Key Entities
 
-- **Confirmation dialog**: A decision surface that requires explicit user choice
+- **Confirmation dialog**: A prompt that requires explicit user choice
   before an operation can discard, replace, delete, permanently delete, or close
   user work.
 - **Native dialog convention**: The active operating system's expected dialog
@@ -260,3 +265,15 @@ The feature applies to these existing dialog surfaces:
 - **Future dialogs**: A new application dialog that asks the user to confirm a
   destructive or data-replacing outcome must follow the same native-dialog
   requirements when it is added.
+
+## Clarifications
+
+- **2026-08-04 — Folder-open confirmation is in scope**: The existing
+  "Open folder with unsaved changes?" confirmation (spec 004, FR-010) is added
+  to the Dialog Inventory as item 9. It converts to the native presentation with
+  the same Save All / Discard / Cancel outcomes, so the whole application uses
+  one dialog style.
+- **2026-08-04 — Default actions**: Recoverable destructive actions (delete to
+  trash) may be the default action where the platform expects them. Irreversible
+  actions (permanent delete) are never the default on any platform; the safe
+  cancellation is always the default there.

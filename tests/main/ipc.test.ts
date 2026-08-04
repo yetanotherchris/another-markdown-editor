@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, TrashReceipt, ErrorCode, MenuCommand, RecentItem,
-  DesktopApi
+  DesktopApi, NativeDialogRequest, NativeDialogDecision
 } from '../../src/shared/ipc-contract'
 
 describe('IPC contract types', () => {
@@ -107,5 +107,38 @@ describe('DesktopApi recent-items operations', () => {
     expect(typeof open).toBe('function')
     expect(typeof warn).toBe('function')
     expect(typeof ok).toBe('function')
+  })
+})
+
+describe('DesktopApi native-dialog operations (spec 008)', () => {
+  it('types every NativeDialogRequest member with the right fields', () => {
+    const close: NativeDialogRequest = { kind: 'unsaved-close', documentTitle: 'a.md' }
+    const quit: NativeDialogRequest = { kind: 'unsaved-quit', documentTitles: ['a.md', 'b.md'], error: 'Could not save a.md.' }
+    const folder: NativeDialogRequest = { kind: 'folder-open', documentTitles: ['a.md'] }
+    const changed: NativeDialogRequest = { kind: 'external-changed', documentTitle: 'a.md' }
+    const removed: NativeDialogRequest = { kind: 'external-removed', documentTitle: 'a.md', error: 'Could not save a.md.' }
+    const trash: NativeDialogRequest = { kind: 'delete-to-trash', targetName: 'b.md', detail: '', cleanToCloseTitles: ['a.md'] }
+    const permanent: NativeDialogRequest = { kind: 'permanent-delete', targetName: 'b.md', detail: '', cleanToCloseTitles: [] }
+    const blocked: NativeDialogRequest = { kind: 'delete-blocked', targetName: 'b.md', blockerTitles: ['a.md'] }
+    const failed: NativeDialogRequest = { kind: 'operation-failed', message: 'File or directory not found' }
+    const all = [close, quit, folder, changed, removed, trash, permanent, blocked, failed]
+    expect(all).toHaveLength(9)
+    expect(all.every(r => typeof r.kind === 'string')).toBe(true)
+  })
+
+  it('NativeDialogDecision is the closed set of 12', () => {
+    const decisions: NativeDialogDecision[] = [
+      'save', 'discard', 'save-all', 'discard-all',
+      'keep', 'reload', 'ok', 'save-as',
+      'delete', 'delete-permanent', 'acknowledge', 'cancel'
+    ]
+    expect(new Set(decisions).size).toBe(12)
+  })
+
+  it('types DesktopApi.showConfirmation', () => {
+    const op: DesktopApi['showConfirmation'] = () => Promise.resolve({ ok: true, value: 'cancel' })
+    const opErr: DesktopApi['showConfirmation'] = () => Promise.resolve({ ok: false, code: 'IO', message: 'none' })
+    expect(typeof op).toBe('function')
+    expect(typeof opErr).toBe('function')
   })
 })
