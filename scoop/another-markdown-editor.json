@@ -1,0 +1,18 @@
+{
+  "homepage": "https://github.com/yetanotherchris/another-markdown-editor",
+  "description": "A WYSIWYG markdown editor for Windows, macOS, and Linux, built with Electron and Milkdown.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.1.0/Another%20Markdown%20Editor-0.1.0-windows-x64.zip",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "bin": [
+        [
+          "Another Markdown Editor.exe",
+          "another-markdown-editor"
+        ]
+      ]
+    }
+  }
+}

@@ -40,6 +40,13 @@ export default tseslint.config(
     }
   },
   {
+    files: ['tests/release/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      'no-restricted-globals': 'off'
+    }
+  },
+  {
     files: ['tests/renderer/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
