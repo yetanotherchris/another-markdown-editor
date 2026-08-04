@@ -163,11 +163,26 @@ describe('buildNativeDialogOptions — destructive dialogs', () => {
         buttons: ['OK'],
         defaultId: 0,
         cancelId: 0,
-        type: 'warning'
+        type: 'warning',
+        message: 'Cannot delete'
       })
     }
-    expect(buildNativeDialogOptions('win32', r).message).toContain('folder')
-    expect(buildNativeDialogOptions('win32', r).detail).toContain('a.md')
+    // The explanation and the blocker list live in the content text (US4 sc1).
+    const opts = buildNativeDialogOptions('win32', r)
+    expect(opts.detail).toContain('folder')
+    expect(opts.detail).toContain('a.md')
+  })
+})
+
+describe('buildNativeDialogOptions — Linux Pango-markup escaping', () => {
+  it('escapes markup characters in user-influenced names on linux only', () => {
+    const r = req('unsaved-close', { documentTitle: 'x<b>&c.md' })
+    const linux = buildNativeDialogOptions('linux', r)
+    expect(linux.message).toContain('x&lt;b&gt;&amp;c.md')
+    expect(linux.message).not.toContain('x<b>')
+    // Windows/macOS render plain text: no escaping.
+    expect(buildNativeDialogOptions('win32', r).message).toContain('x<b>&c.md')
+    expect(buildNativeDialogOptions('darwin', r).message).toContain('x<b>&c.md')
   })
 })
 

@@ -334,6 +334,8 @@ test('deleting a file asks for confirmation and sends it to trash', async () => 
   await stubMessageBox(app, 'Delete')
   await window.getByRole('menuitem').getByText('Delete').click()
 
+  // The destructive confirmation must actually have been shown.
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
   await expect(window.getByRole('treeitem').getByText('beta.md')).toHaveCount(0)
   expect(fs.existsSync(path.join(testFolder, 'beta.md'))).toBe(false)
 })
@@ -348,6 +350,7 @@ test('deleting an open clean file closes its tab', async () => {
   await stubMessageBox(app, 'Delete')
   await window.getByRole('menuitem').getByText('Delete').click()
 
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
   await expect(window.getByRole('tab')).toHaveCount(0)
   await expect(window.locator('.empty-state')).toBeVisible()
 })
@@ -362,6 +365,9 @@ test('deleting a file with unsaved changes is refused', async () => {
   await stubMessageBox(app, 'OK')
   await window.getByRole('menuitem').getByText('Delete').click()
 
+  // The blocked-delete acknowledgement must have been shown.
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
+
   // The file is untouched and the tab is still open with the edits.
   expect(fs.existsSync(path.join(testFolder, 'alpha.md'))).toBe(true)
   await expect(window.locator('.ProseMirror:visible')).toContainText('UNSAVED')
@@ -374,6 +380,7 @@ test('deleting a folder warns about hidden files (FR-029b)', async () => {
   await stubMessageBox(app, 'Delete')
   await window.getByRole('menuitem').getByText('Delete').click()
 
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
   expect(fs.existsSync(path.join(testFolder, 'notes'))).toBe(false)
 })
 
@@ -392,6 +399,8 @@ test('when trash is unavailable, permanent deletion requires a second confirmati
   await stubMessageBox(app, ['Delete', 'Delete Permanently'])
   await window.getByRole('menuitem').getByText('Delete').click()
 
+  // Two confirmations must have fired: delete-to-trash then permanent-delete.
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(2)
   await expect(window.getByRole('treeitem').getByText('beta.md')).toHaveCount(0)
   expect(fs.existsSync(path.join(testFolder, 'beta.md'))).toBe(false)
 })

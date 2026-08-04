@@ -184,12 +184,17 @@ function messagesFor(request: NativeDialogRequest): { type: NativeDialogLayout['
         detail: lines.filter(Boolean).join('\n')
       }
     }
-    case 'delete-blocked':
+    case 'delete-blocked': {
+      const lines = joinList('Blocked by:', request.blockerTitles, undefined)
       return {
         type: 'warning',
-        message: `${request.targetName} has unsaved changes in the editor. Save or close ${request.blockerTitles.length === 1 ? 'the document' : 'those documents'} before deleting it.`,
-        detail: joinList('Blocked by:', request.blockerTitles, undefined).join('\n')
+        message: 'Cannot delete',
+        detail: [
+          `${request.targetName} has unsaved changes in the editor. Save or close ${request.blockerTitles.length === 1 ? 'the document' : 'those documents'} before deleting it.`,
+          ...lines
+        ].join('\n')
       }
+    }
     case 'operation-failed':
       return {
         type: 'error',
@@ -206,6 +211,19 @@ function joinList(header: string, titles: string[], error: string | undefined): 
   return lines
 }
 
+/** GTK renders a GtkMessageDialog's primary and secondary text as Pango markup,
+ *  so a user-influenced name containing `<`, `&` or `>` (legal in filenames)
+ *  must be escaped on Linux or it can corrupt/spoof the dialog text (security
+ *  review 2026-08-04). Windows/macOS render plain text, so no escaping there. */
+function escapeMarkup(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 /** The platform-correct `showMessageBox` options for a request. Main passes the
  *  result straight to `dialog.showMessageBox`. The title is left empty so the
  *  OS shows the application name in the window title (the native convention —
@@ -218,8 +236,8 @@ export function buildNativeDialogOptions(platform: string, request: NativeDialog
   return {
     type,
     title: '',
-    message,
-    detail,
+    message: p === 'linux' ? escapeMarkup(message) : message,
+    detail: p === 'linux' ? escapeMarkup(detail) : detail,
     buttons: [...layout.buttons],
     defaultId: layout.defaultId,
     cancelId: layout.cancelId,

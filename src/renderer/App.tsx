@@ -74,9 +74,21 @@ export default function App() {
   // An operation-failed prompt queued while another decision surface is up.
   const pendingErrorRef = useRef<string | null>(null)
 
+  // The single place the decision-surface guard is released. Also drains a
+  // queued operation error, so an error raised while a guarded flow held the
+  // surface (e.g. a failed trash after "Delete", or a failed folder commit) is
+  // still surfaced once that flow finishes (review finding: the queue was never
+  // drained when the guard was released by a different flow).
+  const releaseDialogSurface = useCallback(() => {
+    dialogInFlightRef.current = false
+    const queued = pendingErrorRef.current
+    pendingErrorRef.current = null
+    if (queued) showOperationErrorRef.current(queued)
+  }, [])
+
   // Spec 008 US4: surface a failed operation through the native error box. If
   // another decision surface is already up, the error is queued and shown once
-  // it clears (one decision surface at a time, spec edge case).
+  // the guard releases (one decision surface at a time, spec edge case).
   const showOperationError = useCallback(async (message: string) => {
     if (dialogInFlightRef.current) {
       pendingErrorRef.current = message
@@ -86,12 +98,12 @@ export default function App() {
     try {
       await window.api.showConfirmation({ kind: 'operation-failed', message })
     } finally {
-      dialogInFlightRef.current = false
-      const queued = pendingErrorRef.current
-      pendingErrorRef.current = null
-      if (queued) void showOperationError(queued)
+      releaseDialogSurface()
     }
-  }, [])
+  }, [releaseDialogSurface])
+
+  const showOperationErrorRef = useRef(showOperationError)
+  showOperationErrorRef.current = showOperationError
 
   useEffect(() => {
     loadSettingsFromMain()
@@ -269,9 +281,9 @@ export default function App() {
         continue
       }
     } finally {
-      dialogInFlightRef.current = false
+      releaseDialogSurface()
     }
-  }, [doClose, flushLiveContent, isDirtyLive, saveDocument])
+  }, [doClose, flushLiveContent, isDirtyLive, releaseDialogSurface, saveDocument])
 
   const reloadDocument = useCallback(async (doc: DocumentState, force = false) => {
     if (!doc.path) return
@@ -332,9 +344,9 @@ export default function App() {
         // (US2 scenario 4); the application stays open.
       }
     } finally {
-      dialogInFlightRef.current = false
+      releaseDialogSurface()
     }
-  }, [flushLiveContent, isDirtyLive, saveDocument])
+  }, [flushLiveContent, isDirtyLive, releaseDialogSurface, saveDocument])
 
   const handleExternalPrompt = useCallback(async (prompt: { id: string; kind: 'changed' | 'removed' }) => {
     const doc = sessionRef.current.documents.find(d => d.id === prompt.id)
@@ -373,9 +385,9 @@ export default function App() {
         return
       }
     } finally {
-      dialogInFlightRef.current = false
+      releaseDialogSurface()
     }
-  }, [reloadDocument, saveDocument])
+  }, [reloadDocument, releaseDialogSurface, saveDocument])
 
   const handleActivate = useCallback((id: string) => {
     const current = sessionRef.current
@@ -719,9 +731,9 @@ export default function App() {
       }
       void showOperationError(trashed.message)
     } finally {
-      dialogInFlightRef.current = false
+      releaseDialogSurface()
     }
-  }, [cleanupAfterDelete, isDirtyLive])
+  }, [cleanupAfterDelete, isDirtyLive, releaseDialogSurface])
 
   // T059: drag-and-drop move between folders.
   const handleTreeMove = useCallback((id: string, targetParentId: string) => {
@@ -836,9 +848,9 @@ export default function App() {
       }
     } finally {
       pendingFolderOpenRef.current = null
-      dialogInFlightRef.current = false
+      releaseDialogSurface()
     }
-  }, [commitFolderOpen, dirtyWorkspaceRelativeDocs, doClose, saveDocument])
+  }, [commitFolderOpen, dirtyWorkspaceRelativeDocs, doClose, releaseDialogSurface, saveDocument])
 
   const handleOpenFolder = useCallback(() => {
     void runFolderOpenFlow()

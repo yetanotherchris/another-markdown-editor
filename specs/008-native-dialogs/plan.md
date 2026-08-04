@@ -179,9 +179,9 @@ the returned decision:
   the document(s) stay open and unsaved (US2 scenario 4, research R5).
 - FR-012 (no duplicate completion / no cancel while a destructive action runs):
   the native dialog is modal, so the user cannot double-submit or cancel once a
-  button is clicked and the operation begins; the existing `deleteBusy` renderer
-  guard continues to block a second delete dialog while a trash operation is in
-  flight.
+  button is clicked and the operation begins; the single decision-surface guard
+  (`dialogInFlightRef`, held across `describeEntry` + `trashEntry`) blocks a
+  second delete dialog while a trash operation is in flight.
 - The quit flow is unchanged in shape: main intercepts window close →
   `app:quitRequested` → renderer flushes live content → dirty docs prompt via
   `showConfirmation` → `confirmQuit('quit')`.
@@ -280,7 +280,7 @@ possible boundary change.
 | One IPC operation (`showConfirmation`) whose request is a nine-kind union, instead of nine named preload methods | The nine surfaces are the same shape (build options → show → map decision) and share one layout module; a single op with an exhaustive, type-checked union keeps the preload surface small while remaining a fixed named list (Principle I) | Nine hand-written preload methods + nine channels (identical plumbing nine times) or a generic `invoke(channel, …)` (forbidden) |
 | Per-platform button arrays authored in a shared module that encodes macOS's reversed visual order | Electron's `NSAlert` renders `buttons[0]` at the far right while Windows/GTK render array order left→right; one literal array cannot be correct on both (FR-003, research R1) | Shipping one cross-platform order (violates FR-003 — imposes one OS's order on another) |
 | Re-prompt (close + reopen) instead of an inline error inside the same dialog | Native message boxes are modal and resolve on click; the old `ConfirmDialog` could stay open with an inline `.dialog-error`. US2 scenario 4 requires the failure to be explained and the work to stay open — a re-shown dialog satisfies it without weakening the outcome | Rendering a custom overlay for the error case (defeats the feature's purpose for exactly the data-loss path) |
-| Keep the renderer `deleteBusy` guard even though native dialogs are modal | FR-012: while a trash operation runs after the dialog closed, a second delete prompt must not open; the guard is the only thing preventing it | Relying on the dialog's modality alone (it is gone once a button is clicked; the async op window is unguarded) |
+| Keep the single decision-surface guard (`dialogInFlightRef`) held across the whole delete flow including the async trash call | FR-012: while a trash operation runs, a second delete prompt must not open and nothing is cancelable mid-op; holding the guard across `describeEntry`/`trashEntry` closes the window that `deleteBusy` previously covered | Relying on the dialog's modality alone (it is gone once a button is clicked; the async op window is unguarded) |
 
 ## Decision log (2026-08-04)
 
@@ -313,3 +313,11 @@ possible boundary change.
 - `package.json` gains `"productName": "Another Markdown Editor"` so the
   dialog window title (and packaging) use the human name, matching
   `src/renderer/index.html`'s `<title>`.
+- Post-review fixes (2026-08-04): the operation-error queue is drained on every
+  release of the decision-surface guard (`releaseDialogSurface`), so an error
+  raised inside a guarded flow (failed trash after Delete, failed folder commit)
+  is no longer silently dropped; Linux escapes Pango-markup characters in
+  user-influenced names (GTK renders the message as markup, so `<`/`&` in a
+  filename could corrupt the dialog text); and the `delete-blocked` dialog uses
+  the native short instruction "Cannot delete" with the explanation and blocker
+  list in the content, matching `contracts/renderer.md`.

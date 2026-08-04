@@ -180,6 +180,29 @@ test('closing a dirty tab with Save writes the file and closes it', async () => 
   expect(disk).toContain('EXTRA')
 })
 
+test('closing a dirty tab with a failing save re-prompts and keeps the tab open and unsaved', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' EXTRA')
+
+  // Make the save fail (read-only): the first "Save" fails, the native box
+  // re-prompts (US2 scenario 4), and the second response cancels.
+  const alphaPath = path.join(testFolder, 'alpha.md')
+  fs.chmodSync(alphaPath, 0o444)
+  try {
+    await stubMessageBox(app, ['Save', 'cancel'])
+    await window.getByRole('button', { name: 'Close alpha.md' }).click()
+
+    // The re-prompt is proven by the stub receiving a second call; the tab
+    // stays open and dirty, and nothing was written to disk.
+    await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(2)
+    await expect(window.getByRole('tab', { name: /alpha\.md/ })).toBeVisible()
+    await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toBeVisible()
+    expect(fs.readFileSync(alphaPath, 'utf-8')).not.toContain('EXTRA')
+  } finally {
+    fs.chmodSync(alphaPath, 0o666)
+  }
+})
+
 test('quitting with dirty documents prompts, and cancel keeps the app open', async () => {
   await openFolderAndFile('alpha.md')
   await typeInEditor(' EXTRA')
@@ -189,6 +212,7 @@ test('quitting with dirty documents prompts, and cancel keeps the app open', asy
     BrowserWindow.getAllWindows()[0].close()
   })
 
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
   await expect(window.locator('.document-title')).toContainText('alpha.md')
 })
 
