@@ -36,9 +36,8 @@ authoritative in `specs/005-release-distribution/data-model.md`.
 ## PackageDefinition (unchanged, references renamed assets)
 
 - Scoop manifest `architecture.64bit.url` → the windows portable zip
-  `ameditor-<v>-windows-x64.zip`; `architecture.64bit.bin` still maps the
-  packaged `Another Markdown Editor.exe` to the command `another-markdown-editor`
-  (bundle name unchanged; FR-004).
+  `ameditor-<v>-windows-x64.zip`; `architecture.64bit.bin` maps the packaged
+  `ameditor.exe` to the command `another-markdown-editor` (FR-004/FR-008).
 - Homebrew formula per-arch URLs → the renamed macOS zips / Linux AppImage;
-  `install` still references `Another Markdown Editor.app` on macOS and installs
-  the renamed AppImage to `bin` on Linux (FR-005).
+  `install` still references `Another Markdown Editor.app` on macOS (bundle name
+  unchanged) and installs the renamed AppImage to `bin` on Linux (FR-005).

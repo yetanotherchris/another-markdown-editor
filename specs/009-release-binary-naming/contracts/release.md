@@ -34,8 +34,8 @@ of this document.
 
 - `architecture.64bit.url` → the windows portable zip release URL for
   `ameditor-<version>-windows-x64.zip`; the URL embeds the version like before.
-- `architecture.64bit.bin` → unchanged mapping of the bundled
-  `Another Markdown Editor.exe` to the command `another-markdown-editor`.
+- `architecture.64bit.bin` → maps the packaged `ameditor.exe` to the command
+  `another-markdown-editor` (FR-004/FR-008).
 
 ## 4. Homebrew formula contract (amends 005 contracts §4)
 
