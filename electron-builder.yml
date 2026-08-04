@@ -46,7 +46,10 @@ mac:
       arch: [x64, arm64]
 
 linux:
-  artifactName: Another Markdown Editor-${version}-linux-${arch}.${ext}
+  # Hard-code x64 rather than using ${arch}: electron-builder's ${arch} macro
+  # resolves to "x86_64" for Linux, but the release contract names every asset
+  # with os-arch tokens (linux-x64.AppImage, contracts/release.md §2).
+  artifactName: Another Markdown Editor-${version}-linux-x64.${ext}
   target:
     - target: AppImage
       arch: [x64]
