@@ -1,16 +1,16 @@
 class AnotherMarkdownEditor < Formula
   desc "A WYSIWYG markdown editor for Windows, macOS, and Linux, built with Electron and Milkdown."
   homepage "https://github.com/yetanotherchris/another-markdown-editor"
-  version "0.0.91"
+  version "0.0.93"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.83/Another%20Markdown%20Editor-0.0.83-macos-arm64.zip"
-      sha256 "1ef0c36a1ba245ab63c1de58c16c6bde1420fbf25f1b9c99c773ea3f7b7a63a3"
+      sha256 "a4964fa8d4ed6ae89f82d64f62d64ada1f9ba554e12687757412c8d91ede1e6a"
     else
       url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.83/Another%20Markdown%20Editor-0.0.83-macos-x64.zip"
-      sha256 "48d44e07c3024a3ff71eb47322f68e9cd6b0fccb11bfe90bc912bc30e1cb3ed9"
+      sha256 "31e2cd0bb88de4db11097ad362d854509eebb65d80cbee40c436301a74439bba"
     end
   end
 
@@ -19,7 +19,7 @@ class AnotherMarkdownEditor < Formula
       odie "Another Markdown Editor does not provide a Linux arm64 build"
     else
       url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.83/Another%20Markdown%20Editor-0.0.83-linux-x64.AppImage"
-      sha256 "b59dc5c70aef2876b001e75074c31022777e01c97c4308231268441ee3b91527"
+      sha256 "3620cbbc3c3822e18d8ceea4d2659ef1401d122896e750f9a0ef27fcae9578d8"
     end
   end
 
