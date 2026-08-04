@@ -130,19 +130,10 @@ jobs:
           VERSION="${VERSION#v}"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # Belt-and-braces guard: fail fast with a clear message if package.json's
-      # version drifts from the tag, instead of a confusing missing-artifact
-      # error at the verify step later (release review findings).
-      - name: Assert package.json version matches tag
-        shell: bash
-        run: |
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$PACKAGE_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
-            echo "::error::package.json version ($PACKAGE_VERSION) does not match tag version (${{ steps.version.outputs.VERSION }}). Bump package.json before tagging."
-            exit 1
-          fi
-          echo "package.json version $PACKAGE_VERSION matches tag version ${{ steps.version.outputs.VERSION }}"
-
+      # FR-003: package.json's version is synced to the tag version by the
+      # release job (updatepackagejson.ps1, committed to main alongside the
+      # manifests). Build legs must not fail on a drift here — the packaging
+      # version always comes from the tag via --config.extraMetadata.version.
       - name: Build app
         run: npm run build
 
@@ -277,12 +268,22 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
         run: ./updatebrew.ps1 -Version "$env:RELEASE_VERSION" -ArtifactsDir artifacts
 
+      # FR-003: keep the committed package.json version in sync with the release
+      # tag, committed to main in the same commit as the package definitions, so
+      # the released version is never silently misrepresented by the manifest.
+      - name: Sync package.json version to tag
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: ./updatepackagejson.ps1 -Version "$env:RELEASE_VERSION"
+
       - name: Commit updated package definitions
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # stefanzweifel/git-auto-commit-action v7
         with:
           commit_message: 'chore(release): update package definitions to v${{ steps.version.outputs.VERSION }}'
           branch: main
-          file_pattern: scoop/another-markdown-editor.json Formula/another-markdown-editor.rb
+          file_pattern: scoop/another-markdown-editor.json Formula/another-markdown-editor.rb package.json
           commit_user_name: github-actions[bot]
           commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
 

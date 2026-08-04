@@ -248,9 +248,13 @@ definition is published for that version.
   corrected to match.
 - **`package.json` version equals the tag version (operational rule)**: the
   build legs inject the tag version into packaging via
-  `--config.extraMetadata.version`, and a guard step fails the run if
-  `package.json`'s `version` field differs from the tag version. Maintainers
-  bump `package.json` to the exact tag version before tagging (FR-003).
+  `--config.extraMetadata.version`. The release job rewrites `package.json`'s
+  `version` field to the tag version (`updatepackagejson.ps1`) and commits it to
+  `main` alongside the Scoop and Homebrew definitions, so the committed tree
+  always names the released version. A drift no longer fails the build; it is
+  reconciled by the release job before the draft is published (FR-003).
+  Recorded 2026-08-04 after a tag push (`v0.0.81`) failed because
+  `package.json` held `0.1.0` while the tag guard required an exact match.
 - **`vMAJOR.MINOR.PATCH` trigger is a glob, not a regex**: the `on.push.tags`
   filter `'v[0-9]+.[0-9]+.[0-9]+'` is a GitHub Actions glob (`.` literal, `[0-9]`
   character class, `+` one-or-more). The strict `^v[0-9]+\.[0-9]+\.[0-9]+$`

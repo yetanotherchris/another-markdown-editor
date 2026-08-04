@@ -50,8 +50,8 @@ On macOS, `CSC_IDENTITY_AUTO_DISCOVERY=false` is required (no signing). Note the
 name is `-windows-x64.exe` / `-windows-x64.zip`, NOT `-setup.exe` /
 `-portable.zip`. Artifact names use `${version}` from `package.json` for a local
 `--publish never` run; in CI the tag version is injected via
-`--config.extraMetadata.version`, and the workflow's guard step requires
-`package.json`'s version to equal the tag version.
+`--config.extraMetadata.version`, and the release job rewrites `package.json`'s
+version to the tag (`updatepackagejson.ps1`) so the two always agree.
 
 ## 3. Release flow (GitHub)
 
@@ -69,12 +69,13 @@ Expected:
   (none has `continue-on-error`), then the `release` job runs.
 - The release job verifies the required artifact set, then creates a **draft**
   GitHub Release `v0.1.0` containing all seven required artifacts (contracts
-  §2), updates both manifests on `main`, commits them (`branch: main`), and only
-  then **publishes** the draft. On a tag push the manifests are committed to
-  `main`, so push the tag only after `package.json`'s version equals it.
-- The workflow commits the updated `scoop/another-markdown-editor.json` and
-  `Formula/another-markdown-editor.rb` to `main` with version `0.1.0` and the
-  computed SHA-256 hashes, and the published release references them.
+  §2), updates both manifests and `package.json`'s version on `main`, commits
+  them (`branch: main`), and only then **publishes** the draft. Tagging does not
+  require a matching `package.json`; the release job reconciles it.
+- The workflow commits the updated `scoop/another-markdown-editor.json`,
+  `Formula/another-markdown-editor.rb`, and `package.json` to `main` with version
+  `0.1.0` and the computed SHA-256 hashes, and the published release references
+  them.
 
 Negative cases (each verified once on the fork):
 
