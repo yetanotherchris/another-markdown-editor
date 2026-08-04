@@ -283,7 +283,7 @@ jobs:
         with:
           commit_message: 'chore(release): update package definitions to v${{ steps.version.outputs.VERSION }}'
           branch: main
-          file_pattern: scoop/another-markdown-editor.json Formula/another-markdown-editor.rb package.json
+          file_pattern: another-markdown-editor.json Formula/another-markdown-editor.rb package.json
           commit_user_name: github-actions[bot]
           commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
 

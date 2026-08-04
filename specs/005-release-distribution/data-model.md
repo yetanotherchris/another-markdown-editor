@@ -60,7 +60,7 @@ draft becomes public (FR-009/010, US4 scenarios 1–2).
 
 Versioned metadata that installs the artifact for a specific package manager.
 
-### Scoop manifest (`scoop/another-markdown-editor.json`)
+### Scoop manifest (`another-markdown-editor.json`)
 
 | Field | Type | Validation |
 |-------|------|------------|

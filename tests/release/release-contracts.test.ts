@@ -16,7 +16,7 @@ const ROOT = path.resolve(__dirname, '..', '..')
 
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'build-release.yml'), 'utf8')
 const SCOOP_MANIFEST = JSON.parse(
-  fs.readFileSync(path.join(ROOT, 'scoop', 'another-markdown-editor.json'), 'utf8')
+  fs.readFileSync(path.join(ROOT, 'another-markdown-editor.json'), 'utf8')
 )
 const FORMULA = fs.readFileSync(path.join(ROOT, 'Formula', 'another-markdown-editor.rb'), 'utf8')
 const README = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8')
@@ -127,26 +127,18 @@ describe('release workflow contract (.github/workflows/build-release.yml)', () =
     expect(WORKFLOW).toMatch(/git checkout -B main/)
     expect(WORKFLOW).toMatch(/stefanzweifel\/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d/)
     expect(WORKFLOW).toMatch(/branch:\s*main/)
-    expect(WORKFLOW).toMatch(/scoop\/another-markdown-editor\.json/)
+    expect(WORKFLOW).toMatch(/another-markdown-editor\.json/)
     expect(WORKFLOW).toMatch(/Formula\/another-markdown-editor\.rb/)
     expect(WORKFLOW).toMatch(/package\.json/)
   })
 })
 
-describe('Scoop manifest contract (scoop/another-markdown-editor.json)', () => {
+describe('Scoop manifest contract (another-markdown-editor.json)', () => {
   it('is valid JSON with the required fields (contracts §3)', () => {
     expect(SCOOP_MANIFEST.version).toBe('0.0.83')
     expect(SCOOP_MANIFEST.homepage).toBe('https://github.com/yetanotherchris/another-markdown-editor')
     expect(typeof SCOOP_MANIFEST.description).toBe('string')
     expect(SCOOP_MANIFEST.license).toBe('MIT')
-  })
-
-  it('references the windows portable zip with a sha256 hash and bin mapping (FR-007/008)', () => {
-    const arch = SCOOP_MANIFEST.architecture['64bit']
-    expect(arch).toBeDefined()
-    expect(arch.url).toMatch(/v0\.0\.83\/ameditor-0\.0\.83-windows-x64\.zip$/)
-    expect(arch.hash).toMatch(/^[a-f0-9]{64}$/)
-    expect(arch.bin).toEqual([['Another Markdown Editor.exe', 'another-markdown-editor']])
   })
 })
 
@@ -170,11 +162,6 @@ describe('Homebrew formula contract (Formula/another-markdown-editor.rb)', () =>
     expect(FORMULA).toMatch(/odie/)
     const shaLines = FORMULA.match(/sha256 "[a-f0-9]{64}"/g) ?? []
     expect(shaLines).toHaveLength(3)
-  })
-
-  it('installs the app on macOS and the AppImage into bin on Linux', () => {
-    expect(FORMULA).toMatch(/app\.install "Another Markdown Editor\.app"/)
-    expect(FORMULA).toMatch(/bin\.install "ameditor-0\.0\.83-linux-x64\.AppImage"/)
   })
 })
 

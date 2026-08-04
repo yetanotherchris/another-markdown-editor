@@ -31,7 +31,7 @@ hardening) and kept current by Dependabot (`.github/dependabot.yml`). No new run
 dependency.
 
 **Storage**: N/A for the app. Release state lives in GitHub (Release assets,
-tag history); package definitions are committed files: `scoop/another-markdown-editor.json`
+tag history); package definitions are committed files: `another-markdown-editor.json`
 and `Formula/another-markdown-editor.rb`.
 
 **Testing**: Vitest 4. New `tests/release/` contract suite validates the shipped
@@ -88,7 +88,7 @@ All unknowns resolved — see [research.md](./research.md) R1–R9. Key decision
   app version come from the tag, not `package.json` (FR-003); the release job
   rewrites and commits `package.json`'s version to match the tag
   (`updatepackagejson.ps1`), so a drift is reconciled instead of failing the run.
-- R6: Scoop portable zip + `scoop/another-markdown-editor.json`; Homebrew
+- R6: Scoop portable zip + `another-markdown-editor.json`; Homebrew
   formula (not cask) serving macOS zip + Linux AppImage (with a linux-arm64
   `odie` guard); `.ps1` update scripts that `throw` on a missing artifact.
 - R7: `tests/release/` contract suite; existing suites as regression gate.
@@ -132,8 +132,7 @@ specs/005-release-distribution/
 
 electron-builder.yml         # NEW: packaging config (appId, targets, artifactName)
 
-scoop/
-└── another-markdown-editor.json   # NEW: Scoop manifest (portable zip, sha256, bin)
+another-markdown-editor.json   # NEW: Scoop manifest (portable zip, sha256, bin)
 
 Formula/
 └── another-markdown-editor.rb     # NEW: Homebrew formula (macOS zip + Linux AppImage)

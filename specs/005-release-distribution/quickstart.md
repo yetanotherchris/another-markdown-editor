@@ -72,7 +72,7 @@ Expected:
   §2), updates both manifests and `package.json`'s version on `main`, commits
   them (`branch: main`), and only then **publishes** the draft. Tagging does not
   require a matching `package.json`; the release job reconciles it.
-- The workflow commits the updated `scoop/another-markdown-editor.json`,
+- The workflow commits the updated `another-markdown-editor.json`,
   `Formula/another-markdown-editor.rb`, and `package.json` to `main` with version
   `0.1.0` and the computed SHA-256 hashes, and the published release references
   them.
