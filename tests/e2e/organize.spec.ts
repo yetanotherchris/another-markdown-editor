@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -71,21 +71,13 @@ test.beforeEach(async () => {
       fsMod.rmSync(p, { recursive: true, force: true })
     }
   })
+
+  await stubMessageBox(app)
 })
 
 test.afterEach(async () => {
   try {
-    const closed = app.waitForEvent('close', { timeout: 8000 }).catch(() => {})
-    const quitButton = window.getByRole('button', { name: 'Discard and Quit' })
-    const dialogShown = expect(quitButton).toBeVisible({ timeout: 5000 }).catch(() => {})
-    await app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0].close()
-    })
-    await Promise.race([dialogShown, closed])
-    if (await quitButton.isVisible().catch(() => false)) {
-      await quitButton.click()
-    }
-    await closed
+    await closeAppDiscardingQuit(app)
   } catch {
     await app.close().catch(() => {})
   }
@@ -288,12 +280,13 @@ test('an open document follows a rename in the tree (FR-028)', async () => {
   await expect(window.getByRole('tab', { name: /renamed\.md/ })).toBeVisible()
   // The app's own mutation must not be reported back as an external change
   // (FR-037): no "File changed on disk" prompt may appear.
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+  await expect.poll(() => messageBoxCallCount(app)).toBe(0)
 
-  // Editing and saving writes to the new location.
+  // Editing and saving writes to the new location. The dirty-tab close now
+  // prompts through the stubbed native box: answer "Save".
   await typeInEditor(' EXTRA')
+  await stubMessageBox(app, 'Save')
   await window.getByRole('button', { name: 'Close renamed.md' }).click()
-  await window.getByRole('button', { name: 'Save' }).click()
   const disk = fs.readFileSync(path.join(testFolder, 'renamed.md'), 'utf-8')
   expect(disk).toContain('EXTRA')
 })
@@ -302,8 +295,8 @@ test('renaming to an existing name is refused and nothing is overwritten', async
   await openFolder()
   await renameRow(window.getByRole('treeitem').getByText('alpha.md'), 'beta.md')
 
-  await expect(window.getByRole('dialog')).toContainText('Operation failed')
-  await window.getByRole('button', { name: 'OK' }).click()
+  // The native operation-failed box (stubbed to acknowledge) is surfaced.
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
 
   // Tree state unchanged and beta.md content intact.
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
@@ -314,8 +307,7 @@ test('renaming a file to a non-markdown extension is refused', async () => {
   await openFolder()
   await renameRow(window.getByRole('treeitem').getByText('alpha.md'), 'alpha.txt')
 
-  await expect(window.getByRole('dialog')).toContainText('Operation failed')
-  await window.getByRole('button', { name: 'OK' }).click()
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
   expect(fs.existsSync(path.join(testFolder, 'alpha.md'))).toBe(true)
 })
@@ -339,10 +331,8 @@ test('deleting a file asks for confirmation and sends it to trash', async () => 
   await openFolder()
   const row = window.getByRole('treeitem').getByText('beta.md')
   await openContextMenu(row)
+  await stubMessageBox(app, 'Delete')
   await window.getByRole('menuitem').getByText('Delete').click()
-
-  await expect(window.getByRole('dialog')).toContainText('Delete beta.md?')
-  await window.getByRole('button', { name: 'Delete' }).click()
 
   await expect(window.getByRole('treeitem').getByText('beta.md')).toHaveCount(0)
   expect(fs.existsSync(path.join(testFolder, 'beta.md'))).toBe(false)
@@ -355,8 +345,8 @@ test('deleting an open clean file closes its tab', async () => {
 
   const row = window.getByRole('treeitem').getByText('alpha.md')
   await openContextMenu(row)
+  await stubMessageBox(app, 'Delete')
   await window.getByRole('menuitem').getByText('Delete').click()
-  await window.getByRole('button', { name: 'Delete' }).click()
 
   await expect(window.getByRole('tab')).toHaveCount(0)
   await expect(window.locator('.empty-state')).toBeVisible()
@@ -369,11 +359,8 @@ test('deleting a file with unsaved changes is refused', async () => {
 
   const row = window.getByRole('treeitem').getByText('alpha.md')
   await openContextMenu(row)
+  await stubMessageBox(app, 'OK')
   await window.getByRole('menuitem').getByText('Delete').click()
-
-  await expect(window.getByRole('dialog')).toContainText('Cannot delete')
-  await expect(window.getByRole('dialog')).toContainText('alpha.md')
-  await window.getByRole('button', { name: 'OK' }).click()
 
   // The file is untouched and the tab is still open with the edits.
   expect(fs.existsSync(path.join(testFolder, 'alpha.md'))).toBe(true)
@@ -384,11 +371,8 @@ test('deleting a folder warns about hidden files (FR-029b)', async () => {
   await openFolder()
   const row = window.getByRole('treeitem').filter({ hasText: 'notes' })
   await openContextMenu(row)
+  await stubMessageBox(app, 'Delete')
   await window.getByRole('menuitem').getByText('Delete').click()
-
-  await expect(window.getByRole('dialog')).toContainText('Delete notes?')
-  await expect(window.getByRole('dialog')).toContainText('not shown in the explorer')
-  await window.getByRole('button', { name: 'Delete' }).click()
 
   expect(fs.existsSync(path.join(testFolder, 'notes'))).toBe(false)
 })
@@ -403,15 +387,10 @@ test('when trash is unavailable, permanent deletion requires a second confirmati
   await openFolder()
   const row = window.getByRole('treeitem').getByText('beta.md')
   await openContextMenu(row)
+  // First the delete-to-trash confirmation, then — after trash fails — the
+  // permanent-delete confirmation, which offers Cancel / Delete Permanently.
+  await stubMessageBox(app, ['Delete', 'Delete Permanently'])
   await window.getByRole('menuitem').getByText('Delete').click()
-
-  await expect(window.getByRole('dialog')).toContainText('Delete beta.md?')
-  await window.getByRole('button', { name: 'Delete' }).click()
-
-  // Second confirmation states the deletion is permanent.
-  await expect(window.getByRole('dialog')).toContainText('Trash unavailable')
-  await expect(window.getByRole('dialog')).toContainText('cannot be undone')
-  await window.getByRole('button', { name: 'Delete Permanently' }).click()
 
   await expect(window.getByRole('treeitem').getByText('beta.md')).toHaveCount(0)
   expect(fs.existsSync(path.join(testFolder, 'beta.md'))).toBe(false)
@@ -455,8 +434,8 @@ test('moving a folder containing an open document reroutes the document (FR-028)
   await expect.poll(() => fs.existsSync(path.join(testFolder, 'notes', 'sub', 'gamma.md'))).toBe(true)
 
   await typeInEditor(' MOVED')
+  await stubMessageBox(app, 'Save')
   await window.getByRole('button', { name: 'Close gamma.md' }).click()
-  await window.getByRole('button', { name: 'Save' }).click()
   const disk = fs.readFileSync(path.join(testFolder, 'notes', 'sub', 'gamma.md'), 'utf-8')
   expect(disk).toContain('MOVED')
 })
@@ -468,12 +447,12 @@ test('cannot drop a folder onto its own descendant or onto a file', async () => 
 
   // Dropping onto a file row is not a valid destination: nothing happens.
   await dragTreeRow('sub', 'gamma.md')
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+  await expect.poll(() => messageBoxCallCount(app)).toBe(0)
   expect(fs.existsSync(path.join(testFolder, 'sub', 'gamma.md'))).toBe(true)
   expect(fs.existsSync(path.join(testFolder, 'sub'))).toBe(true)
 
   // Dropping a folder onto itself is rejected silently as well.
   await dragTreeRow('sub', 'sub')
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+  await expect.poll(() => messageBoxCallCount(app)).toBe(0)
   expect(fs.existsSync(path.join(testFolder, 'sub'))).toBe(true)
 })

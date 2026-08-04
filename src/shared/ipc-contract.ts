@@ -84,6 +84,27 @@ export interface RecentItemsWarning {
   message: string
 }
 
+/** Native confirmation surfaces (spec 008). A closed union of every dialog the
+ *  app can show through the OS message box. Requests carry only display strings
+ *  and renderer-owned state — NEVER filesystem paths (Principle II). */
+export type NativeDialogRequest =
+  | { kind: 'unsaved-close'; documentTitle: string; error?: string }
+  | { kind: 'unsaved-quit'; documentTitles: string[]; error?: string }
+  | { kind: 'folder-open'; documentTitles: string[]; error?: string }
+  | { kind: 'external-changed'; documentTitle: string }
+  | { kind: 'external-removed'; documentTitle: string; error?: string }
+  | { kind: 'delete-to-trash'; targetName: string; detail: string; cleanToCloseTitles: string[] }
+  | { kind: 'permanent-delete'; targetName: string; detail: string; cleanToCloseTitles: string[] }
+  | { kind: 'delete-blocked'; targetName: string; blockerTitles: string[] }
+  | { kind: 'operation-failed'; message: string }
+
+/** The semantic outcome of a native dialog — what the renderer acts on. The
+ *  renderer never receives a button index or the platform (spec 008). */
+export type NativeDialogDecision =
+  | 'save' | 'discard' | 'save-all' | 'discard-all'
+  | 'keep' | 'reload' | 'ok' | 'save-as'
+  | 'delete' | 'delete-permanent' | 'acknowledge' | 'cancel'
+
 export type MenuCommand =
   | 'open-file' | 'open-folder' | 'save' | 'save-as'
   | 'close-tab' | 'new-file'
@@ -129,4 +150,8 @@ export interface DesktopApi {
   onRecentItemsOk(cb: () => void): () => void
   onQuitRequested(cb: () => void): () => void
   confirmQuit(decision: 'quit' | 'cancel'): void
+  /** Spec 008: show the platform-native confirmation box for the request and
+   *  resolve with the semantic decision. Only display strings cross the
+   *  boundary; the renderer never sees a button index or the platform. */
+  showConfirmation(request: NativeDialogRequest): Promise<Result<NativeDialogDecision>>
 }

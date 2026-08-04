@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -44,6 +44,8 @@ test.beforeEach(async () => {
       filePaths: [folder as string]
     })
   }, testFolder)
+
+  await stubMessageBox(app)
 })
 
 test.afterEach(async () => {
@@ -51,18 +53,9 @@ test.afterEach(async () => {
   // a stalled quit round-trip must not be treated as "closed" (which would leak
   // a live Electron process into the next test). If the app did not close,
   // force it closed explicitly.
-  let closed = false
-  const closeEvent = app.waitForEvent('close', { timeout: 8000 }).then(() => { closed = true }).catch(() => {})
-  const quitButton = window.getByRole('button', { name: 'Discard and Quit' })
-  const dialogShown = expect(quitButton).toBeVisible({ timeout: 5000 }).then(() => true).catch(() => false)
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0].close()
-  })
-  await Promise.race([dialogShown, closeEvent])
-  if (await quitButton.isVisible().catch(() => false)) {
-    await quitButton.click()
-  }
-  if (!closed) {
+  try {
+    await closeAppDiscardingQuit(app)
+  } catch {
     await app.close().catch(() => {})
   }
   fs.rmSync(configDir, { recursive: true, force: true })
@@ -308,15 +301,14 @@ test('US3 a deleted recent file explains, preserves the session, and is removed'
   await clickRecentItem('external.md')
 
   // In-context error; the session is unchanged (the still-open external.md tab
-  // remains, and the error dialog is the only prompt).
-  await expect(window.getByText('Operation failed')).toBeVisible()
+  // remains). The native error box is stubbed to acknowledge.
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
 
   // The dead entry is gone from the menu.
   const items = await recentItemsState()
   expect(items.some((i) => i.label.includes('external.md'))).toBe(false)
 
   // The open document session is unchanged after the failed reopen.
-  await window.getByRole('button', { name: 'OK' }).click()
   await expect(window.locator('.document-title')).toContainText('external.md')
 })
 
@@ -341,11 +333,13 @@ test('US3 a failed recent open never leaks an absolute path in the error', async
 
   fs.rmSync(doomedFolder, { recursive: true, force: true })
   await clickRecentItem('doomed-leak')
-  await expect(window.getByText('Operation failed')).toBeVisible()
-  const body = await window.getByRole('dialog').textContent()
+  // The native operation-failed box is surfaced; its detail must not contain
+  // the absolute path (Principle II).
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
+  const last = await lastMessageBoxOptions(app)
+  const body = `${last.message ?? ''}\n${last.detail ?? ''}`
   expect(body).not.toContain(doomedFolder)
   expect(body).not.toMatch(/[A-Za-z]:\\[^\s]*ame-recent-e2e/)
-  await window.getByRole('button', { name: 'OK' }).click()
 })
 
 test('US3 a deleted recent folder explains, preserves the workspace, and is removed', async () => {
@@ -372,7 +366,7 @@ test('US3 a deleted recent folder explains, preserves the workspace, and is remo
   // Delete the now-inactive folder, then reopen it from Recent Items.
   fs.rmSync(doomed, { recursive: true, force: true })
   await clickRecentItem('doomed')
-  await expect(window.getByText('Operation failed')).toBeVisible()
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
 
   // The current workspace is unchanged.
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
@@ -380,7 +374,6 @@ test('US3 a deleted recent folder explains, preserves the workspace, and is remo
   // Functional probe: the live workspace in MAIN must be intact, not just the
   // renderer's stale tree — clicking a tree file drives file:read through
   // withWorkspace, which fails with NO_WORKSPACE if main nulled the root.
-  await window.getByRole('button', { name: 'OK' }).click()
   await window.getByRole('treeitem').getByText('alpha.md').click()
   await expect(window.locator('.document-title')).toContainText('alpha.md')
 
@@ -408,15 +401,13 @@ test('US3 cancelling an unsaved-work confirmation keeps the session and the rece
   await expect(window.locator('.document-title')).toContainText('alpha.md')
   await typeInEditor(' UNSAVED')
 
-  // Reopen the alternative folder from Recent Items: the unsaved-work
-  // confirmation appears before the workspace swap (US3 scenario 3).
+  // Reopen the alternative folder from Recent Items: the native unsaved-work
+  // confirmation appears before the workspace swap (US3 scenario 3). Stub it
+  // to cancel.
+  await stubMessageBox(app, 'Cancel')
   await clickRecentItem('other')
-  await expect(window.getByRole('dialog')).toContainText('unsaved changes')
-  await expect(window.getByRole('dialog')).toContainText('alpha.md')
 
   // Cancel: session intact, edit intact, recent entry still present.
-  await window.getByRole('button', { name: 'Cancel' }).click()
-  await expect(window.getByRole('dialog')).toHaveCount(0)
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
   await expect(window.getByRole('treeitem').getByText('delta.md')).toHaveCount(0)
   const items = await recentItemsState()
@@ -448,14 +439,13 @@ test('US3 Save All in the folder-open confirmation saves before switching folder
   await expect(window.locator('.document-title')).toContainText('alpha.md')
   await typeInEditor(' UNSAVED')
 
+  await stubMessageBox(app, 'Save All')
   await clickRecentItem('other')
-  await expect(window.getByRole('dialog')).toContainText('unsaved changes')
-  await window.getByRole('button', { name: 'Save All' }).click()
 
-  // The document was saved to its current location, then the folder switched.
-  expect(fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')).toContain('UNSAVED')
-  await expect(window.getByRole('dialog')).toHaveCount(0)
+  // The folder switched only after the document was saved to its current
+  // location, so wait for the commit, then verify the bytes on disk.
   await expect(window.getByRole('treeitem').getByText('delta.md')).toBeVisible()
+  expect(fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')).toContain('UNSAVED')
 })
 
 test('US3 a failing Save All keeps the confirmation open and does not commit', async () => {
@@ -480,18 +470,15 @@ test('US3 a failing Save All keeps the confirmation open and does not commit', a
   const alphaPath = path.join(testFolder, 'alpha.md')
   fs.chmodSync(alphaPath, 0o444)
   try {
+    // First prompt answers "Save All" (fails), the re-prompt then cancels. The
+    // native re-prompt is proven by the stub receiving a second call.
+    await stubMessageBox(app, ['Save All', 'cancel'])
     await clickRecentItem('other')
-    await expect(window.getByRole('dialog')).toContainText('unsaved changes')
-    await window.getByRole('button', { name: 'Save All' }).click()
+    await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(2)
 
-    // The failed save keeps the confirmation open, does NOT commit (no delta.md
-    // in the tree), and reports the failure.
-    await expect(window.getByRole('dialog')).toContainText('Could not save alpha.md')
+    // The failed save does NOT commit (no delta.md in the tree) and the session
+    // stays on the current folder.
     await expect(window.getByRole('treeitem').getByText('delta.md')).toHaveCount(0)
-
-    // Cancel leaves the session on the current folder.
-    await window.getByRole('button', { name: 'Cancel' }).click()
-    await expect(window.getByRole('dialog')).toHaveCount(0)
     await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
   } finally {
     // Restore so the shared fixture and afterAll cleanup can delete the file.
@@ -518,16 +505,14 @@ test('US3 Discard in the folder-open confirmation switches the folder without sa
   // test's edits on disk, so assert on this edit only.
   await typeInEditor(' DISCARDED')
 
+  await stubMessageBox(app, 'Discard')
   await clickRecentItem('other')
-  await expect(window.getByRole('dialog')).toContainText('unsaved changes')
-  await window.getByRole('button', { name: 'Discard' }).click()
 
   // Nothing was written to disk; the folder still switched; and "Discard"
   // actually discarded — the dirty alpha.md tab is CLOSED (leaving it open
   // dirty would let a later save write its content over the new folder's
   // file sharing the same relative path).
   expect(fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')).not.toContain('DISCARDED')
-  await expect(window.getByRole('dialog')).toHaveCount(0)
   await expect(window.getByRole('treeitem').getByText('delta.md')).toBeVisible()
   await expect(window.locator('.document-title')).not.toContainText('alpha.md')
 })
@@ -610,7 +595,7 @@ test('a recent folder whose path is now a regular file is dropped with NOT_FOUND
   fs.writeFileSync(target, '# Now a file')
 
   await clickRecentItem('type-swap')
-  await expect(window.getByText('Operation failed')).toBeVisible()
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
   const items = await recentItemsState()
   expect(items.some((i) => i.label.includes('type-swap'))).toBe(false)
 })

@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   DesktopApi, Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, EntryKind, TrashReceipt, Settings,
-  WatchEvent, DocumentChangeEvent, MenuCommand, EntryInfo, RecentItemsWarning
+  WatchEvent, DocumentChangeEvent, MenuCommand, EntryInfo, RecentItemsWarning,
+  NativeDialogRequest, NativeDialogDecision
 } from '../shared/ipc-contract'
 
 const api: DesktopApi = {
@@ -61,7 +62,10 @@ const api: DesktopApi = {
 
   confirmQuit: (decision: 'quit' | 'cancel') => {
     ipcRenderer.invoke('quit:respond', { decision })
-  }
+  },
+
+  showConfirmation: (request: NativeDialogRequest) =>
+    ipcRenderer.invoke('dialog:show', request) as Promise<Result<NativeDialogDecision>>
 }
 
 contextBridge.exposeInMainWorld('api', api)
