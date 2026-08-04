@@ -17,13 +17,13 @@ enforces the machine-checkable parts of this document.
 | Preflight | job `validate` (before `build`): strict semver regex check, `git merge-base --is-ancestor <ref> refs/remotes/origin/main` (non-zero → fail naming the tag), and `gh release view` — a tag whose version is already released fails clearly | FR-001/002, US1 s4, Edge Cases |
 | Permissions | workflow default `permissions: contents: read`; job-scoped `contents: write` ONLY on `release` (no other scope, no secrets) | FR-013 |
 | Build job | job `build`, `needs: validate`, `strategy.matrix` with `fail-fast: false` and the four legs `windows-latest`/`macos-15-intel`/`macos-latest`/`ubuntu-latest`; NO `continue-on-error` on any required leg | FR-004/010 |
-| Version derivation | each leg derives `VERSION` = tag minus leading `v` AND uses it in packaging via `--config.extraMetadata.version=<VERSION>`; a guard step fails if `package.json`'s version does not equal the tag version | FR-003 |
+| Version derivation | each leg derives `VERSION` = tag minus leading `v` AND uses it in packaging via `--config.extraMetadata.version=<VERSION>`; the `release` job rewrites `package.json`'s version to the tag and commits it to `main` with the manifests | FR-003 |
 | Publish suppression | build legs run `electron-builder --publish never` | R1/R5 |
 | macOS signing off | macOS legs set `CSC_IDENTITY_AUTO_DISCOVERY=false` | R5, Assumptions |
 | Release job | job `release`, `needs: build`, `if: github.ref_type == 'tag'` | R1 |
 | Completeness/verification | download all artifacts; assert the full required set exists (data-model artifact table); compute sha256 for the manifest targets BEFORE the release is public | FR-009 |
 | Release creation | `softprops/action-gh-release` (SHA-pinned v3) creates a **draft** with `draft: true`, `files` = all artifacts and `fail_on_unmatched_files: true`; a second invocation (SHA-pinned v3, `tag_name`, `draft` omitted) publishes the draft AFTER the manifest commit | FR-009/010, R8 |
-| Manifest updates | on main (explicit `git checkout -B main origin/main` + `git pull --rebase origin main`), run `updatescoop.ps1` then `updatebrew.ps1` from the downloaded artifacts; commit via `stefanzweifel/git-auto-commit-action` (SHA-pinned v7) with `branch: main` | FR-006/007/008 |
+| Manifest updates | on main (explicit `git checkout -B main origin/main` + `git pull --rebase origin main`), run `updatescoop.ps1`, `updatebrew.ps1`, then `updatepackagejson.ps1` from the downloaded artifacts; commit via `stefanzweifel/git-auto-commit-action` (SHA-pinned v7) with `branch: main` and `file_pattern` covering the two manifests and `package.json` | FR-006/007/008 |
 | Action pinning | all third-party actions pinned to full commit SHAs, kept current by Dependabot (`.github/dependabot.yml`) | Security review |
 
 ## 2. Artifact contract
@@ -104,7 +104,7 @@ YAML parse):
   (`contents: read` default, `contents: write` on `release` only); the four
   matrix legs; `fail-fast: false`; no `continue-on-error: true` on required
   legs; `--publish never` AND `--config.extraMetadata.version` on build legs;
-  the `package.json`-version guard; curated upload globs;
+  `updatepackagejson.ps1` syncing `package.json` version to the tag; curated upload globs;
   `CSC_IDENTITY_AUTO_DISCOVERY=false` on macOS legs; `needs: build`; the
   required artifact set; `draft: true` + `fail_on_unmatched_files: true` +
   `tag_name` publish; `git checkout -B main`; `updatescoop.ps1` / `updatebrew.ps1`

@@ -105,7 +105,8 @@ same artifact names as `contracts/release.md` §2.
       (FR-010); each leg: checkout (fetch-depth 0), setup-node + `npm ci`,
       `npm run build`, then `npx electron-builder --publish never` with the
       leg's platform/arch AND `--config.extraMetadata.version=<VERSION>`
-      (FR-003); a guard step fails if `package.json`'s version != tag version;
+      (FR-003); the release job syncs `package.json`'s version to the tag via
+      `updatepackagejson.ps1` (committed to `main` with the manifests);
       macOS legs set `CSC_IDENTITY_AUTO_DISCOVERY=false`; each leg uploads its
       curated `dist/Another Markdown Editor-*.{exe,zip,dmg,AppImage}` output via
       `actions/upload-artifact` (SHA-pinned) with `if-no-files-found: error`

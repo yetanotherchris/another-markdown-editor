@@ -69,9 +69,11 @@ describe('release workflow contract (.github/workflows/build-release.yml)', () =
     }
   })
 
-  it('guards that package.json version matches the tag version (FR-003)', () => {
-    expect(WORKFLOW).toMatch(/require\('\.\/package\.json'\)\.version/)
-    expect(WORKFLOW).toMatch(/does not match tag version/)
+  it('syncs package.json version to the tag version instead of failing (FR-003)', () => {
+    // a drift no longer fails the build legs; the release job rewrites
+    // package.json and commits it to main with the manifests
+    expect(WORKFLOW).toMatch(/updatepackagejson\.ps1/)
+    expect(WORKFLOW).not.toMatch(/does not match tag version/)
   })
 
   it('uploads only the curated installer files, not electron-builder staging (FR-005)', () => {
@@ -125,6 +127,7 @@ describe('release workflow contract (.github/workflows/build-release.yml)', () =
     expect(WORKFLOW).toMatch(/branch:\s*main/)
     expect(WORKFLOW).toMatch(/scoop\/another-markdown-editor\.json/)
     expect(WORKFLOW).toMatch(/Formula\/another-markdown-editor\.rb/)
+    expect(WORKFLOW).toMatch(/package\.json/)
   })
 })
 

@@ -85,8 +85,9 @@ All unknowns resolved — see [research.md](./research.md) R1–R9. Key decision
   (arm64), `ubuntu-latest` (x64); names embed os-arch-version (FR-005).
 - R5: `electron-builder --publish never` on build legs, plus
   `--config.extraMetadata.version=<VERSION>` so artifact names and the embedded
-  app version come from the tag, not `package.json` (FR-003); a guard step fails
-  if `package.json`'s version differs from the tag.
+  app version come from the tag, not `package.json` (FR-003); the release job
+  rewrites and commits `package.json`'s version to match the tag
+  (`updatepackagejson.ps1`), so a drift is reconciled instead of failing the run.
 - R6: Scoop portable zip + `scoop/another-markdown-editor.json`; Homebrew
   formula (not cask) serving macOS zip + Linux AppImage (with a linux-arm64
   `odie` guard); `.ps1` update scripts that `throw` on a missing artifact.
@@ -219,8 +220,9 @@ pin the new workflow.
   the same `v`-stripping logic as the release job (FR-003). Each leg passes
   `--config.extraMetadata.version=${{ steps.version.outputs.VERSION }}` to
   electron-builder so artifact names AND the embedded app version come from the
-  tag, not `package.json`; a guard step additionally fails if `package.json`'s
-  version does not equal the tag version (release-review CRITICAL fix).
+  tag, not `package.json`; the release job then rewrites `package.json`'s
+  version to the tag and commits it to `main` with the manifests
+  (release-review CRITICAL fix).
 - Third-party actions are pinned to full commit SHAs (checkout `fbc6f39`,
   setup-node `49933ea`, upload-artifact `b7c566a`, download-artifact `018cc2c`,
   softprops `3d0d988`, git-auto-commit `4a55954`) and kept current by Dependabot
