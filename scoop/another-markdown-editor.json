@@ -5,7 +5,7 @@
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.83/Another%20Markdown%20Editor-0.0.83-windows-x64.zip",
+      "url": "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.83/ameditor-0.0.83-windows-x64.zip",
       "hash": "9cf60d32ff3b28fb075ef47b9a5d0a8489b76b90800874c33663372080d85f7e",
       "bin": [
         [

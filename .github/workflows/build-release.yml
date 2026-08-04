@@ -169,10 +169,10 @@ jobs:
         with:
           name: artifacts-${{ matrix.suffix }}
           path: |
-            dist/Another Markdown Editor-*.exe
-            dist/Another Markdown Editor-*.zip
-            dist/Another Markdown Editor-*.dmg
-            dist/Another Markdown Editor-*.AppImage
+            dist/ameditor-*.exe
+            dist/ameditor-*.zip
+            dist/ameditor-*.dmg
+            dist/ameditor-*.AppImage
           if-no-files-found: error
 
   release:
@@ -212,13 +212,13 @@ jobs:
         run: |
           set -euo pipefail
           required=(
-            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-windows-x64.exe"
-            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-windows-x64.zip"
-            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-x64.dmg"
-            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-x64.zip"
-            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-arm64.dmg"
-            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-macos-arm64.zip"
-            "Another Markdown Editor-${{ steps.version.outputs.VERSION }}-linux-x64.AppImage"
+            "ameditor-${{ steps.version.outputs.VERSION }}-windows-x64.exe"
+            "ameditor-${{ steps.version.outputs.VERSION }}-windows-x64.zip"
+            "ameditor-${{ steps.version.outputs.VERSION }}-macos-x64.dmg"
+            "ameditor-${{ steps.version.outputs.VERSION }}-macos-x64.zip"
+            "ameditor-${{ steps.version.outputs.VERSION }}-macos-arm64.dmg"
+            "ameditor-${{ steps.version.outputs.VERSION }}-macos-arm64.zip"
+            "ameditor-${{ steps.version.outputs.VERSION }}-linux-x64.AppImage"
           )
           for f in "${required[@]}"; do
             if [ ! -s "artifacts/$f" ]; then

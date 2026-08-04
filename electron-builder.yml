@@ -28,9 +28,10 @@ files:
 
 # Every asset name carries product-version-os-arch (FR-005). The os token is
 # literal per platform so names read windows/macos/linux rather than electron-
-# builder's win/mac/linux abbreviations (contracts/release.md §2).
+# builder's win/mac/linux abbreviations (contracts/release.md §2). The product
+# token is the short prefix `ameditor` (spec 009).
 win:
-  artifactName: Another Markdown Editor-${version}-windows-${arch}.${ext}
+  artifactName: ameditor-${version}-windows-${arch}.${ext}
   target:
     - target: nsis
       arch: [x64]
@@ -38,7 +39,7 @@ win:
       arch: [x64]
 
 mac:
-  artifactName: Another Markdown Editor-${version}-macos-${arch}.${ext}
+  artifactName: ameditor-${version}-macos-${arch}.${ext}
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -49,7 +50,7 @@ linux:
   # Hard-code x64 rather than using ${arch}: electron-builder's ${arch} macro
   # resolves to "x86_64" for Linux, but the release contract names every asset
   # with os-arch tokens (linux-x64.AppImage, contracts/release.md §2).
-  artifactName: Another Markdown Editor-${version}-linux-x64.${ext}
+  artifactName: ameditor-${version}-linux-x64.${ext}
   target:
     - target: AppImage
       arch: [x64]

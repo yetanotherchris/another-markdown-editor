@@ -77,10 +77,10 @@ describe('release workflow contract (.github/workflows/build-release.yml)', () =
   })
 
   it('uploads only the curated installer files, not electron-builder staging (FR-005)', () => {
-    expect(WORKFLOW).toMatch(/dist\/Another Markdown Editor-\*\.exe/)
-    expect(WORKFLOW).toMatch(/dist\/Another Markdown Editor-\*\.zip/)
-    expect(WORKFLOW).toMatch(/dist\/Another Markdown Editor-\*\.dmg/)
-    expect(WORKFLOW).toMatch(/dist\/Another Markdown Editor-\*\.AppImage/)
+    expect(WORKFLOW).toMatch(/dist\/ameditor-\*\.exe/)
+    expect(WORKFLOW).toMatch(/dist\/ameditor-\*\.zip/)
+    expect(WORKFLOW).toMatch(/dist\/ameditor-\*\.dmg/)
+    expect(WORKFLOW).toMatch(/dist\/ameditor-\*\.AppImage/)
   })
 
   it('disables macOS signing discovery (R5, spec Assumptions)', () => {
@@ -97,6 +97,8 @@ describe('release workflow contract (.github/workflows/build-release.yml)', () =
     // the verification step enumerates every required artifact name
     const setStep = WORKFLOW.match(/required=\(([\s\S]*?)\n\s*\)/) ?? []
     expect(setStep).not.toHaveLength(0)
+    // asset names use the ameditor prefix (spec 009 FR-001)
+    expect(setStep[1]).toMatch(/ameditor-\${{ steps\.version\.outputs\.VERSION }}-/g)
     for (const asset of [
       'windows-x64.exe',
       'windows-x64.zip',
@@ -133,7 +135,7 @@ describe('release workflow contract (.github/workflows/build-release.yml)', () =
 
 describe('Scoop manifest contract (scoop/another-markdown-editor.json)', () => {
   it('is valid JSON with the required fields (contracts §3)', () => {
-    expect(SCOOP_MANIFEST.version).toBe('0.1.0')
+    expect(SCOOP_MANIFEST.version).toBe('0.0.83')
     expect(SCOOP_MANIFEST.homepage).toBe('https://github.com/yetanotherchris/another-markdown-editor')
     expect(typeof SCOOP_MANIFEST.description).toBe('string')
     expect(SCOOP_MANIFEST.license).toBe('MIT')
@@ -142,7 +144,7 @@ describe('Scoop manifest contract (scoop/another-markdown-editor.json)', () => {
   it('references the windows portable zip with a sha256 hash and bin mapping (FR-007/008)', () => {
     const arch = SCOOP_MANIFEST.architecture['64bit']
     expect(arch).toBeDefined()
-    expect(arch.url).toMatch(/v0\.1\.0\/Another%20Markdown%20Editor-0\.1\.0-windows-x64\.zip$/)
+    expect(arch.url).toMatch(/v0\.0\.83\/ameditor-0\.0\.83-windows-x64\.zip$/)
     expect(arch.hash).toMatch(/^[a-f0-9]{64}$/)
     expect(arch.bin).toEqual([['Another Markdown Editor.exe', 'another-markdown-editor']])
   })
@@ -151,7 +153,7 @@ describe('Scoop manifest contract (scoop/another-markdown-editor.json)', () => {
 describe('Homebrew formula contract (Formula/another-markdown-editor.rb)', () => {
   it('is a formula (not a cask) with the right class and metadata (FR-006)', () => {
     expect(FORMULA).toMatch(/^class AnotherMarkdownEditor < Formula/)
-    expect(FORMULA).toMatch(/version "0\.1\.0"/)
+    expect(FORMULA).toMatch(/version "0\.0\.83"/)
     expect(FORMULA).toMatch(/homepage "https:\/\/github\.com\/yetanotherchris\/another-markdown-editor"/)
     expect(FORMULA).toMatch(/license "MIT"/)
   })
@@ -172,7 +174,7 @@ describe('Homebrew formula contract (Formula/another-markdown-editor.rb)', () =>
 
   it('installs the app on macOS and the AppImage into bin on Linux', () => {
     expect(FORMULA).toMatch(/app\.install "Another Markdown Editor\.app"/)
-    expect(FORMULA).toMatch(/bin\.install "Another Markdown Editor-0\.1\.0-linux-x64\.AppImage"/)
+    expect(FORMULA).toMatch(/bin\.install "ameditor-0\.0\.83-linux-x64\.AppImage"/)
   })
 })
 
