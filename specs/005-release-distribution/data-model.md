@@ -14,14 +14,15 @@ A version marker that authorizes a release.
 
 | Field | Type | Validation |
 |-------|------|------------|
-| `name` | string | MUST match `^v\d+\.\d+\.\d+$` (FR-001). Pre-release/`v1.0.0-beta.1` excluded (Assumptions). |
+| `name` | string | MUST match `^v\d+\.\d+\.\d+$` (FR-001). The trigger filter is a glob (`'v[0-9]+.[0-9]+.[0-9]+'`); the strict regex is enforced in the `validate` job. Pre-release/`v1.0.0-beta.1` excluded (Assumptions). |
 | `target` | commit | MUST be reachable from `main` (FR-002, Assumptions). |
 | `version` | string | Derived: `name` with the leading `v` stripped, e.g. tag `v1.0.0` → `1.0.0` (FR-003). |
 
-**States**: pushed (unauthorized) → validated reachable → authorized →
-released. A tag not matching the regex never starts the workflow; a matching tag
-whose target is not reachable from `main` is rejected inside the workflow with
-an explicit failure (US1 scenarios 3–4).
+**States**: pushed (unauthorized) → validated (regex + reachable + no existing
+release) → authorized → drafted → released. A tag not matching the glob never
+starts the workflow; a matching tag whose target is not reachable from `main`,
+or whose version already has a release, is rejected inside the `validate` job
+with an explicit failure (US1 scenarios 3–4, Edge Cases).
 
 ## ReleaseArtifact
 
@@ -41,8 +42,8 @@ verify before publication):
 
 | os | arch | target | fileName |
 |----|------|--------|----------|
-| windows | x64 | nsis | `Another Markdown Editor-<v>-windows-x64-setup.exe` |
-| windows | x64 | zip | `Another Markdown Editor-<v>-windows-x64-portable.zip` |
+| windows | x64 | nsis | `Another Markdown Editor-<v>-windows-x64.exe` |
+| windows | x64 | zip | `Another Markdown Editor-<v>-windows-x64.zip` |
 | macos | x64 | dmg | `Another Markdown Editor-<v>-macos-x64.dmg` |
 | macos | x64 | zip | `Another Markdown Editor-<v>-macos-x64.zip` |
 | macos | arm64 | dmg | `Another Markdown Editor-<v>-macos-arm64.dmg` |
@@ -50,8 +51,10 @@ verify before publication):
 | linux | x64 | AppImage | `Another Markdown Editor-<v>-linux-x64.AppImage` |
 
 **State transitions**: built → uploaded as workflow artifact → downloaded by the
-release job → hashed & verified → attached to the GitHub Release. Any missing or
-hash-mismatched artifact aborts before publication (FR-009/010, US4 scenarios 1–2).
+release job → verified present and non-empty → attached to a **draft** GitHub
+Release → hashed into both manifests → manifests committed to `main` → draft
+published. Any missing artifact or failed hash/manifest step aborts before the
+draft becomes public (FR-009/010, US4 scenarios 1–2).
 
 ## PackageDefinition
 
@@ -77,8 +80,9 @@ Versioned metadata that installs the artifact for a specific package manager.
 | `install` | code | macOS: `app.install "Another Markdown Editor.app"`; Linux: install the AppImage to `bin` |
 
 **State transition**: template at HEAD → rewritten by `updatescoop.ps1` /
-`updatebrew.ps1` from the verified downloaded artifacts → committed to `main`.
-Only after every artifact verified (US4 scenario 3).
+`updatebrew.ps1` from the verified downloaded artifacts → committed to `main`
+while the GitHub Release is still a draft. Only after every artifact is verified
+and hashed, and the release is public, are users pointed at it (US4 scenario 3).
 
 ## ReleaseWorkflow
 
@@ -86,11 +90,13 @@ The GitHub Actions process that orchestrates the above.
 
 | Element | Validation |
 |---------|------------|
-| Trigger | `push` on tags matching `v[0-9]+.[0-9]+.[0-9]+` (FR-001) |
-| Permissions | `contents: write` only (FR-013) |
-| Build job | matrix over the four legs (R4); `fail-fast: false`; required legs have NO `continue-on-error` (FR-010) |
-| Release job | `needs: build`; reachability gate (FR-002); downloads all artifacts; verifies required set + hashes (FR-009); creates release with `fail_on_unmatched_files: true` (FR-010); updates + commits both manifests (FR-006/007/008) |
+| Trigger | `push` on tags matching glob `v[0-9]+.[0-9]+.[0-9]+`; strict `^v[0-9]+\.[0-9]+\.[0-9]+$` regex checked in `validate` (FR-001) |
+| Permissions | workflow default `contents: read`; `contents: write` job-scoped to `release` only (FR-013) |
+| Preflight job | `validate` before `build`: semver regex, `git merge-base --is-ancestor <ref> refs/remotes/origin/main`, and `gh release view` (existing release → fail) |
+| Build job | matrix over the four legs (R4); `needs: validate`; `fail-fast: false`; required legs have NO `continue-on-error` (FR-010); each leg packages with `--config.extraMetadata.version=<VERSION>` (FR-003) |
+| Release job | `needs: build`; downloads all artifacts; verifies required set (FR-009); creates a **draft** release with `fail_on_unmatched_files: true`; checks out `main`, updates + commits both manifests (FR-006/007/008); publishes the draft last |
 
-**Guarantee**: a valid main-reachable tag produces exactly one release containing
-every required artifact and both manifests pointing at that version (FR-004,
-US4 scenario 3); any failure produces no release and no manifest update (FR-010).
+**Guarantee**: a valid main-reachable tag produces exactly one public release
+containing every required artifact and both manifests pointing at that version,
+and no *public* release or manifest state exists for a version that failed any
+required step (FR-004/010, US4 scenario 3).

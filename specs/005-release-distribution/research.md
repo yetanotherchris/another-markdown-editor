@@ -31,30 +31,44 @@ FR-009/FR-010 (no partial release, FR-004 every platform present).
 
 ## R2 — Tag trigger and version derivation
 
-**Decision**: Trigger strictly on `tags: ['v[0-9]+.[0-9]+.[0-9]+']` (the tinycity
-regex; zolam's loose `v*.*.*` matches shapes like `v1.2` that the spec
-excludes). Version = tag with the leading `v` stripped (FR-003).
+**Decision**: Trigger on `tags: ['v[0-9]+.[0-9]+.[0-9]+']` — a GitHub Actions
+**glob** pattern, not a regex: `.` is a literal dot, `[0-9]` is a character
+class, `+` means "one or more". `v1.2.3` matches; `v1.2`, `v1x2y3` and
+`v1.0.0-beta.1` do not. The strict `^v[0-9]+\.[0-9]+\.[0-9]+$` **regex** is
+additionally enforced inside the `validate` job (added after review), so the
+vMAJOR.MINOR.PATCH guarantee is explicit and survives any future widening of the
+trigger filter. Version = tag with the leading `v` stripped (FR-003).
 
 **Rationale**: FR-001 requires `vMAJOR.MINOR.PATCH`; the Assumptions section
-excludes pre-release tags like `v1.0.0-beta.1`. A strict regex in the `push`
-trigger means a malformed tag never starts a release (US1 scenario 3). The
-version is derived in the `release` job from `github.ref_name` with
-`${VERSION#v}`.
+excludes pre-release tags like `v1.0.0-beta.1`. The glob in the `push` trigger
+means a malformed tag never starts a release (US1 scenario 3), and the
+`validate` regex makes the rejection actionable. The version is derived from
+`github.ref_name` with `${VERSION#v}`.
 
-**Alternatives considered**: GitVersion (used by tinycity) — adds a tool and
-complexity for a simple tag→version mapping (rejected).
+**Alternatives considered**: Escaping the dots in the trigger
+(`v[0-9]+\.[0-9]+\.[0-9]+`) — commonly recommended as "valid glob and regex",
+but GitHub Actions glob semantics for `\.` are not documented and a literal
+backslash match would silently disable the workflow; keeping the proven glob and
+adding a real regex check in `validate` is safer (accepted). GitVersion (used by
+tinycity) — adds a tool and complexity for a simple tag→version mapping
+(rejected).
 
 ## R3 — Main-branch reachability gate (FR-002, US1 scenario 4)
 
-**Decision**: In the `release` job, checkout with `fetch-depth: 0`, then run
+**Decision**: In a cheap `validate` job that runs *before* the build matrix,
+checkout with `fetch-depth: 0`, then run
 `git merge-base --is-ancestor <ref_name> refs/remotes/origin/main` and fail with
 an explicit message ("tag <tag> is not reachable from main; not creating a
-release") when it returns non-zero.
+release") when it returns non-zero. The `validate` job also runs the strict
+semver regex and the "no existing release for this tag" check, so a bad tag
+never burns a build runner.
 
 **Rationale**: The spec defines "from main" as "target revision reachable from
 the current main branch" (Assumptions). With `fetch-depth: 0` the full history
 is present so `merge-base --is-ancestor` is exact. A non-reachable tag aborts
-before any artifact is published (US1 scenario 4, FR-002).
+before any artifact is built or published (US1 scenario 4, FR-002). Placing the
+gate in `validate` (rather than the `release` job) was a review change: the
+original design only rejected non-main tags after all four build legs had run.
 
 **Alternatives considered**: `git merge-base --is-ancestor` against a locally
 fetched `origin/main` (same thing); comparing the tag's commit to `main`'s HEAD
@@ -167,35 +181,51 @@ for a contract test (rejected). Attempting to run the real workflow in CI here �
 impossible; releases need a real GitHub repo (out of scope; covered by
 quickstart.md on a fork).
 
-## R8 — Known residual gap: release-then-manifest ordering
+## R8 — Release ordering: draft → manifests → publish
 
-**Decision**: The `release` job creates the GitHub Release *before* updating the
-package definitions (release assets must exist for the manifests to point at
-them). A failure between "release created" and "manifests committed" leaves a
-release whose definitions are stale; this matches the reference repos and is
-mitigated by `fail_on_unmatched_files: true` (a missing asset fails the release
-creation) and idempotent update scripts (a re-run of the tag overwrites both).
+**Decision**: The `release` job creates the GitHub Release as a **draft**
+(`softprops/action-gh-release` v3, `draft: true` — the action uploads assets
+before publishing and stays unpublished), then checks out `main`
+(`git checkout -B main origin/main && git pull --rebase origin main`), runs both
+update scripts, commits the two manifests with `git-auto-commit-action` v7
+(`branch: main`), and only then publishes the draft (a second `softprops` call
+with `tag_name` and `draft` omitted).
 
-**Rationale**: FR-010's "no partial public release" is enforced at the two
-gates that matter most — the `needs: build` matrix gate (a failed build means no
-release at all) and the artifact-completeness/checksum validation that runs
-*before* `softprops/action-gh-release`. The small post-creation window matches
-the reference repos' accepted behaviour and is documented rather than silently
-accepted.
+**Rationale**: This was the "draft release → commit manifests → publish"
+alternative explicitly rejected in the first pass (it mirrored the reference
+repos' release-first ordering). PR review found the release-first ordering was
+not just a residual gap but broken in practice: on a tag push the checkout is a
+detached HEAD, so `git-auto-commit-action` v5 without `branch: main` could never
+push the manifest commit — every tag produced a *public* release whose Scoop and
+Homebrew definitions were never updated. The draft ordering closes that window:
+a public release can never exist referencing stale or missing definitions, and
+FR-009's "validate before making public" holds literally (hashes are written to
+the manifests while the release is still a draft). `softprops` v3 uploads assets
+before publishing, so `draft: true` + later publish is a single coherent flow,
+not two separate uploads. The `validate` job's "existing release" check keeps
+re-runs from silently overwriting.
 
-**Alternatives considered**: Draft release → commit manifests → publish — more
-moving parts and a second `gh` round-trip; the reference repos do not do it
-(rejected).
+**Alternatives considered**: (a) Commit manifests to `main` before creating the
+release — simpler, but a release-creation failure after the commit leaves `main`
+pointing at a non-existent release (FR-010 risk); (b) keep release-first ordering
+with the manifest commit "fixed" by `branch: main` alone — the detached-HEAD push
+still fails without an explicit `git checkout -B main`; (c) `gh release edit` on
+a draft after commit — softprops' `draft: true` → publish flow is fewer moving
+parts (rejected).
 
 ## R9 — Credentials scope (FR-013)
 
-**Decision**: The workflow declares `permissions: contents: write` (the default
-`GITHUB_TOKEN`), the minimum needed to (a) create a GitHub Release with assets
-and (b) push the package-definition commit to `main`. No additional secrets.
+**Decision**: The workflow declares a default `permissions: contents: read`;
+only the `release` job overrides it with `contents: write` — the minimum needed
+to (a) create a GitHub Release with assets and (b) push the package-definition
+commit to `main`. The `validate` and `build` jobs keep `contents: read`. No
+additional secrets. (Changed after review: the first pass granted the whole
+workflow `contents: write`, which also covered the four build legs that run
+`npm ci` and electron-builder and need only read.)
 
 **Rationale**: FR-013 requires minimum credentials. Release creation and the
-manifest commit both need `contents` write; nothing else in the workflow touches
-packages, actions, or secrets.
+manifest commit both need `contents` write; the build legs need none. `GITHUB_TOKEN`
+is automatically scoped to the triggering repo.
 
 **Alternatives considered**: A dedicated PAT with narrower/org scope — unnecessary
 for a single public repo; `GITHUB_TOKEN` is automatically scoped to the

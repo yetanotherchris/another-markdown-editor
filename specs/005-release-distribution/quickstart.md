@@ -14,6 +14,12 @@ covered by `npm run test` (`tests/release/release-contracts.test.ts`).
 - A GitHub fork with Actions enabled (fork used unless you are the maintainer).
 - Homebrew on macOS/Linux (or Linuxbrew) and Scoop on Windows for the install
   checks.
+- **Homebrew tap prerequisite (FR-012):** `brew install
+  yetanotherchris/tap/another-markdown-editor` resolves to the repository
+  `github.com/yetanotherchris/homebrew-tap`. That tap must exist and host a copy
+  of `Formula/another-markdown-editor.rb` before the brew install path can
+  succeed (see spec.md `## Clarifications`). Until it exists, validate the
+  formula by installing it from this repo's `Formula/` directory instead.
 
 ## 1. Automate gate (local, no GitHub needed)
 
@@ -38,9 +44,14 @@ npx electron-builder --publish never --linux       # on Linux
 ```
 
 Expected: `dist/` contains the artifacts named per contracts §2
-(`Another Markdown Editor-<version>-windows-x64-setup.exe`,
-`...-portable.zip`, `...-macos-x64.dmg`/`...-macos-x64.zip`, `...-linux-x64.AppImage`).
-On macOS, `CSC_IDENTITY_AUTO_DISCOVERY=false` is required (no signing).
+(`Another Markdown Editor-<version>-windows-x64.exe`,
+`...-windows-x64.zip`, `...-macos-x64.dmg`/`...-macos-x64.zip`, `...-linux-x64.AppImage`).
+On macOS, `CSC_IDENTITY_AUTO_DISCOVERY=false` is required (no signing). Note the
+name is `-windows-x64.exe` / `-windows-x64.zip`, NOT `-setup.exe` /
+`-portable.zip`. Artifact names use `${version}` from `package.json` for a local
+`--publish never` run; in CI the tag version is injected via
+`--config.extraMetadata.version`, and the workflow's guard step requires
+`package.json`'s version to equal the tag version.
 
 ## 3. Release flow (GitHub)
 
@@ -53,20 +64,25 @@ git push origin v0.1.0
 
 Expected:
 
-- The `Build and Release` workflow runs. The four build legs succeed (none has
-  `continue-on-error`), then the `release` job runs.
-- The release job's reachability gate passes (tag pushed from `main`).
-- A single GitHub Release `v0.1.0` appears containing all seven required
-  artifacts (contracts §2).
+- The `Build and Release` workflow runs. The `validate` job passes (semver
+  regex, reachability gate, no existing release), the four build legs succeed
+  (none has `continue-on-error`), then the `release` job runs.
+- The release job verifies the required artifact set, then creates a **draft**
+  GitHub Release `v0.1.0` containing all seven required artifacts (contracts
+  §2), updates both manifests on `main`, commits them (`branch: main`), and only
+  then **publishes** the draft. On a tag push the manifests are committed to
+  `main`, so push the tag only after `package.json`'s version equals it.
 - The workflow commits the updated `scoop/another-markdown-editor.json` and
   `Formula/another-markdown-editor.rb` to `main` with version `0.1.0` and the
-  computed SHA-256 hashes.
+  computed SHA-256 hashes, and the published release references them.
 
 Negative cases (each verified once on the fork):
 
 - Push `v0.1` (wrong shape): workflow does not run (FR-001).
-- Tag a non-main commit with `v0.1.1` and push: workflow runs, `release` job
+- Tag a non-main commit with `v0.1.1` and push: workflow runs, `validate` job
   fails at the reachability gate; no release appears (FR-002, US1 s4).
+- Re-tag an already-released version and push: `validate` fails clearly; no
+  release overwritten (spec Edge Cases).
 - (Optional) Break a build leg in a scratch branch and tag it: no release is
   created (FR-010).
 

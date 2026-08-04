@@ -126,8 +126,9 @@ definition is published for that version.
 
 - A release tag is created for a revision that is not reachable from `main`: it
   is rejected without publishing artifacts or changing package definitions.
-- A tag is valid in shape but its version is already released: the workflow fails
-  clearly without replacing the existing release or package definitions.
+- A tag is valid in shape but its version is already released: the `validate`
+  job fails the run clearly, before any build, and the existing release and
+  package definitions are left untouched.
 - A release asset is missing, corrupted, or has a checksum mismatch: the release
   is not published and neither package manager is pointed at that asset.
 - A platform-specific build fails: no partial public release is created, even if
@@ -225,3 +226,32 @@ definition is published for that version.
   specified.
 - **Versioning**: Only stable semantic-version tags in the requested format are
   included. Pre-release tags such as `v1.0.0-beta.1` are out of scope.
+
+## Clarifications
+
+- **Homebrew tap is an external dependency**: the documented brew command
+  `brew install yetanotherchris/tap/another-markdown-editor` resolves to the
+  repository `github.com/yetanotherchris/homebrew-tap`. As of 2026-08-05 that
+  repository does not exist, so FR-012 / US3 scenario 4 / SC-003 cannot pass
+  until it is created and hosts a copy or forwarder of
+  `Formula/another-markdown-editor.rb`. This release pipeline ships the formula
+  (the source of truth) but cannot create or publish the tap; creating it is
+  out-of-band and tracked in `tasks.md` (T016). Until then, the brew install
+  example is the target state, not a working path; Scoop is unaffected because
+  the bucket names this repo directly.
+- **Actual artifact filenames**: the packaged asset names are
+  `Another Markdown Editor-<version>-windows-{x64}` `.exe` / `.zip` (no
+  `-setup` / `-portable` suffixes). Earlier drafts of data-model.md and
+  contracts/release.md named these `-windows-x64-setup.exe` and
+  `-windows-x64-portable.zip`; the implementation (electron-builder.yml,
+  workflow, update scripts, tests) is the source of truth and the docs were
+  corrected to match.
+- **`package.json` version equals the tag version (operational rule)**: the
+  build legs inject the tag version into packaging via
+  `--config.extraMetadata.version`, and a guard step fails the run if
+  `package.json`'s `version` field differs from the tag version. Maintainers
+  bump `package.json` to the exact tag version before tagging (FR-003).
+- **`vMAJOR.MINOR.PATCH` trigger is a glob, not a regex**: the `on.push.tags`
+  filter `'v[0-9]+.[0-9]+.[0-9]+'` is a GitHub Actions glob (`.` literal, `[0-9]`
+  character class, `+` one-or-more). The strict `^v[0-9]+\.[0-9]+\.[0-9]+$`
+  regex is enforced inside the workflow's `validate` job (FR-001).

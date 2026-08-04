@@ -23,10 +23,12 @@ scripts (AGENTS.md: `.ps1` on Windows, never `.bat`).
 
 **Primary Dependencies**: New devDependency `electron-builder` (the
 constitution-fixed packaging tool, already named in `docs/DESIGN_DECISIONS.md`).
-GitHub Actions steps: `actions/checkout@v5`, `actions/setup-node@v4`,
-`actions/upload-artifact@v6`, `actions/download-artifact@v6`,
-`softprops/action-gh-release@v2`, `stefanzweifel/git-auto-commit-action@v5` —
-all pinned major versions as in the reference repos. No new runtime dependency.
+GitHub Actions steps: `actions/checkout`, `actions/setup-node`,
+`actions/upload-artifact`, `actions/download-artifact`,
+`softprops/action-gh-release` (v3), `stefanzweifel/git-auto-commit-action` (v7) —
+all pinned to **full commit SHAs** (not mutable major-version tags; a security-review
+hardening) and kept current by Dependabot (`.github/dependabot.yml`). No new runtime
+dependency.
 
 **Storage**: N/A for the app. Release state lives in GitHub (Release assets,
 tag history); package definitions are committed files: `scoop/another-markdown-editor.json`
@@ -74,19 +76,26 @@ All unknowns resolved — see [research.md](./research.md) R1–R9. Key decision
 
 - R1: matrix build + single gated `release` job (`needs: build`,
   `fail-fast: false`, no `continue-on-error` on required legs) → all-or-nothing.
-- R2: trigger regex `v[0-9]+.[0-9]+.[0-9]+`; version = tag minus `v`.
-- R3: reachability gate `git merge-base --is-ancestor <tag> refs/remotes/origin/main`.
+- R2: trigger glob `v[0-9]+.[0-9]+.[0-9]+` (glob, not regex: `.` literal, `[0-9]`
+  char class, `+` one-or-more); version = tag minus `v`. The strict
+  `^v[0-9]+\.[0-9]+\.[0-9]+$` regex is enforced in a cheap `validate` job.
+- R3: reachability gate `git merge-base --is-ancestor <tag> refs/remotes/origin/main`,
+  moved into `validate` so a bad/non-main/duplicate tag never burns build legs.
 - R4: matrix `windows-latest` (x64), `macos-15-intel` (x64), `macos-latest`
   (arm64), `ubuntu-latest` (x64); names embed os-arch-version (FR-005).
-- R5: `electron-builder --publish never` on build legs; `CSC_IDENTITY_AUTO_DISCOVERY=false`
-  on macOS; default icons.
+- R5: `electron-builder --publish never` on build legs, plus
+  `--config.extraMetadata.version=<VERSION>` so artifact names and the embedded
+  app version come from the tag, not `package.json` (FR-003); a guard step fails
+  if `package.json`'s version differs from the tag.
 - R6: Scoop portable zip + `scoop/another-markdown-editor.json`; Homebrew
-  formula (not cask) serving macOS zip + Linux AppImage; `.ps1` update scripts
-  that `throw` on a missing artifact.
+  formula (not cask) serving macOS zip + Linux AppImage (with a linux-arm64
+  `odie` guard); `.ps1` update scripts that `throw` on a missing artifact.
 - R7: `tests/release/` contract suite; existing suites as regression gate.
-- R8: release-before-manifest ordering with `fail_on_unmatched_files` +
-  idempotent scripts (documented residual gap).
-- R9: `permissions: contents: write` only.
+- R8: draft-release → update + commit manifests on `main` → publish the draft,
+  so a public release can never exist with stale/missing definitions (replaces
+  the earlier release-before-manifest ordering).
+- R9: workflow default `permissions: contents: read`; `contents: write`
+  job-scoped to `release` only.
 
 ## Phase 1: data-model.md, contracts, quickstart.md
 
@@ -168,8 +177,21 @@ release-contract), 102 e2e tests, lint and typecheck clean,
 scripts verified against a simulated v1.2.3 artifact set (correct hashes; throw
 on missing artifact).
 
+**Status 2026-08-05**: PR review fixes landed on the `005-release-distribution`
+branch — tag-version wiring into packaging (`--config.extraMetadata.version`),
+`package.json`-version guard, `validate` preflight job, draft→commit→publish
+release ordering, commit-on-`main` (`branch: main`), SHA-pinned actions +
+Dependabot, curated uploads, corrected artifact names in the spec artifacts,
+linux-arm64 `odie` guard, and update-script polish. Contract tests updated to
+pin the new workflow.
+
 ## Deferred / later features
 
+- `yetanotherchris/homebrew-tap` repo creation (FR-012): required before
+  `brew install yetanotherchris/tap/another-markdown-editor` works; recorded as
+  an external dependency in spec.md `## Clarifications`. Out of band.
+- `main` branch protection (release security review): the pipeline's real trust
+  anchor is "who can write to main"; enable in GitHub settings as a follow-up.
 - linux-arm64 build leg (R4) — add when upstream AppImage/Electron support warrants.
 - macOS signing/notarization (spec Assumptions: out of scope).
 - Auto-update (electron-builder `publish` provider / `latest*.yml`) — out of scope.
@@ -194,7 +216,24 @@ on missing artifact).
 - `artifactName` is set per-target so every asset name carries
   `productName-version-os-arch.ext` (FR-005).
 - The version used for packaging is derived from the tag in each build leg via
-  the same `v`-stripping logic as the release job (FR-003).
+  the same `v`-stripping logic as the release job (FR-003). Each leg passes
+  `--config.extraMetadata.version=${{ steps.version.outputs.VERSION }}` to
+  electron-builder so artifact names AND the embedded app version come from the
+  tag, not `package.json`; a guard step additionally fails if `package.json`'s
+  version does not equal the tag version (release-review CRITICAL fix).
+- Third-party actions are pinned to full commit SHAs (checkout `fbc6f39`,
+  setup-node `49933ea`, upload-artifact `b7c566a`, download-artifact `018cc2c`,
+  softprops `3d0d988`, git-auto-commit `4a55954`) and kept current by Dependabot
+  — a security-review hardening over the reference repos' mutable major-version
+  tags.
+- The release is created as a **draft**, the manifests are updated and committed
+  to `main` (`git checkout -B main origin/main`), and only then is the draft
+  published (softprops v3: `draft: true` → commit → publish with `draft`
+  omitted). This closes the release-before-manifest gap (research R8, rewritten)
+  and makes a public release with stale definitions impossible.
+- The `yetanotherchris/tap` Homebrew tap is an **external dependency** that must
+  exist (`github.com/yetanotherchris/homebrew-tap`) before FR-012 / SC-003 hold;
+  recorded in spec.md `## Clarifications` and deferred until created out-of-band.
 - `vitest.workspace.ts` is a legacy leftover: it imports `defineWorkspace`,
   which `vitest/config` in vitest 4.1.10 does not export (verified via ESM
   import), so vitest ignores it and loads `vitest.config.ts` (which uses

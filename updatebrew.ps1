@@ -36,6 +36,10 @@ if (-not (Test-Path -LiteralPath $formulaPath)) {
 
 $content = Get-Content -LiteralPath $formulaPath -Raw
 
+# Normalize any accidental CRLF so the line-based replacements below are not
+# brittle if a Windows editor ever saves the formula as CRLF (release review).
+$content = $content -replace "`r", ""
+
 # The release download URL is deterministic: v<version>/<encoded artifact name>
 # (spaces are %20 in URLs). Tag and version share the numeric part (FR-003).
 $baseUrl = "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v$Version"

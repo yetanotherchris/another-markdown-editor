@@ -15,8 +15,12 @@ class AnotherMarkdownEditor < Formula
   end
 
   on_linux do
-    url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.1.0/Another%20Markdown%20Editor-0.1.0-linux-x64.AppImage"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    if Hardware::CPU.arm?
+      odie "Another Markdown Editor does not provide a Linux arm64 build"
+    else
+      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.1.0/Another%20Markdown%20Editor-0.1.0-linux-x64.AppImage"
+      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    end
   end
 
   def install

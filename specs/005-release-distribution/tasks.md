@@ -96,33 +96,38 @@ same artifact names as `contracts/release.md` §2.
 
 - [X] T006 [US1] Create `.github/workflows/build-release.yml`: trigger
       `on.push.tags` with exactly `'v[0-9]+.[0-9]+.[0-9]+'` (FR-001; research R2),
-      top-level `permissions: contents: write` (FR-013), and the `build` job —
-      matrix of the four legs from research R4 (`windows-latest`,
-      `macos-15-intel`, `macos-latest`, `ubuntu-latest`) with `fail-fast: false`
-      and NO `continue-on-error` on any required leg (FR-010); each leg:
-      checkout (fetch-depth 0), setup-node + `npm ci`, `npm run build`, then
-      `npx electron-builder --publish never` with the leg's platform/arch;
+      workflow-default `permissions: contents: read` with `contents: write`
+      scoped to the `release` job only (FR-013), a `validate` preflight job
+      (strict semver regex, reachability gate, no-existing-release check), and
+      the `build` job — matrix of the four legs from research R4
+      (`windows-latest`, `macos-15-intel`, `macos-latest`, `ubuntu-latest`) with
+      `fail-fast: false` and NO `continue-on-error` on any required leg
+      (FR-010); each leg: checkout (fetch-depth 0), setup-node + `npm ci`,
+      `npm run build`, then `npx electron-builder --publish never` with the
+      leg's platform/arch AND `--config.extraMetadata.version=<VERSION>`
+      (FR-003); a guard step fails if `package.json`'s version != tag version;
       macOS legs set `CSC_IDENTITY_AUTO_DISCOVERY=false`; each leg uploads its
-      `dist/**` output via `actions/upload-artifact@v6` with `if-no-files-found:
-      error` (FR-010).
+      curated `dist/Another Markdown Editor-*.{exe,zip,dmg,AppImage}` output via
+      `actions/upload-artifact` (SHA-pinned) with `if-no-files-found: error`
+      (FR-010).
       (Result: `.github/workflows/build-release.yml` created with the strict tag
-      regex, `permissions: contents: write`, the four-leg matrix, `fail-fast:
-      false`, and no `continue-on-error` on any leg.)
+      glob, job-scoped credentials, the `validate` preflight, the four-leg
+      matrix with `fail-fast: false`, no `continue-on-error`, tag-version
+      wiring into packaging, and the `package.json`-version guard.)
 - [X] T007 [US1] Add the `release` job to the same workflow (sequential — same
       file): `needs: build`, `if: github.ref_type == 'tag'`, `runs-on:
-      ubuntu-latest`. Steps: (1) checkout `fetch-depth: 0`; (2) **reachability
-      gate** — `git merge-base --is-ancestor "${{ github.ref_name }}"
-      refs/remotes/origin/main` and fail with a message naming the tag when it
-      returns non-zero (FR-002, US1 scenario 4); (3) determine `VERSION` =
-      `github.ref_name` minus leading `v` (FR-003); (4) download all artifacts
-      (`actions/download-artifact@v6`, merge-multiple); (5) verify the full
-      required set from `contracts/release.md` §2 exists before publishing
-      (FR-009); (6) create the release with `softprops/action-gh-release@v2`
-      (`files` = all artifacts, `fail_on_unmatched_files: true`,
-      `generate_release_notes: true`) (FR-004/010).
-      (Result: `release` job added with `needs: build`, the
-      `git merge-base --is-ancestor` reachability gate, artifact-set
-      verification, and `softprops/action-gh-release@v2`.)
+      ubuntu-latest`, `permissions: contents: write`. Steps: (1) checkout
+      `fetch-depth: 0`; (2) determine `VERSION` = `github.ref_name` minus
+      leading `v` (FR-003); (3) download all artifacts
+      (`actions/download-artifact`, merge-multiple); (4) verify the full
+      required set from `contracts/release.md` §2 exists before creating any
+      release (FR-009); (5) create the release as a **draft** with
+      `softprops/action-gh-release` (SHA-pinned v3) — `draft: true`,
+      `files` = all artifacts, `fail_on_unmatched_files: true`,
+      `generate_release_notes: true` (FR-004/010).
+      (Result: `release` job added with `needs: build`, artifact-set
+      verification, and a draft-release step; the reachability gate lives in the
+      `validate` job.)
 
 **Acceptance**: a valid main-reachable tag yields exactly one release with every
 required artifact; a malformed or non-main tag yields none (US1 scenarios 1–4).
@@ -153,17 +158,22 @@ scenarios 1–4).
       `updatebrew.ps1` fills real values). A formula, not a cask, so it serves
       macOS and Linux per FR-006 (research R6).
 - [X] T010 [US2] Wire the manifest updates into the `release` job (sequential —
-      same workflow file): after the release is created, run
-      `pwsh ./updatescoop.ps1 -Version $VERSION` and
+      same workflow file): after the draft release is created, checkout `main`
+      explicitly (`git checkout -B main origin/main` + `git pull --rebase origin
+      main`), run `pwsh ./updatescoop.ps1 -Version $VERSION` and
       `pwsh ./updatebrew.ps1 -Version $VERSION` (from the downloaded artifacts),
       then commit `scoop/another-markdown-editor.json` and
       `Formula/another-markdown-editor.rb` to `main` via
-      `stefanzweifel/git-auto-commit-action@v5` (research R1/R6/R8). Both scripts
-      `throw` on a missing artifact, so a failed build can never reach the
-      commit (FR-010, US4 scenario 2).
-      (Result: `pwsh ./updatescoop.ps1` and `pwsh ./updatebrew.ps1` steps added
-      after the release, with `git-auto-commit-action@v5` committing the two
-      manifest files.)
+      `stefanzweifel/git-auto-commit-action` (SHA-pinned v7) with `branch: main`
+      (research R1/R6/R8). Finally publish the draft (a second `softprops`
+      invocation with `tag_name` and `draft` omitted). Both scripts `throw` on a
+      missing artifact, so a failed build can never reach the commit (FR-010,
+      US4 scenario 2).
+      (Result: `git checkout -B main` step, `pwsh ./updatescoop.ps1` and
+      `pwsh ./updatebrew.ps1` steps, `git-auto-commit-action` with `branch: main`
+      committing the two manifest files, and a final publish-draft step. The
+      explicit `main` checkout was required because a tag push checks out a
+      detached HEAD, which broke the manifest commit.)
 
 **Acceptance**: a published `v1.0.0` is installable via the documented brew and
 scoop commands at version `1.0.0`, and each definition carries the exact
@@ -215,7 +225,9 @@ test T014.
       `updatescoop.ps1` / `updatebrew.ps1` where any invariant is not yet met,
       and record any deviation in `plan.md`'s decision log (AGENTS.md).
       (Result: audit PASS — all §6 invariants present in the workflow and both
-      scripts; no deviation to record.)
+      scripts; no deviation to record. The review-driven changes (draft release
+      ordering, commit-on-`main`, job-scoped permissions, SHA pinning) are
+      recorded in T016 and in plan.md's decision log / research R8/R9.)
 
 **Acceptance**: the workflow publishes nothing — neither release nor manifest
 commit — when any required build or verification fails (US4 scenarios 1–2); a
@@ -269,6 +281,47 @@ passes, and a local `--dir` packaging run succeeds.
 
 ---
 
+## Phase 8: PR review fixes (2026-08-05)
+
+**Purpose**: close the findings from the PR #14 review (5 reviews, same-model
+subagents) that broke the pipeline or drifted from the contract.
+
+- [X] T016 [P] Apply the release-review fixes:
+      - **Tag-version wiring (CRITICAL, FR-003):** pass
+        `--config.extraMetadata.version=${{ steps.version.outputs.VERSION }}` to
+        every `electron-builder` packaging step so artifact names and the
+        embedded app version come from the tag, not `package.json`; add a guard
+        step that fails when `package.json`'s version != tag version.
+      - **Commit on `main` (HIGH, FR-006/007/008):** explicit
+        `git checkout -B main origin/main` + `git pull --rebase origin main`
+        before the update scripts, and `branch: main` on
+        `git-auto-commit-action` v7 (a tag push checks out detached HEAD).
+      - **Release ordering (MEDIUM/HIGH, FR-009/010):** draft release →
+        update + commit manifests → publish draft, so a public release can never
+        exist with stale/missing definitions (research R8 rewritten).
+      - **`validate` preflight job:** strict semver regex, reachability gate,
+        and "no existing release for tag" check before the build matrix.
+      - **Security hardening (MEDIUM):** SHA-pin all six third-party actions and
+        add `.github/dependabot.yml`; job-scope `permissions` (`contents: write`
+        only on `release`); curate uploads to the installer files only.
+      - **Documentation drift (MEDIUM):** corrected artifact names
+        (`-windows-x64.exe` / `-windows-x64.zip`, not `-setup` / `-portable`) in
+        data-model.md / contracts/release.md / quickstart.md; glob-vs-regex
+        wording for the trigger.
+      - **Linux arm64 (LOW):** `odie` guard in the formula's `on_linux` block.
+      - **Update scripts (LOW):** trailing newline in `updatescoop.ps1`; CRLF
+        normalization in `updatebrew.ps1`.
+      - **Homebrew tap (HIGH, FR-012):** `yetanotherchris/homebrew-tap` does not
+        exist. Recorded as an external dependency in spec.md `## Clarifications`
+        and quickstart.md prerequisites; creating/publishing the tap is
+        out-of-band and must happen before FR-012 / SC-003 hold.
+      (Result: all in-repo review fixes landed on the branch; contract tests
+      updated to pin the new workflow; see plan.md decision log + research
+      R2/R8/R9. Out-of-band GitHub items remain: create `homebrew-tap`,
+      enable `main` branch protection.)
+
+---
+
 ## Dependencies & Execution Order
 
 | Phase | Depends on | Blocks |
@@ -276,10 +329,11 @@ passes, and a local `--dir` packaging run succeeds.
 | Phase 1: Setup | — | Phase 2 |
 | Phase 2: Foundational | Phase 1 | Phases 3–6 (workflow calls the scripts; scripts need artifact names) |
 | Phase 3: US1 workflow | Phase 2 | Phase 4 (release job runs the scripts) |
-| Phase 4: US2 manifests | Phase 3 | Phase 7 (contract test asserts them) |
+| Phase 4: US2 manifests | Phase 3 | Phase 7 |
 | Phase 5: US3 README | Phase 2 | Phase 7 |
 | Phase 6: US4 hardening | Phase 3 | Phase 7 |
-| Phase 7: Polish | Phases 3–6 | — |
+| Phase 7: Polish | Phases 3–6 | Phase 8 |
+| Phase 8: Review fixes | Phase 7 | — (out-of-band: tap repo, branch protection) |
 
 ### Parallel Opportunities
 

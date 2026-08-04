@@ -35,5 +35,8 @@ $manifest.architecture."64bit".url = $url
 $manifest.architecture."64bit".hash = $hash
 
 $json = $manifest | ConvertTo-Json -Depth 10
-[System.IO.File]::WriteAllText($manifestPath, $json, (New-Object System.Text.UTF8Encoding($false)))
+# ConvertTo-Json emits no trailing newline; keep the committed file LF-terminated
+# so a release commit never produces a cosmetic last-line diff (release review).
+$content = $json + "`n"
+[System.IO.File]::WriteAllText($manifestPath, $content, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "Updated $manifestPath to v$Version"
