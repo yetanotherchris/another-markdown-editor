@@ -26,7 +26,7 @@ assets; its `artifactName` template controls the file name.
 
 **Storage**: N/A. Committed files change: `electron-builder.yml`,
 `.github/workflows/build-release.yml`, `updatescoop.ps1`, `updatebrew.ps1`,
-`scoop/another-markdown-editor.json`, `Formula/another-markdown-editor.rb`,
+`another-markdown-editor.json`, `Formula/another-markdown-editor.rb`,
 `tests/release/release-contracts.test.ts`.
 
 **Testing**: The contract suite `tests/release/release-contracts.test.ts` pins
@@ -99,7 +99,7 @@ electron-builder.yml                 # MODIFY: artifactName -> ameditor-${versio
 .github/workflows/build-release.yml  # MODIFY: upload globs + required set
 updatescoop.ps1                      # MODIFY: zip file name + URL
 updatebrew.ps1                       # MODIFY: zip/AppImage file names + URLs + bin.install
-scoop/another-markdown-editor.json   # MODIFY: windows zip URL
+another-markdown-editor.json   # MODIFY: windows zip URL
 Formula/another-markdown-editor.rb   # MODIFY: URLs + bin.install file name
 tests/release/release-contracts.test.ts  # MODIFY: assert renamed names
 ```

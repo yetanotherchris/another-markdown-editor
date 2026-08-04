@@ -41,7 +41,7 @@ enforces the machine-checkable parts of this document.
   downloaded files (FR-008), and are written to the manifests while the release
   is still a draft (before it becomes public — FR-009).
 
-## 3. Scoop manifest contract (`scoop/another-markdown-editor.json`)
+## 3. Scoop manifest contract (`another-markdown-editor.json`)
 
 Valid JSON with:
 

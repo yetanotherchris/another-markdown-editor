@@ -25,7 +25,7 @@ Write-Host "SHA256 of ${fileName}: $hash"
 # tag is the exact release tag (FR-003/FR-008). The `ameditor` prefix has no
 # spaces, so no URL encoding is needed (spec 009).
 $url = "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v$Version/ameditor-$Version-windows-x64.zip"
-$manifestPath = Join-Path $PSScriptRoot "scoop" "another-markdown-editor.json"
+$manifestPath = Join-Path $PSScriptRoot "another-markdown-editor.json"
 
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "Unable to locate Scoop manifest at $manifestPath"

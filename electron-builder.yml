@@ -20,7 +20,7 @@ files:
   - "!{.gitignore,AGENTS.md,CLAUDE.md,LICENSE}"
   - "!update{scoop,brew}.ps1"
   - "!Formula/**"
-  - "!scoop/**"
+  - "!another-markdown-editor.json"
   - "!.github/**"
   - "!.specify/**"
   - "!test-results/**"

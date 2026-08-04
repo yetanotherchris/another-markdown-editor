@@ -31,7 +31,7 @@ gates.
 - [X] T004 Change `updatebrew.ps1`: the three `$*File` names, the three URL
       replace regexes, and the `bin.install` replace regex to the `ameditor-*`
       names.
-- [X] T005 Change `scoop/another-markdown-editor.json`: `architecture.64bit.url`
+- [X] T005 Change `another-markdown-editor.json`: `architecture.64bit.url`
       to the `ameditor-0.0.83-windows-x64.zip` URL (keep `bin` unchanged).
 - [X] T006 Change `Formula/another-markdown-editor.rb`: the three per-arch URLs
       and the Linux `bin.install "Another Markdown Editor-0.0.83-linux-x64.AppImage"`

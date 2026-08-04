@@ -68,7 +68,7 @@ workflow references them.**
       mandatory `-Version`; locates the Windows portable zip artifact
       (`dist/Another Markdown Editor-$Version-windows-x64.zip`, research R6);
       `throw`s if absent; computes `Get-FileHash -Algorithm SHA256` (lowercase);
-      reads `scoop/another-markdown-editor.json`, sets `version`, the
+      reads `another-markdown-editor.json`, sets `version`, the
       `architecture.64bit.url` (release download URL for the zip) and
       `architecture.64bit.hash`, and writes it back (FR-007/008).
 - [X] T005 Create `updatebrew.ps1`: takes a mandatory `-Version`; locates the
@@ -145,7 +145,7 @@ scenarios 1–4).
 
 ### Implementation
 
-- [X] T008 [US2] Create `scoop/another-markdown-editor.json` — a valid Scoop
+- [X] T008 [US2] Create `another-markdown-editor.json` — a valid Scoop
       manifest with `version: 0.1.0` (placeholder), `description`, `homepage`,
       `license`, and `architecture.64bit` containing `url`, `hash` (all-zero
       placeholder) and `bin: [["Another Markdown Editor.exe",
@@ -163,7 +163,7 @@ scenarios 1–4).
       explicitly (`git checkout -B main origin/main` + `git pull --rebase origin
       main`), run `pwsh ./updatescoop.ps1 -Version $VERSION` and
       `pwsh ./updatebrew.ps1 -Version $VERSION` (from the downloaded artifacts),
-      then commit `scoop/another-markdown-editor.json` and
+      then commit `another-markdown-editor.json` and
       `Formula/another-markdown-editor.rb` to `main` via
       `stefanzweifel/git-auto-commit-action` (SHA-pinned v7) with `branch: main`
       (research R1/R6/R8). Finally publish the draft (a second `softprops`
@@ -340,8 +340,8 @@ subagents) that broke the pipeline or drifted from the contract.
 
 - T003, T004, T005 touch disjoint files (`electron-builder.yml` /
   `updatescoop.ps1` / `updatebrew.ps1`) and can run together.
-- T008, T009, T011 touch disjoint files (`scoop/…json` / `Formula/….rb` /
-  `README.md`) and can run together.
+- T008, T009, T011 touch disjoint files (`another-markdown-editor.json` /
+  `Formula/….rb` / `README.md`) and can run together.
 - T006 then T007 then T010 are sequential — they all edit
   `.github/workflows/build-release.yml`.
 - T012 is an audit that may edit the workflow and scripts — run after T007/T010.

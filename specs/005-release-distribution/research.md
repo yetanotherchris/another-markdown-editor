@@ -117,7 +117,7 @@ constitution-fixed choice and handles NSIS/dmg/AppImage per-OS (rejected).
 
 **Decision**:
 - **Windows/Scoop**: a portable `.zip` asset (electron-builder `zip` target, x64)
-  referenced by `scoop/another-markdown-editor.json` with
+  referenced by `another-markdown-editor.json` with
   `architecture.64bit.url`, `architecture.64bit.hash` (SHA-256, lowercase), and
   `bin: [["Another Markdown Editor.exe", "another-markdown-editor"]]`.
 - **macOS/Homebrew**: the `.zip` asset (contains the `.app`), referenced by
