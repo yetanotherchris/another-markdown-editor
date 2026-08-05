@@ -18,7 +18,7 @@ import { validateNativeDialogRequest } from './dialogValidation'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, TrashReceipt, Settings, EntryKind, ErrorCode,
-  WatchEvent, EntryInfo, RecentKind, NativeDialogDecision
+  WatchEvent, EntryInfo, RecentKind, RecentItem, NativeDialogDecision
 } from '../../shared/ipc-contract'
 
 let workspaceState: WorkspaceState | null = null
@@ -607,7 +607,7 @@ export function setupHandlers(window: BrowserWindow): void {
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 30, themeOverride: null })
+      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true })
     }
   })
 
@@ -622,7 +622,8 @@ export function setupHandlers(window: BrowserWindow): void {
         sidebarWidth: typeof p.sidebarWidth === 'number' ? p.sidebarWidth : current.sidebarWidth,
         themeOverride: p.themeOverride === 'light' || p.themeOverride === 'dark' || p.themeOverride === null
           ? p.themeOverride as 'light' | 'dark' | null
-          : current.themeOverride
+          : current.themeOverride,
+        explorerVisible: typeof p.explorerVisible === 'boolean' ? p.explorerVisible : current.explorerVisible
       }
       saveSettings(updated)
       return ok(updated)
@@ -640,6 +641,40 @@ export function setupHandlers(window: BrowserWindow): void {
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
+  })
+
+  // ---- spec-010 hamburger menu IPC (renderer can no longer reach the native
+  // menu, so the actions that lived there move behind named operations) ----
+
+  ipcMain.handle('recent:list', (): Result<RecentItem[]> => {
+    return ok(loadRecentItems(recentItemsConfigPath()))
+  })
+
+  // FR-011: clearing is best-effort like record/remove — on a persistence
+  // failure the empty list cannot be saved, the failure is reported quietly,
+  // and nothing else changes.
+  ipcMain.handle('recent:clear', (): Result<null> => {
+    try {
+      saveRecentItems(recentItemsConfigPath(), [])
+      notifyRecentItemsOk()
+    } catch (e: unknown) {
+      reportRecentItemsWarning(e, 'clear')
+    }
+    refreshApplicationMenu()
+    return ok(null)
+  })
+
+  // Request a quit through the normal window-close flow (research R4): the
+  // close handler sends `app:quitRequested`, the renderer flushes and prompts
+  // for unsaved changes, then calls confirmQuit. Never call app.quit() here.
+  ipcMain.handle('app:requestQuit', (): Result<null> => {
+    tryCloseWindow()
+    return ok(null)
+  })
+
+  ipcMain.handle('devtools:toggle', (): Result<null> => {
+    window.webContents.toggleDevTools()
+    return ok(null)
   })
 
   ipcMain.handle('quit:respond', (_e, args: unknown) => {

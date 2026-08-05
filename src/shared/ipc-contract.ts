@@ -113,6 +113,10 @@ export type MenuCommand =
 export interface Settings {
   sidebarWidth: number
   themeOverride: 'light' | 'dark' | null
+  /** The persisted visibility of the left explorer panel (spec 010 FR-007).
+   *  Defaults to true — a fresh install shows the explorer; once the user
+   *  toggles it, the choice persists across restarts. */
+  explorerVisible: boolean
 }
 
 export interface DesktopApi {
@@ -154,4 +158,15 @@ export interface DesktopApi {
    *  resolve with the semantic decision. Only display strings cross the
    *  boundary; the renderer never sees a button index or the platform. */
   showConfirmation(request: NativeDialogRequest): Promise<Result<NativeDialogDecision>>
+  /** Spec 010: the current Recent Items list for the hamburger submenu. Returns
+   *  display strings only — the renderer never feeds the paths back into the
+   *  filesystem (the recent-open handlers re-validate against this list). */
+  getRecentItems(): Promise<Result<RecentItem[]>>
+  /** Spec 010: clear the Recent Items list (hamburger "Clear Recent Items"). */
+  clearRecentItems(): Promise<Result<null>>
+  /** Spec 010: request a quit through the normal window-close flow, so the
+   *  renderer's unsaved-changes prompt still guards the exit (Principle III). */
+  requestQuit(): Promise<Result<null>>
+  /** Spec 010: toggle the devtools window from the hamburger's View menu. */
+  toggleDevTools(): Promise<Result<null>>
 }

@@ -909,67 +909,74 @@ export default function App() {
     void runFolderOpenFlow()
   }, [runFolderOpenFlow])
 
-  useEffect(() => {
-    const unsubMenu = window.api.onMenuCommand((command: MenuCommand) => {
-      const active = getActiveDocument(sessionRef.current)
-      if (typeof command === 'object') {
-        // Spec 004: File > Recent Items. Route through the exact same dispatch
-        // paths as File > Open File / Open Folder (FR-007). A failed open
-        // surfaces in-context and leaves the session untouched (FR-009).
-        if (command.type === 'open-recent') {
-          if (command.kind === 'file') {
-            window.api.openRecentFile(command.path).then((result) => {
-              if (result.ok) {
-                dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-                enforcePoolCap(sessionRef.current.activeId)
-              } else {
-                void showOperationError(result.message)
-              }
-            })
-          } else {
-            // Recent-folder open shares the prepare → (confirm) → commit flow
-            // with File > Open Folder (FR-007/FR-010).
-            void runFolderOpenFlow(command.path)
-          }
-        }
-        return
-      }
-      switch (command) {
-        case 'open-file': {
-          window.api.openFileDialog().then((result) => {
-            if (result.ok && result.value) {
+  // Spec 010: the single command bus for menu-driven actions — shared by the
+  // native-menu IPC listener, the renderer hamburger, and the keyboard
+  // shortcuts (which send the same `menu:command`). Every action the old File
+  // menu could send resolves here, so the hamburger exposes the same set
+  // (FR-001/FR-002).
+  const handleMenuCommand = useCallback((command: MenuCommand) => {
+    const active = getActiveDocument(sessionRef.current)
+    if (typeof command === 'object') {
+      // Spec 004: File > Recent Items. Route through the exact same dispatch
+      // paths as File > Open File / Open Folder (FR-007). A failed open
+      // surfaces in-context and leaves the session untouched (FR-009).
+      if (command.type === 'open-recent') {
+        if (command.kind === 'file') {
+          window.api.openRecentFile(command.path).then((result) => {
+            if (result.ok) {
               dispatch({ type: 'OPEN_EXISTING', payload: result.value })
               enforcePoolCap(sessionRef.current.activeId)
-            } else if (!result.ok) {
+            } else {
               void showOperationError(result.message)
             }
           })
-          break
+        } else {
+          // Recent-folder open shares the prepare → (confirm) → commit flow
+          // with File > Open Folder (FR-007/FR-010).
+          void runFolderOpenFlow(command.path)
         }
-        case 'open-folder': {
-          void runFolderOpenFlow()
-          break
-        }
-        case 'save': {
-          if (active) saveDocument(active)
-          break
-        }
-        case 'save-as': {
-          if (active) saveDocument(active, true)
-          break
-        }
-        case 'close-tab': {
-          if (active) handleCloseRequest(active.id)
-          break
-        }
-        case 'new-file': {
-          handleNew()
-          break
-        }
-        default:
-          break
       }
-    })
+      return
+    }
+    switch (command) {
+      case 'open-file': {
+        window.api.openFileDialog().then((result) => {
+          if (result.ok && result.value) {
+            dispatch({ type: 'OPEN_EXISTING', payload: result.value })
+            enforcePoolCap(sessionRef.current.activeId)
+          } else if (!result.ok) {
+            void showOperationError(result.message)
+          }
+        })
+        break
+      }
+      case 'open-folder': {
+        void runFolderOpenFlow()
+        break
+      }
+      case 'save': {
+        if (active) saveDocument(active)
+        break
+      }
+      case 'save-as': {
+        if (active) saveDocument(active, true)
+        break
+      }
+      case 'close-tab': {
+        if (active) handleCloseRequest(active.id)
+        break
+      }
+      case 'new-file': {
+        handleNew()
+        break
+      }
+      default:
+        break
+    }
+  }, [enforcePoolCap, handleCloseRequest, handleNew, runFolderOpenFlow, saveDocument, showOperationError])
+
+  useEffect(() => {
+    const unsubMenu = window.api.onMenuCommand(handleMenuCommand)
 
     const unsubDocument = window.api.onDocumentChanged((e) => {
       const doc = sessionRef.current.documents.find(d => d.path === e.path)
@@ -1012,7 +1019,7 @@ export default function App() {
       unsubRecentOk()
       unsubQuit()
     }
-  }, [enforcePoolCap, handleCloseRequest, handleExternalChange, handleNew, handleQuitRequest, runFolderOpenFlow, saveDocument])
+  }, [handleExternalChange, handleMenuCommand, handleQuitRequest])
 
   useEffect(() => {
     return () => {
