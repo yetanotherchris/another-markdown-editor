@@ -34,11 +34,13 @@ dependency.
 tag history); package definitions are committed files: `another-markdown-editor.json`
 and `Formula/another-markdown-editor.rb`.
 
-**Testing**: Vitest 4. New `tests/release/` contract suite validates the shipped
-release artifacts (workflow structure, Scoop manifest JSON, Homebrew formula
-shape, README install section) without running GitHub Actions. The existing
-unit + Playwright e2e suites must stay green (regression gate). The actual
-tag→release→install flow is verified manually per quickstart.md.
+**Testing**: Vitest 4 unit suites + Playwright e2e suites are the regression
+gate. There is no automated release-contract suite: the shipped release
+artifacts (workflow structure, Scoop manifest JSON, Homebrew formula shape,
+README install section) are verified manually per quickstart.md (the
+`tests/release/` suite was removed 2026-08-05 — spec 009 Assumptions / plan
+Decision log). The actual tag→release→install flow is verified manually per
+quickstart.md.
 
 **Target Platform**: Windows x64, macOS x64 + arm64, Linux x64 (release scope
 matches the app's supported desktop platforms; research R4).
@@ -68,7 +70,7 @@ auto-update are out of scope (spec Assumptions).
 | II. Every Path Is Untrusted | No filesystem paths cross a trust boundary in this feature. Package definitions embed only release URLs and SHA-256 hashes derived from built artifacts in CI; the workflow runs on the trusted tag | **PASS** |
 | III. Never Lose The User's Words | Nothing here reads or writes user documents; the save/atomic-write invariants are untouched | **PASS** |
 | IV. Calm, Predictable Editing | CI-only feature; no runtime UX change | **PASS** |
-| V. Test What Can Corrupt Or Escape | A Vitest contract suite validates the workflow trigger/gates/permissions, the Scoop manifest and Homebrew formula shape (URL/version/hash fields), and the README commands, so a regression in the release contract fails tests. The end-to-end release is validated manually via quickstart.md | **PASS** |
+| V. Test What Can Corrupt Or Escape | The release contract is verified manually via quickstart.md (workflow trigger/gates/permissions, Scoop manifest and Homebrew formula shape, README commands). The automated `tests/release/` contract suite was removed 2026-08-05; unit + e2e suites remain the regression gate | **PASS** |
 
 ## Phase 0: research.md
 
@@ -91,7 +93,9 @@ All unknowns resolved — see [research.md](./research.md) R1–R9. Key decision
 - R6: Scoop portable zip + `another-markdown-editor.json`; Homebrew
   formula (not cask) serving macOS zip + Linux AppImage (with a linux-arm64
   `odie` guard); `.ps1` update scripts that `throw` on a missing artifact.
-- R7: `tests/release/` contract suite; existing suites as regression gate.
+- R7: release verification is manual via quickstart.md; the `tests/release/`
+  contract suite (an earlier R7) was removed 2026-08-05 (spec 009 Assumptions);
+  unit + e2e suites remain the regression gate.
 - R8: draft-release → update + commit manifests on `main` → publish the draft,
   so a public release can never exist with stale/missing definitions (replaces
   the earlier release-before-manifest ordering).
@@ -144,9 +148,6 @@ README.md                    # MODIFY: add Installation section (brew + scoop)
 
 package.json                 # MODIFY: add electron-builder devDependency, dist scripts
 .gitignore                   # VERIFY: dist/ covered (already present)
-
-tests/release/
-└── release-contracts.test.ts  # NEW: contract tests for workflow/manifests/README
 ```
 
 **Structure Decision**: Mirrors the referenced repositories
@@ -200,9 +201,9 @@ pin the new workflow.
 
 ## Decision log (2026-08-04)
 
-- `.github/workflows/build-release.yml` is the single source of truth for release
-  mechanics; it is validated by `tests/release/release-contracts.test.ts`
-  structure assertions rather than a YAML parse (research R7).
+- The release workflow structure is verified manually per quickstart.md rather
+  than parsed (research R7). The earlier `tests/release/release-contracts.test.ts`
+  structure assertions were removed 2026-08-05 (spec 009 Assumptions).
 - Scoop installs a **portable zip** (not the NSIS installer) because Scoop
   installs via `bin` from an archive; NSIS installers need a machine-specific
   silent install (research R6).
@@ -235,10 +236,8 @@ pin the new workflow.
 - The `yetanotherchris/tap` Homebrew tap is an **external dependency** that must
   exist (`github.com/yetanotherchris/homebrew-tap`) before FR-012 / SC-003 hold;
   recorded in spec.md `## Clarifications` and deferred until created out-of-band.
-- `vitest.workspace.ts` is a legacy leftover: it imports `defineWorkspace`,
+- `vitest.workspace.ts` was a legacy leftover: it imported `defineWorkspace`,
   which `vitest/config` in vitest 4.1.10 does not export (verified via ESM
   import), so vitest ignores it and loads `vitest.config.ts` (which uses
-  `projects`). The `release` test project is therefore registered in
-  `vitest.config.ts` (the active config); `vitest.workspace.ts` was updated too
-  so the two never drift apart. The existing `defineWorkspace` LSP error in that
-  file is pre-existing and unrelated to this feature.
+  `projects`). It was deleted 2026-08-05 along with the `release` project when
+  the contract suite was removed; `vitest.config.ts` is the single active config.

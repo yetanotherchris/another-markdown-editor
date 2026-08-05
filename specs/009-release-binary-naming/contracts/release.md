@@ -4,8 +4,9 @@
 **Data model**: [data-model.md](./data-model.md)
 
 Amends the artifact-naming parts of `specs/005-release-distribution/contracts/release.md`.
-`tests/release/release-contracts.test.ts` enforces the machine-checkable parts
-of this document.
+The machine-checkable parts were previously enforced by
+`tests/release/release-contracts.test.ts`, which was removed 2026-08-05 (release
+verification is manual — spec 009 Assumptions).
 
 ---
 
@@ -35,16 +36,18 @@ of this document.
 - `architecture.64bit.url` → the windows portable zip release URL for
   `ameditor-<version>-windows-x64.zip`; the URL embeds the version like before.
 - `architecture.64bit.bin` → maps the packaged `ameditor.exe` to the command
-  `another-markdown-editor` (FR-004/FR-008).
+  `ameditor` (FR-004/FR-008).
 
 ## 4. Homebrew formula contract (amends 005 contracts §4)
 
 - `on_macos` / `on_linux` URLs reference the renamed `ameditor-*` assets.
 - `install`: macOS → `app.install "Another Markdown Editor.app"` (unchanged);
-  Linux → `bin.install "ameditor-<version>-linux-x64.AppImage"` (renamed).
+  Linux → `bin.install "ameditor-<version>-linux-x64.AppImage" => "ameditor"`
+  (renamed file and `ameditor` command, FR-004/FR-008).
 
-## 5. Test contract (amends 005 contracts §7)
+## 5. Verification contract (amends 005 contracts §7)
 
-The release-contract suite asserts the renamed upload globs, the renamed
-required set, the renamed Scoop URL, and the renamed `bin.install` AppImage
-filename, and passes.
+No automated release-contract suite exists (`tests/release/` was removed
+2026-08-05; spec 009 Assumptions). The renamed upload globs, the required set,
+the Scoop URL, the Scoop/Homebrew `ameditor` command name, and the `bin.install`
+AppImage filename are verified manually via `quickstart.md`.

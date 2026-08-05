@@ -40,13 +40,6 @@ export default tseslint.config(
     }
   },
   {
-    files: ['tests/release/**/*.ts'],
-    rules: {
-      'no-restricted-imports': 'off',
-      'no-restricted-globals': 'off'
-    }
-  },
-  {
     files: ['tests/renderer/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
@@ -54,7 +47,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ['*.config.{ts,js}', 'vitest.workspace.ts'],
+    files: ['*.config.{ts,js}'],
     rules: {
       'no-restricted-imports': 'off'
     }

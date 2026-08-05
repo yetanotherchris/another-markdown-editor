@@ -62,21 +62,25 @@ and verify the version and checksum match.
 
 ---
 
-### User Story 3 - Keep the contract tests green (Priority: P2)
+### User Story 3 - Verify the rename manually (Priority: P2)
 
-The release-contract test suite keeps passing after the rename.
+The renamed asset names, package definitions, and command name are verified
+manually against a release rather than by an automated contract suite.
 
-**Why this priority**: The contract tests pin the asset-name globs, the required
-set, and the manifest file names; the rename must update them in the same change.
+**Why this priority**: The asset-name globs, the required artifact set, and the
+manifest command name must all agree after the rename. Automated release-contract
+tests were dropped (2026-08-05, recorded in the Assumptions below); the
+quickstart is the manual verification path.
 
-**Independent Test**: `npm run test` passes, including
-`tests/release/release-contracts.test.ts`.
+**Independent Test**: Follow `quickstart.md`: install from a release and confirm
+the `ameditor` command launches the app.
 
 **Acceptance Scenarios**:
 
-1. **Given** the rename is implemented, **When** `npm run test` runs, **Then** the
-   release-contract tests pass against the updated workflow, manifests, and
-   formula.
+1. **Given** the rename is implemented, **When** a maintainer runs the
+   quickstart's install checks, **Then** `ameditor` (Scoop/Homebrew) is the
+   command that launches the app and every published asset carries the
+   `ameditor-<version>-<os>-<arch>.<ext>` name.
 2. **Given** a future maintainer reads the spec, **When** they look up the asset
    naming rule, **Then** it is stated once, unambiguously, in this spec and its
    contract.
@@ -112,8 +116,8 @@ set, and the manifest file names; the rename must update them in the same change
   AppImage assets.
 - **FR-006**: The PowerShell manifest-update scripts MUST locate and write the
   renamed asset file names.
-- **FR-007**: The release-contract test suite MUST be updated to assert the
-  renamed asset names, and MUST pass.
+- **FR-007**: The release workflow's curated upload globs and its required
+  artifact set MUST reference the `ameditor-*` names.
 - **FR-008**: The packaged launcher binary (the executable users run) MUST be
   named `ameditor` (`ameditor.exe` on Windows) on every platform. The in-app
   product name and the macOS `.app` bundle name remain `Another Markdown Editor`.
@@ -137,8 +141,9 @@ set, and the manifest file names; the rename must update them in the same change
 
 - **SC-001**: In 100% of packaging runs, every produced asset name matches
   `ameditor-<version>-<os>-<arch>.<ext>`.
-- **SC-002**: In 100% of release-contract test runs, the suite passes with the
-  renamed names asserted.
+- **SC-002**: In 100% of manual release-verification runs (quickstart.md §4), the
+  `ameditor` command launches the installed app on every supported package
+  manager.
 - **SC-003**: In 100% of manifest-update script runs against a renamed asset set,
   the definition is rewritten with the correct `ameditor-*` file name and hash.
 
@@ -152,6 +157,10 @@ set, and the manifest file names; the rename must update them in the same change
   `-<version>-<os>-<arch>.<ext>` suffix established in spec 005 is preserved.
 - **No re-release**: The change applies to future releases; existing published
   releases keep their historical asset names.
+- **Release verification is manual**: There is no automated release-contract test
+  suite (`tests/release/` was removed 2026-08-05). The renamed asset names, the
+  Scoop/Homebrew command name `ameditor`, and the manifest contents are verified
+  by hand via `quickstart.md` before each release is declared good.
 
 ## Clarifications
 

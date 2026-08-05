@@ -51,9 +51,11 @@ $baseUrl = "https://github.com/yetanotherchris/another-markdown-editor/releases/
 
 $content = $content -replace 'version "[\d\.]+"', "version `"$Version`""
 
-$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/)[^"]*(macos-arm64\.zip")', "`${1}ameditor-$Version-`${2}"
-$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/)[^"]*(macos-x64\.zip")', "`${1}ameditor-$Version-`${2}"
-$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/v[\d\.]+/)[^"]*(linux-x64\.AppImage")', "`${1}ameditor-$Version-`${2}"
+# The release tag in each URL path is rewritten to v$Version, not just the
+# filename, so the committed formula never points at a previous tag.
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(macos-arm64\.zip")', "`${1}v$Version/ameditor-$Version-`${2}"
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(macos-x64\.zip")', "`${1}v$Version/ameditor-$Version-`${2}"
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(linux-x64\.AppImage")', "`${1}v$Version/ameditor-$Version-`${2}"
 
 # Update the sha256 that follows each known url line (order matches the formula
 # structure in Formula/another-markdown-editor.rb).
@@ -79,7 +81,7 @@ $expected = @(
     "ameditor-$Version-macos-arm64.zip",
     "ameditor-$Version-macos-x64.zip",
     "ameditor-$Version-linux-x64.AppImage",
-    "bin.install `"ameditor-$Version-linux-x64.AppImage`""
+    "bin.install `"ameditor-$Version-linux-x64.AppImage`" => `"ameditor`""
 )
 foreach ($e in $expected) {
     if (-not $content.Contains($e)) {

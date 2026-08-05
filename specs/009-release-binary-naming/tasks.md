@@ -51,3 +51,14 @@ gates.
       and tests).
 
 **Checkpoint**: all gates green; contract tests assert `ameditor-*` names.
+
+## Follow-up (2026-08-05)
+
+- [X] T010 Remove the release-contract suite (`tests/release/release-contracts.test.ts`
+      deleted; vitest project, eslint override, and spec 005 Test contract removed).
+      Release verification is manual via quickstart.md (plan Decision log).
+- [X] T011 Fix the Scoop/Homebrew command name to `ameditor` (spec 009 FR-004):
+      `another-markdown-editor.json` bin maps `ameditor.exe` → `ameditor`;
+      `Formula/another-markdown-editor.rb` installs the Linux AppImage as
+      `bin/ameditor`; `updatebrew.ps1` rewrites the URL tag and guards the
+      `ameditor` command name.

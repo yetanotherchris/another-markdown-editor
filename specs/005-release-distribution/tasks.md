@@ -12,11 +12,11 @@ gated `release` job that verifies the tag is reachable from `main`, downloads
 and verifies the full required artifact set, creates the GitHub Release with
 `fail_on_unmatched_files`, and finally rewrites + commits the Scoop manifest and
 Homebrew formula. The README install section (US3) and the all-or-nothing
-hardening audit (US4) follow, then the `tests/release` contract suite pins every
-contract so a regression fails the unit suite.
+hardening audit (US4) follow.
 
 The required artifact set, names, manifests, and failure contract are pinned in
-`contracts/release.md` and enforced by `tests/release/release-contracts.test.ts`.
+`contracts/release.md` and verified manually per quickstart.md (the
+`tests/release` contract suite was removed 2026-08-05 — spec 009 Assumptions).
 
 ---
 
@@ -250,7 +250,9 @@ successful run leaves release and manifests consistent (US4 scenario 3).
       (Result: `release` project added to `vitest.config.ts` (active config —
       `vitest.workspace.ts` uses `defineWorkspace`, which vitest 4.1.10 does not
       export and ignores) and `vitest.workspace.ts` (kept consistent);
-      `eslint.config.mjs` rule added for `tests/release/**/*.ts`.)
+      `eslint.config.mjs` rule added for `tests/release/**/*.ts`.
+      SUPERSEDED 2026-08-05: the `release` project, the eslint override, and
+      `vitest.workspace.ts` itself were removed with the contract suite.)
 - [X] T014 [US1] [US2] [US3] [US4] Write `tests/release/release-contracts.test.ts`
       enforcing `contracts/release.md` §7 against the committed files: workflow
       has the exact tag regex, `permissions: contents: write`, the four matrix
@@ -264,7 +266,8 @@ successful run leaves release and manifests consistent (US4 scenario 3).
       blocks, `sha256` and `app.install`/`bin.install`; the README has
       `## Installation` and the two exact commands.
       (Result: 18 contract tests added; the full suite runs 274 tests and all
-      pass.)
+      pass. SUPERSEDED 2026-08-05: the file was deleted; release verification is
+      manual — spec 009 Assumptions.)
 - [X] T015 Run the full quickstart Automate line — `npm run lint`, `npm run
       typecheck`, `npm run test`, `npm run test:e2e` — all green; verify
       `npx electron-builder --dir --x64` (or the local-OS equivalent) packages
@@ -277,8 +280,8 @@ successful run leaves release and manifests consistent (US4 scenario 3).
       set — both rewrite their manifest/formula with the computed SHA-256 and
       both `throw` when a required artifact is missing.)
 
-**Checkpoint**: the release contract is pinned by tests, the four-command gate
-passes, and a local `--dir` packaging run succeeds.
+**Checkpoint**: the release contract is verified manually via quickstart.md, the
+four-command gate passes, and a local `--dir` packaging run succeeds.
 
 ---
 
@@ -365,8 +368,10 @@ manifest update is visible for a failed build or verification (FR-010).
 - [P] tasks touch disjoint files; the workflow-file tasks (T006, T007, T010,
   T012) are strictly sequential.
 - The release workflow cannot be executed locally; the tag→release→install flow
-  is validated on a fork per quickstart.md, and every machine-checkable contract
-  is pinned by `tests/release/release-contracts.test.ts` (research R7).
+  is validated on a fork per quickstart.md. The release contract is verified
+  manually — the `tests/release/release-contracts.test.ts` suite that once
+  pinned it was removed 2026-08-05 (spec 009 Assumptions; it went stale across
+  version bumps, failing on `main` at v0.0.83).
 - `.ps1` scripts are used for all PowerShell (AGENTS.md: never `.bat`).
 - The existing Playwright e2e suite covers the app's user-visible behaviour and
   must remain green throughout (this feature adds no renderer surface).
@@ -375,4 +380,4 @@ manifest update is visible for a failed build or verification (FR-010).
   failure-safety hardening.
 - Deviations from the research/plan must be written there per AGENTS.md; the
   artifact set and failure contract live in `contracts/release.md` and are
-  enforced by the contract tests.
+  verified manually per quickstart.md.

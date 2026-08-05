@@ -68,7 +68,7 @@ Versioned metadata that installs the artifact for a specific package manager.
 | `description` / `homepage` / `license` | string | present |
 | `architecture.64bit.url` | string | the release download URL for the windows portable zip (FR-007) |
 | `architecture.64bit.hash` | string | SHA-256 of that zip, lowercase (FR-008) |
-| `architecture.64bit.bin` | array | `[["Another Markdown Editor.exe", "another-markdown-editor"]]` |
+| `architecture.64bit.bin` | array | `[["ameditor.exe", "ameditor"]]` |
 
 ### Homebrew formula (`Formula/another-markdown-editor.rb`)
 

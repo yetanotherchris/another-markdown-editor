@@ -153,33 +153,28 @@ also serve Linux per FR-006.
 
 **Decision**: The feature adds no renderer surface, so the Playwright e2e
 requirement of AGENTS.md applies to the app's user-visible behaviour only — the
-existing suite must remain green (regression gate). New coverage is a Vitest
-"contract" suite in `tests/release/` that validates the *shipped artifacts*
-without running GitHub Actions:
-- the workflow file's trigger regex, job structure, reachability gate, matrix
-  legs, `--publish never`, `fail_on_unmatched_files`, and minimal
-  `permissions: contents: write` (FR-001/002/004/009/013, US1 scenarios 1/3/4),
-  asserted via structural text checks (deliberately NOT a YAML parse — see
-  below);
-- the Scoop manifest parses as JSON and has the required `version` /
-  `architecture.64bit.{url,hash,bin}` fields;
-- the Homebrew formula contains the required per-OS/arch blocks and placeholder
-  structure;
-- the README contains the installation section and the exact documented brew /
-  scoop commands (FR-011, US3 scenarios 1–3).
+existing suite must remain green (regression gate). The shipped release
+artifacts (workflow structure, Scoop manifest JSON, Homebrew formula shape,
+README install section) are verified **manually** via quickstart.md, because an
+automated release-contract suite drifts stale across version bumps (the earlier
+`tests/release/` Vitest suite was removed 2026-08-05 — spec 009 Assumptions).
 
 **Rationale**: The only verifiable-in-repo artefacts are the committed workflow
 and package definitions plus the README; the actual release run is verified
-manually via quickstart.md (tag → release → install). Structure-level assertions
-are robust to cosmetic edits and fail loudly when a requirement (trigger, gate,
-permissions, manifest fields) regresses.
+manually via quickstart.md (tag → release → install). A manual checklist is
+robust to cosmetic edits and version drift without the maintenance cost of
+pinning the exact current release in tests.
 
-**Alternatives considered**: Parsing the workflow with a YAML library — GitHub
-workflow files use the reserved `on:` key and parsing them accurately needs a
-specialised YAML mode; line/block structure assertions are simpler and sufficient
-for a contract test (rejected). Attempting to run the real workflow in CI here —
-impossible; releases need a real GitHub repo (out of scope; covered by
-quickstart.md on a fork).
+**Alternatives considered**: A Vitest "contract" suite asserting the workflow's
+trigger regex, job structure, `--publish never`, `permissions`, the Scoop
+manifest fields, and the README commands (the original R7) — it duplicated
+manual checks and went stale every release bump (the suite failed on `main` at
+v0.0.83 because it still asserted `0.1.0`), so it was removed (rejected).
+Parsing the workflow with a YAML library — GitHub workflow files use the
+reserved `on:` key and parsing them accurately needs a specialised YAML mode
+(rejected). Attempting to run the real workflow in CI here — impossible;
+releases need a real GitHub repo (out of scope; covered by quickstart.md on a
+fork).
 
 ## R8 — Release ordering: draft → manifests → publish
 

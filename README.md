@@ -18,3 +18,5 @@ brew install yetanotherchris/tap/another-markdown-editor
 scoop bucket add another-markdown-editor https://github.com/yetanotherchris/another-markdown-editor
 scoop install another-markdown-editor
 ```
+
+Launch the editor with `ameditor` on every platform.

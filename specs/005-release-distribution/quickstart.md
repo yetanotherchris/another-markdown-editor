@@ -5,8 +5,8 @@
 
 Manual validation of the release pipeline end-to-end. The GitHub Actions
 workflow cannot run locally, so the real tag→release→install flow is validated
-on a fork (or the real repo, with care). The machine-checkable parts are
-covered by `npm run test` (`tests/release/release-contracts.test.ts`).
+on a fork (or the real repo, with care). There is no automated release-contract
+suite (removed 2026-08-05); the checks below are the verification path.
 
 ## Prerequisites
 
@@ -27,13 +27,11 @@ covered by `npm run test` (`tests/release/release-contracts.test.ts`).
 npm ci
 npm run lint
 npm run typecheck
-npm run test          # includes tests/release/release-contracts.test.ts
+npm run test          # unit suites; no release-contract suite (removed 2026-08-05)
 npm run test:e2e      # existing regression gate must stay green
 ```
 
-Expected: all four commands exit 0. `npm run test` reports the release-contract
-tests (workflow trigger/gates/permissions, Scoop manifest JSON shape, Homebrew
-formula shape, README commands) passing.
+Expected: all commands exit 0.
 
 ## 2. Package locally (proves electron-builder config)
 
@@ -44,7 +42,7 @@ npx electron-builder --publish never --linux       # on Linux
 ```
 
 Expected: `dist/` contains the artifacts named per contracts §2
-(`Another Markdown Editor-<version>-windows-x64.exe`,
+(`ameditor-<version>-windows-x64.exe`,
 `...-windows-x64.zip`, `...-macos-x64.dmg`/`...-macos-x64.zip`, `...-linux-x64.AppImage`).
 On macOS, `CSC_IDENTITY_AUTO_DISCOVERY=false` is required (no signing). Note the
 name is `-windows-x64.exe` / `-windows-x64.zip`, NOT `-setup.exe` /
@@ -93,7 +91,7 @@ macOS/Linux:
 
 ```bash
 brew install yetanotherchris/tap/another-markdown-editor
-another-markdown-editor --version   # or launch the app
+ameditor --version   # or launch the app
 ```
 
 Windows:
@@ -103,7 +101,8 @@ scoop bucket add another-markdown-editor https://github.com/yetanotherchris/anot
 scoop install another-markdown-editor
 ```
 
-Expected: the installed app version equals the tag version (US2 s1–2).
+Expected: the installed app version equals the tag version (US2 s1–2), and
+`ameditor` is the command that launches it on every platform.
 Verify the checksum path: `scoop install` fails if the manifest hash does not
 match the downloaded artifact (US2 s3).
 
