@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Opencode Desktop UI Appearance
+# Specification Quality Checklist: Modern Grey UI
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-08-05
