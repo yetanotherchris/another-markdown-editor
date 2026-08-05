@@ -36,10 +36,18 @@ const explorerPanelRef = usePanelRef<PanelImperativeHandle>()
 - `toggleExplorer()`: `explorerCollapsed ? explorerPanelRef.current?.expand() : explorerPanelRef.current?.collapse()`.
 - `onResize(panelSize)`: `setExplorerCollapsed(panelSize.asPercentage <= 0)`;
   on any change persist `updateSettings({ explorerVisible: !collapsed })` +
-  `window.api.updateSettings(...)` (the `handleSidebarResize` pair).
-- Mount effect: if the loaded setting says hidden, `explorerPanelRef.current?.collapse()`.
+  `window.api.updateSettings(...)` (the `handleSidebarResize` pair). The
+  transient size-0 the Group reports while a Panel mounts is suppressed by an
+  `explorerRestoreDoneRef` guard so it is not persisted as a user choice; a
+  collapsed (0) width is never persisted (writes a 0 `sidebarWidth`, which
+  re-runs the Panel's registration effect and wipes `expandToSize`).
+- Opening a folder always reveals the explorer (clarification 2026-08-05) — there
+  is no launch-time restore of a persisted hidden choice to observe, so no mount
+  collapse effect exists (clarification 2026-08-06).
 - Rendered tree: `{hasWorkspace && (<><Panel collapsible collapsedSize={0} …/>
-  {explorerCollapsed ? null : <Separator/>}</>)}`.
+  <Separator style={collapsed ? { visibility: 'hidden' } : undefined}/></>)}`
+  — the Separator is ALWAYS mounted and hidden while collapsed (verified
+  2026-08-05: unmounting it re-runs the Panel's registration effect).
 
 ## Hamburger command model
 
@@ -49,13 +57,18 @@ One source of truth for the dropdown — an ordered item list rendered by
 ```ts
 type HamburgerAction =
   | { kind: 'command'; label: string; command: MenuCommand; accelerator?: string }
-  | { kind: 'recent'; label: string }
+  | { kind: 'recent-items' }   // a parent menuitem opening the Recent Items submenu
   | { kind: 'action'; label: string; action: 'clear-recent' | 'toggle-devtools' | 'quit' }
   | { kind: 'separator' }
 ```
 
-Order: `new-file`, `open-file`, `open-folder`, `recent` group, separator,
+Order: `new-file`, `open-file`, `open-folder`, `recent-items`, separator,
 `save`, `save-as`, `close-tab`, separator, `toggle-devtools`, separator, `quit`.
+
+The Recent Items submenu entries are computed by `recentMenuEntries(items)`
+(folders, separator, files, separator, Clear Recent Items — mirroring
+`menu.ts`), each carrying its full path so the renderer can feed it back via
+`openRecentFile` / `runFolderOpenFlow`.
 
 `App.tsx` extracts the body of the current `onMenuCommand` listener into
 `handleMenuCommand(command: MenuCommand)`; the hamburger's `onCommand` prop and
@@ -76,8 +89,9 @@ interface TabBarProps {
 
 - `documents.length === 0` ⇒ render the strip with only the "+" button (spec
   edge: "+" stays present without a workspace).
-- Otherwise render tabs in order, inserting the "+" immediately after the
-  active tab's DOM node (FR-004 literal).
+- Otherwise render tabs in order; the "+" is pinned at the end of the strip
+  (`position: sticky; right: 0`) so it stays reachable as tabs scroll or
+  reorder (user decision 2026-08-06, superseding FR-004's literal reading).
 
 ## Aria contract (e2e anchors)
 

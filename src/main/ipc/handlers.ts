@@ -677,8 +677,15 @@ export function setupHandlers(window: BrowserWindow): void {
   // Request a quit through the normal window-close flow (research R4): the
   // close handler sends `app:quitRequested`, the renderer flushes and prompts
   // for unsaved changes, then calls confirmQuit. Never call app.quit() here.
+  // Crucially this must NOT arm `allowClose`: the close handler has to
+  // intercept first (review 2026-08-06) so a dirty document is never discarded
+  // silently — `quit:respond` (the renderer's confirmation) re-enters
+  // `tryCloseWindow()`, which is the only path allowed to set `allowClose`.
   ipcMain.handle('app:requestQuit', (): Result<null> => {
-    tryCloseWindow()
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0) {
+      windows[0].close()
+    }
     return ok(null)
   })
 

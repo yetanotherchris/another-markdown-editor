@@ -73,24 +73,30 @@ export default function HamburgerMenu({ onCommand }: HamburgerMenuProps) {
   }, [loadRecent, setSubmenuOpenSync])
 
   const toggle = useCallback(() => {
-    setOpen((prev) => {
-      if (prev) return false
+    if (open) {
+      setOpen(false)
+      setSubmenuOpenSync(false)
+    } else {
+      // The fetch lives OUTSIDE the state updater: React StrictMode double-
+      // invokes updaters in dev, which would fire two IPC requests per open.
       loadRecent()
-      return true
-    })
-  }, [loadRecent])
+      setOpen(true)
+    }
+  }, [open, loadRecent, setSubmenuOpenSync])
 
-  // Outside click closes the dropdown (US4 scenario 2).
+  // Outside click closes the dropdown (US4 scenario 2). The submenu must be
+  // collapsed too (review 2026-08-06), else the next open auto-expands it.
   useEffect(() => {
     if (!open) return
     const onPointerDown = (e: PointerEvent) => {
       if (!menuRef.current?.contains(e.target as Node) && !triggerRef.current?.contains(e.target as Node)) {
         setOpen(false)
+        setSubmenuOpenSync(false)
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
+  }, [open, setSubmenuOpenSync])
 
   // Escape closes the submenu first (focus returning to its parent item), then
   // the whole dropdown, then returns focus to the trigger (FR-009).

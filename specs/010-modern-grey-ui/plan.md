@@ -10,7 +10,8 @@ Restyle the application chrome to the user-provided rounded-corner, modern grey
 look and reorganize the primary workspace controls. A **hamburger menu** (a React
 dropdown — user decision, not an OS-native menu) and an adjacent **file-explorer
 toggle** sit in a new top-left chrome bar. The "New File" text button is replaced
-by a **"+" icon button placed immediately after the active tab** (FR-004). The
+by a **"+" icon button at the end of the tab strip** (clarification 2026-08-06,
+superseding FR-004's literal reading). The
 tab bar is restyled to the grey palette with a `#EAEAEA` active-tab pill
 (edit icon + truncated label + XMark close). The **native menu bar is removed**
 on Windows/Linux (FR-002) and its keyboard accelerators are re-registered in the
@@ -92,8 +93,8 @@ dialogs (spec 008, untouched), file operations, and explorer behaviour.
 | Principle | Gate | Status |
 |-----------|------|--------|
 | I. Process Isolation Is Absolute | All new chrome is renderer-side. The four new IPC operations are named methods on `DesktopApi`, and shortcuts are registered main-side (`before-input-event`) reusing the existing `menu:command` channel. No generic invoke, no new main-only chrome | **PASS** |
-| II. Every Path Is Untrusted | `getRecentItems` returns display strings (labels shortened by the existing `shortenPath`); the renderer never feeds them back to the filesystem. No filesystem path crosses the new IPC. `explorerVisible` is validated as a boolean in main before save | **PASS** |
-| III. Never Lose The User's Words | Save/close/quit decision flows are unchanged. Hamburger Quit triggers `mainWindow.close()`, which runs the exact `app:quitRequested` → renderer flush → native unsaved-changes flow as the window X (research R4) | **PASS** |
+| II. Every Path Is Untrusted | `getRecentItems` returns full `RecentItem[]` — display labels (shortened by `shortenPath`) AND their paths cross the IPC, and the renderer feeds those paths back via `openRecentFile`/`runFolderOpenFlow`. This is safe because main re-validates every such path against the recorded recent list (`isRecentEntry`) before any filesystem access. `explorerVisible` is validated as a boolean in main before save | **PASS** |
+| III. Never Lose The User's Words | Save/close/quit decision flows are unchanged. Hamburger Quit triggers `mainWindow.close()` WITHOUT pre-arming `allowClose`, so the close handler sends `app:quitRequested` → renderer flush → native unsaved-changes flow, exactly as the window X (research R4). The pre-arming bug (`requestQuit` calling `tryCloseWindow()`) was found in review and fixed 2026-08-06 | **PASS** |
 | IV. Calm, Predictable Editing | The explorer toggle animates through the panels library without stealing focus (the toggle button keeps focus); the hamburger is click-opened; nothing runs on the keystroke path except the synchronous shortcut lookup | **PASS** |
 | V. Test What Can Corrupt Or Escape | New unit tests pin the shortcut map and settings validation; e2e drives the hamburger, the "+" button, and the explorer toggle including restart persistence, and migrates every spec that referenced the removed toolbar buttons / native menu | **PASS** |
 
@@ -158,14 +159,18 @@ re-registered in a new electron-free-pure `src/main/shortcuts.ts`:
 `webContents.on('before-input-event')` handler that sends `menu:command` (the
 same channel the old menu used) and `preventDefault()`s when matched. F12 /
 Ctrl+Shift+I toggles devtools main-side directly. macOS keeps a minimal native
-application menu (About/Edit-roles/Quit plus the accelerators) because the system
-menu bar is mandatory there and cannot be removed; the in-window hamburger is
-present on all platforms (platform deviation, complexity table).
+application menu (About + Edit-roles + Quit) because the system menu bar is
+mandatory there and cannot be removed; the File/View accelerators are handled by
+the shortcut mapper on all platforms (including macOS), so the macOS menu does
+not repeat them (menu.ts docstring, review 2026-08-06). The in-window hamburger
+is present on all platforms (platform deviation, complexity table).
 
 **Tab bar restyle + "+" button** — `TabBar` gains `onNew: () => void`. The "+"
-button (Heroicons `Plus`) is placed immediately after the active tab (FR-004
-literal reading; the tab order is unchanged and the "+" is inserted in DOM right
-after the active tab). With zero documents the strip still renders with the "+"
+button (Heroicons `Plus`) is pinned at the end of the tab strip
+(`position: sticky; right: 0`), after the last tab, so it stays reachable as
+tabs scroll or reorder (user decision 2026-08-06; overrides FR-004's literal
+"immediately after the active tab" — see Decision log). With zero documents the
+strip still renders with the "+"
 at its start (spec edge: the "+" must remain present when no workspace is open).
 The strip keeps its overflow scrolling and the "+" stays reachable through it.
 Active tab: `#EAEAEA` rounded pill containing a decorative `PencilSquare` edit
@@ -278,9 +283,11 @@ unchanged.
 | New runtime dependency `@heroicons/react` | The spec's Assumptions name Heroicons (`Bars3`, `Squares2x2`, `Plus`, `XMark`, `PencilSquare`) and the user chose "Add Heroicons per spec" over reusing `lucide-react` on 2026-08-05. The chrome icons are a user-visible, spec-pinned deliverable | Reusing `lucide-react` (constitution-preferred) would not render the exact icons the spec and the user asked for |
 | Removing the native menu bar and re-implementing Recent Items / Quit / DevTools in the renderer (four new IPC ops + a shortcut module) | FR-002 removes the menu bar and FR-001 moves its actions into the renderer hamburger; recent items, quit, and devtools are main-owned today, so the renderer needs named operations to reach them | Keeping the native menu (violates FR-002) or a generic `invoke(channel, …)` (forbidden by Principle I) |
 | macOS keeps a minimal native application menu while Windows/Linux remove theirs | The macOS system menu bar is mandatory (OS requirement); it cannot be "no longer shown". The in-window hamburger exists on all platforms | Removing the macOS menu entirely is not possible; forcing the hamburger to also render native roles is duplicative |
-| "+" button literally placed immediately after the active tab | FR-004 and US1 scenario 2 say "immediately after the active tab" (repeated in the Assumptions); when the active tab is mid-strip the "+" sits mid-strip, which some tabbed UIs avoid by pinning "+" at the end | Pinning "+" at the strip end is the common pattern but contradicts the spec text; the literal reading is the recorded decision (reversible) |
+| "+" button pinned at the end of the tab strip instead of literally after the active tab | FR-004/US1 scenario 2 said "immediately after the active tab", and the original plan recorded that literal reading. When the active tab is mid-strip a literal "+" would jump around and be unreachable at the strip's scroll end; pinning it (`position: sticky; right: 0`) keeps it fixed and always reachable. User decision 2026-08-06 (review finding) superseded the literal reading; spec.md/plan.md/contracts were amended | Following the literal reading produces a "+" that moves with the active tab and can scroll out of reach with many tabs |
 
-## Decision log (2026-08-05)
+## Decision log
+
+### 2026-08-05
 
 - Icon library: `@heroicons/react@^2.2.0` added per spec and user decision; the
   four chrome icons come from `@heroicons/react/24/outline`. Peer range
@@ -335,3 +342,59 @@ unchanged.
   `before-input-event` handler, so Ctrl+N/O/S could not be exercised that way.
   `sendInputEvent` goes through the real shortcut pipeline. `pressShortcut` in
   `chrome.spec.ts` wraps it.
+
+### 2026-08-06 (code-review round)
+
+- **Quit data-loss fix (verified):** the original `app:requestQuit` handler
+  called `tryCloseWindow()`, which pre-arms `allowClose = true` before
+  `window.close()` — the close handler then returned early and NEVER sent
+  `app:quitRequested`, so the renderer's flush + unsaved-changes prompt never
+  ran and dirty documents were silently discarded (Principle III violation).
+  Found by the correctness/security review subagents. `requestQuit` now calls
+  `window.close()` directly without arming `allowClose`; only the renderer's
+  confirmed `quit:respond` may arm it. Two e2e tests now click hamburger Quit
+  with a dirty document (Cancel keeps the app open; Discard and Quit closes).
+- **Hamburger submenu state (verified):** the toggle-close and outside-click
+  close paths reset only `open`, leaving `submenuOpen`/`submenuOpenRef` true, so
+  the next open auto-expanded the Recent Items submenu. Both paths now call
+  `setSubmenuOpenSync(false)`. The `loadRecent()` fetch was also moved OUT of the
+  `setOpen` updater (React StrictMode double-invokes updaters in dev → two IPC
+  fetches per open).
+- **Launch-time explorer restore removed (FR-007 re-scoped):** the
+  restore-on-workspace-mount effect was dead code — the sidebar only mounts
+  while a workspace is open, and a workspace only arrives via `commitFolderOpen`,
+  which always calls `revealExplorer()` and sets `explorerVisible: true`
+  synchronously before the deferred collapse could run. A persisted
+  `explorerVisible: false` can never be observed on launch. The effect and its
+  misleading comments were removed; `revealExplorer` no longer arms the mount
+  guard (which would persist the transient size-0 as hidden on the reveal path).
+  spec.md FR-007/US2 scenario 3/SC-005 and contracts §E2e item 4 were amended
+  (user-approved).
+- **"+" pinned at end of tab strip (user decision):** code review flagged that
+  the "+" is pinned at the strip end, contradicting FR-004's literal reading
+  that the original plan recorded. The user decided to keep the current
+  behaviour ("It's fine how it currently works"); spec.md FR-004/US1 scenario 2,
+  the complexity table, and contracts §E2e item 1 were amended to record it.
+- **`recent:list` strict read (verified):** the handler does a strict read —
+  probe `path.dirname(config)` is a directory, parse the config file, `ENOENT` →
+  `ok([])`, any other failure → `err('IO', …)` — instead of delegating to
+  `loadRecentItems`. It is a defensive superset (a corrupt config never surfaces
+  a malformed list); the contract was reworded to describe it. The old
+  "display strings only" wording was also wrong: full paths cross the IPC and
+  the renderer feeds them back, which is safe only because main re-validates
+  with `isRecentEntry`. Both contracts/renderer.md and the Constitution Check II
+  row were corrected.
+- **Footer restyled to the palette:** plan/tasks listed `.app-footer` among the
+  FR-006 chrome rules; the code had left it at `#fafafa`/`#e0e0e0`/`#555`. Now
+  `var(--ame-surface)`/`var(--ame-border)`/`var(--ame-muted)`. The
+  `.footer-placeholder`/`.footer-note` colours keep their WCAG-AA contrast;
+  their comments now cite the new background.
+- **Tab warning colour recorded:** `.tab-warning` `#b8453a` is an off-palette
+  colour whose CSS comment cited a "decision 2026-08-05" that did not exist.
+  Recorded here: the grey palette has no red, so a desaturated red keeps the
+  deleted-on-disk warning semantic while harmonising with the palette.
+- **macOS menu wording fixed:** plan claimed the macOS menu keeps "the
+  File/View accelerators"; `menu.ts` omits them (the shortcut mapper covers all
+  platforms). plan.md now matches the code.
+- **Sidebar top padding:** the user asked for a few more pixels of top padding
+  on the file explorer; `.sidebar` gained `padding-top: 8px` (2026-08-06).

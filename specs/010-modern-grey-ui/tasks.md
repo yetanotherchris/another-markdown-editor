@@ -306,3 +306,11 @@ editor content area keeps its exact colors (FR-010).
 - Deviations from the research/plan must be written there per AGENTS.md — the
   shortcut table and aria names live in `contracts/renderer.md` and are enforced
   by unit tests and `chrome.spec.ts`.
+- Review round 2026-08-06 (code-review subagents on PR #24): fixed a
+  data-loss bug where hamburger Quit pre-armed `allowClose` and skipped the
+  dirty-doc prompt (added two Quit e2e tests), reset the hamburger submenu on
+  close paths, removed the dead launch-time explorer-restore effect (FR-007
+  re-scoped via spec clarification 2026-08-06), and pinned the "+" at the end
+  of the tab strip (user decision, superseding FR-004's literal reading). All
+  deviations are recorded in spec.md / plan.md / research.md / contracts /
+  data-model.md.

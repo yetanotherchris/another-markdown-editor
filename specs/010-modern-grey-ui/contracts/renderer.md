@@ -8,14 +8,18 @@ generic `invoke(channel, …)`.
 
 | Operation | Channel | Request | Response | Main handler behaviour |
 |-----------|---------|---------|----------|------------------------|
-| `getRecentItems()` | `recent:list` | — | `Result<RecentItem[]>` | `loadRecentItems(recentItemsConfigPath())` (existing module) |
+| `getRecentItems()` | `recent:list` | — | `Result<RecentItem[]>` | Strict read: probe `path.dirname(config)` is a directory, then parse `recentItemsConfigPath()`; `ENOENT` → `ok([])`; any other failure → `err('IO', …)`. Deliberate superset of `loadRecentItems` (recorded in plan.md, review 2026-08-06) so a corrupt config never surfaces a malformed list |
 | `clearRecentItems()` | `recent:clear` | — | `Result<null>` | `saveRecentItems(…, [])` best-effort + `notifyRecentItemsOk()` / `reportRecentItemsWarning(e, 'clear')` (extract from `menu.ts` `clearRecentItems`) |
-| `requestQuit()` | `app:requestQuit` | — | `Result<null>` | `mainWindow.close()` — re-enters the existing quit → `app:quitRequested` → dirty-doc flow |
+| `requestQuit()` | `app:requestQuit` | — | `Result<null>` | `mainWindow.close()` WITHOUT pre-arming `allowClose` — the close handler sends `app:quitRequested`, the renderer flushes and prompts for unsaved changes, then confirms via `quit:respond` (Principle III, review 2026-08-06) |
 | `toggleDevTools()` | `devtools:toggle` | — | `Result<null>` | `window.webContents.toggleDevTools()` |
 
 Preload (`src/preload/index.ts`): four named methods invoking those channels.
-`getRecentItems` returns only display strings (labels shortened by the shared
-`shortenPath`); no path is re-validated or re-used by the renderer (Principle II).
+`getRecentItems` returns the full `RecentItem[]` — each entry carries the display
+label (shortened by the shared `shortenPath`) AND its path; the renderer feeds
+that path back via `openRecentFile(path)` / `runFolderOpenFlow(path)`. Main
+re-validates every such path against the recorded recent list (`isRecentEntry`)
+before any filesystem access, so Principle II holds even though a path crosses
+the IPC.
 
 ## Settings
 
@@ -71,15 +75,19 @@ menu fetches `window.api.getRecentItems()`; file entries →
 
 ## E2e coverage for the chrome (`chrome.spec.ts`)
 
-1. US1: hamburger + explorer-toggle buttons visible top-left; "+" button after
-   the active tab; active tab is a `#EAEAEA` pill with an edit icon, label,
-   close button; inactive tabs truncate.
+1. US1: hamburger + explorer-toggle buttons visible top-left; "+" button at the
+   end of the tab strip (clarification 2026-08-06 — a fixed, always-reachable
+   placement supersedes FR-004's literal "immediately after the active tab");
+   active tab is a `#EAEAEA` pill with an edit icon, label, close button;
+   inactive tabs truncate.
 2. US2 scenario 1: toggle hides the explorer, editor expands.
 3. US2 scenario 2: toggle again restores the previous width.
-4. US2 scenario 3 (amended 2026-08-05): hide → restart the app → the
-   persisted `explorerVisible` is restored as the toggle default; an explicit
-   folder open always reveals the explorer (reveal-on-open overrides a
-   persisted hidden choice).
+4. US2 scenario 3 (amended 2026-08-05/06): the explorer only mounts once a
+   folder is open, and opening a folder always reveals it (reveal-on-open
+   overrides a persisted hidden choice), so there is no launch-time restore of
+   a hidden state to observe. The e2e verifies: hide → persisted `false` is
+   written; restart → folder open reveals the explorer and persists `true`;
+   restart → folder open reveals again.
 5. US3: "+" opens a new untitled tab without discarding unsaved changes.
 6. US4: hamburger opens a dropdown; outside click closes it.
 7. FR-009: hamburger, toggle, and "+" are focusable and activatable with Enter.

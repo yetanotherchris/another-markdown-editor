@@ -822,12 +822,14 @@ export default function App() {
     }
     updateSettings({ sidebarWidth: size.asPercentage })
     window.api.updateSettings({ sidebarWidth: size.asPercentage }).catch(() => { /* ignore */ })
-    // Spec 010, US2 (FR-007): a collapse (size 0) or expand also updates the
-    // persisted explorer visibility. Guarded by the restore flag: while the
-    // panel mounts the Group reports a transient size 0 before laying out
-    // (verified 2026-08-05), and the initial restore below may collapse it —
-    // neither is the user's choice and must not be persisted.
-    if (!explorerRestoreDoneRef.current) return
+    // A non-collapsed panel IS visible, so persist true unconditionally. Main's
+    // settings merge reads the CURRENT state from disk, so two updates inside
+    // the 500 ms debounce window clobber each other (the sidebarWidth-only
+    // write above would otherwise resurrect a stale persisted "hidden" choice —
+    // the exact race that broke the reveal-on-open restart e2e, review
+    // 2026-08-06). The launch-time restore was removed the same day; the mount
+    // guard above still suppresses the transient size-0 from persisting a fake
+    // collapse.
     updateSettings({ explorerVisible: true })
     window.api.updateSettings({ explorerVisible: true }).catch(() => { /* ignore */ })
   }, [])
@@ -840,11 +842,13 @@ export default function App() {
     const panel = sidebarPanelRef.current
     if (!panel) return
     explorerRestoreDoneRef.current = true
-    const visible = panel.isCollapsed()
-    if (visible) panel.expand()
+    // isCollapsed() is true when the panel IS collapsed: expand then, else
+    // collapse, and persist the resulting state.
+    const currentlyCollapsed = panel.isCollapsed()
+    if (currentlyCollapsed) panel.expand()
     else panel.collapse()
-    updateSettings({ explorerVisible: visible })
-    window.api.updateSettings({ explorerVisible: visible }).catch(() => { /* ignore */ })
+    updateSettings({ explorerVisible: !currentlyCollapsed })
+    window.api.updateSettings({ explorerVisible: !currentlyCollapsed }).catch(() => { /* ignore */ })
   }, [])
 
   // Spec 004, FR-010: a folder switch rebinds the workspace-relative paths of
@@ -861,9 +865,11 @@ export default function App() {
   // even if it was previously hidden — an explicit open overrides the persisted
   // hidden choice so the newly opened workspace is always browsable. Runs on
   // every successful folder commit (both Open Folder and a recent-folder open
-  // route through commitFolderOpen).
+  // route through commitFolderOpen). The restore flag is deliberately NOT set
+  // here (review 2026-08-06): the panel has not mounted yet, and arming it
+  // would defeat the mount guard that suppresses the transient size-0 resize.
+  // Persistence is explicit on this path, so nothing is lost.
   const revealExplorer = useCallback(() => {
-    explorerRestoreDoneRef.current = true
     updateSettings({ explorerVisible: true })
     window.api.updateSettings({ explorerVisible: true }).catch(() => { /* ignore */ })
     const panel = sidebarPanelRef.current
@@ -1112,26 +1118,6 @@ export default function App() {
 
   const sidebarWidth = getSettings().sidebarWidth
   const hasWorkspace = workspace.name !== null
-
-  // Spec 010, US2 scenario 3 / FR-007: when a workspace mounts, restore the
-  // persisted explorer visibility. The panel mounts expanded at its saved
-  // width; a prior "hidden" choice collapses it here. The imperative
-  // collapse/isCollapsed calls are deferred to the next frame because the
-  // panels library registers a new Panel with its Group asynchronously — the
-  // imperative handle's constraint lookup throws "Panel constraints not found"
-  // if called in the mount effect (verified 2026-08-05).
-  useEffect(() => {
-    if (!hasWorkspace) return
-    const id = requestAnimationFrame(() => {
-      const panel = sidebarPanelRef.current
-      if (!panel) return
-      explorerRestoreDoneRef.current = true
-      if (!getSettings().explorerVisible && !panel.isCollapsed()) {
-        panel.collapse()
-      }
-    })
-    return () => cancelAnimationFrame(id)
-  }, [hasWorkspace])
 
   return (
     <div className="app-container">

@@ -66,8 +66,14 @@ Verified in `node_modules/react-resizable-panels/dist/react-resizable-panels.d.t
   callback is `onResize(panelSize: { asPercentage, inPixels }, id, prevPanelSize)`.
   Therefore drag-collapse/drag-expand is detected in `onResize` by
   `panelSize.asPercentage <= collapsedSize` ⇒ collapsed. On mount
-  `prevPanelSize` is undefined and `onResize` still fires, so the initial
-  collapse-from-settings applies the persisted state cleanly.
+  `prevPanelSize` is undefined and `onResize` still fires once with a transient
+  size 0 before the real layout size, so the App guards that first resize (an
+  `explorerRestoreDoneRef`) and never persists it as a user choice. There is no
+  launch-time collapse-from-settings to apply: the panel only mounts while a
+  workspace is open, and opening a folder always reveals the explorer
+  (clarification 2026-08-05), so a persisted hidden choice is never observed
+  (clarification 2026-08-06 — the launch-time restore effect was dead code and
+  was removed).
 - The `Separator` must be a direct child of the `Group`. It is ALWAYS mounted
   and hidden with `visibility: hidden` while collapsed: a conditional render
   (`{!collapsed && <Separator/>}`) makes the Group re-register the separator on
@@ -86,6 +92,14 @@ Verified in `node_modules/react-resizable-panels/dist/react-resizable-panels.d.t
   logic, Principle III preserved. `role: 'quit'` in the removed menu would have
   bypassed the renderer guard if naively re-added as `app.quit()`, so routing
   through window-close is the safe equivalent.
+- Verified 2026-08-06 (review round): the original `requestQuit` handler called
+  `tryCloseWindow()`, which sets `allowClose = true` BEFORE `window.close()` —
+  the close handler then returned early at `if (allowClose) return` and never
+  sent `app:quitRequested`, so the renderer's flush + unsaved-changes prompt
+  never ran and dirty documents were silently discarded (Principle III
+  violation). `requestQuit` now closes the window WITHOUT arming `allowClose`;
+  only the renderer's confirmed `quit:respond` may arm it. The contract's
+  "re-enters the quit → dirty-doc flow" wording is now true of the code.
 - FR-010 is honored by leaving every `.editor-host` / `.milkdown` /
   `.ProseMirror` / `.source-*` CSS rule byte-identical; only chrome rules
   (`.toolbar`, `.tab-bar`, `.tab*`, `.sidebar*`, `.resize-handle`, `.app-footer`)
@@ -119,3 +133,20 @@ Verified in `node_modules/react-resizable-panels/dist/react-resizable-panels.d.t
   `before-input-event` handler in the main process, so `keyboard.press` cannot
   drive Ctrl+N/O/S (verified 2026-08-05).
 - These migrations are required by FR-002, not optional cleanup.
+
+## R6 — `recent:list` handler shape (review round, 2026-08-06)
+
+- The contract originally said `recent:list` delegates to
+  `loadRecentItems(recentItemsConfigPath())`. The shipped handler instead does a
+  strict read: `fs.statSync(path.dirname(config))` must be a directory, then
+  `JSON.parse(fs.readFileSync(config))`, with `ENOENT` → `ok([])` and any other
+  failure → `err('IO', 'Recent Items could not be loaded')`. This is a
+  deliberate defensive superset — a corrupt config can never surface a
+  malformed list through the IPC — and it reuses the same `normalizeRecentItems`
+  shape so the renderer contract is unchanged. Recorded in the plan decision log
+  and reworded in contracts/renderer.md.
+- The old "returns only display strings; no path crosses the IPC" claim was
+  wrong: `RecentItem[]` carries full paths and the hamburger feeds them back via
+  `openRecentFile` / `runFolderOpenFlow`. Safe only because main re-validates
+  every such path against the recorded list (`isRecentEntry`) before any
+  filesystem access (Principle II).

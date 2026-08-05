@@ -160,7 +160,7 @@ test('US2 toggling back restores the previous explorer width', async () => {
   expect(Math.abs(widthAfter - widthBefore)).toBeLessThan(3)
 })
 
-test('US2 the persisted explorer state loads on restart; opening a folder reveals it', async () => {
+test('US2 a persisted hidden choice is overridden by reveal-on-open across restarts', async () => {
   // Phase 1: hide the explorer and let the debounced settings write land.
   await openFolder()
   await window.getByRole('button', { name: 'Toggle file explorer' }).click()
@@ -175,10 +175,15 @@ test('US2 the persisted explorer state loads on restart; opening a folder reveal
 
   // Phase 2: restart with the same config. A folder open always reveals the
   // explorer (reveal-on-open overrides a persisted hidden choice, clarification
-  // 2026-08-05).
+  // 2026-08-05), and that reveal is persisted (visible=true).
   ;({ app, window } = await launchApp())
   await openFolder()
   await expect.poll(sidebarWidth).toBeGreaterThan(50)
+  await expect.poll(() => {
+    const settingsPath = path.join(configDir, 'settings.json')
+    if (!fs.existsSync(settingsPath)) return undefined
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf-8')).explorerVisible
+  }).toBe(true)
 
   await closeAppDiscardingQuit(app)
 

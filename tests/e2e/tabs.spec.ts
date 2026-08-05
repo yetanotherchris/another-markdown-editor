@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, openHamburger } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -254,6 +254,30 @@ test('quitting with Save All writes every dirty document and closes the app', as
   // Save All wrote both dirty documents to disk before quitting.
   expect(fs.readFileSync(path.join(testFolder, 'alpha.md'), 'utf-8')).toContain('ALPHA')
   expect(fs.readFileSync(path.join(testFolder, 'beta.md'), 'utf-8')).toContain('BETA')
+})
+
+test('hamburger Quit with a dirty document prompts, and cancel keeps the app open', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' EXTRA')
+
+  await stubMessageBox(app, 'Cancel')
+  await clickHamburgerItem(window, 'Quit')
+
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
+  await expect(window.locator('.document-title')).toContainText('alpha.md')
+})
+
+test('hamburger Quit with Discard and Quit closes the application', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' EXTRA')
+
+  const closed = app.waitForEvent('close')
+  await stubMessageBox(app, 'Discard and Quit')
+  // Click Quit directly (not via clickHamburgerItem, whose post-click focus
+  // step cannot run once the app closes).
+  await openHamburger(window)
+  await window.getByRole('menuitem', { name: 'Quit' }).click()
+  await closed
 })
 
 test('external change to a clean document auto-reloads it', async () => {
