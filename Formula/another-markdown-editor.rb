@@ -1,16 +1,16 @@
 class AnotherMarkdownEditor < Formula
   desc "A WYSIWYG markdown editor for Windows, macOS, and Linux, built with Electron and Milkdown."
   homepage "https://github.com/yetanotherchris/another-markdown-editor"
-  version "0.0.94"
+  version "0.0.95"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.94/ameditor-0.0.94-macos-arm64.zip"
-      sha256 "b707f86eea26048853080b3785548cad450a3443dd31794b34c4e6ce550468ff"
+      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.95/ameditor-0.0.95-macos-arm64.zip"
+      sha256 "ec703095dfd5b66bbe2a59a38d4e440a6c134cdd94ecec98189e7beda4affb8f"
     else
-      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.94/ameditor-0.0.94-macos-x64.zip"
-      sha256 "9eaf2417b4dc46dbb4d00630276e26efc48b9c63a62bdcf5262cd5ab5876223f"
+      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.95/ameditor-0.0.95-macos-x64.zip"
+      sha256 "b9767437b04e58bd3cba5787bc4d34d894cfc851820f5a6a9187d9189089bb7b"
     end
   end
 
@@ -18,8 +18,8 @@ class AnotherMarkdownEditor < Formula
     if Hardware::CPU.arm?
       odie "Another Markdown Editor does not provide a Linux arm64 build"
     else
-      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.94/ameditor-0.0.94-linux-x64.AppImage"
-      sha256 "a8ffe5c249324ddfc2447b64371b5f2e39165fdbe918404683e9090863db6329"
+      url "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.95/ameditor-0.0.95-linux-x64.AppImage"
+      sha256 "b377d7968f6ebc8bd37987a963e935851a862a4d321e57ae1c4c05ffd04f1abc"
     end
   end
 
@@ -27,7 +27,7 @@ class AnotherMarkdownEditor < Formula
     if OS.mac?
       app.install "Another Markdown Editor.app"
     else
-      bin.install "ameditor-0.0.94-linux-x64.AppImage" => "ameditor"
+      bin.install "ameditor-0.0.95-linux-x64.AppImage" => "ameditor"
     end
   end
 
