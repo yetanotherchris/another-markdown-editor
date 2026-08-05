@@ -45,11 +45,14 @@ and `preventDefault()`s; it is installed once per window in `src/main/index.ts`.
 
 ## Hamburger item model
 
-Rendered by `HamburgerMenu`; accessible names are the labels. Recent Items
-submenu grouping mirrors `menu.ts`: folders, separator, files, separator,
-Clear Recent Items. On dropdown open the menu fetches
-`window.api.getRecentItems()`; file entries → `openRecentFile(path)`, folder
-entries → `runFolderOpenFlow(path)`.
+Rendered by `HamburgerMenu`; accessible names are the labels. Recent Items is
+its own parent menuitem (`aria-haspopup="menu"`, `aria-expanded`) that opens a
+nested submenu — mirroring the native `File > Recent Items`. The submenu
+grouping mirrors `menu.ts`: folders, separator, files, separator, Clear Recent
+Items (the folders/files separator renders only when both groups are non-empty;
+an empty history shows a disabled `No Recent Items` entry). On dropdown open the
+menu fetches `window.api.getRecentItems()`; file entries →
+`openRecentFile(path)`, folder entries → `runFolderOpenFlow(path)`.
 
 ## E2e helper contract (`tests/e2e/launch.ts` or `helpers.ts`)
 
@@ -73,8 +76,10 @@ entries → `runFolderOpenFlow(path)`.
    close button; inactive tabs truncate.
 2. US2 scenario 1: toggle hides the explorer, editor expands.
 3. US2 scenario 2: toggle again restores the previous width.
-4. US2 scenario 3: hide → restart the app → explorer stays hidden; show →
-   restart → stays visible.
+4. US2 scenario 3 (amended 2026-08-05): hide → restart the app → the
+   persisted `explorerVisible` is restored as the toggle default; an explicit
+   folder open always reveals the explorer (reveal-on-open overrides a
+   persisted hidden choice).
 5. US3: "+" opens a new untitled tab without discarding unsaved changes.
 6. US4: hamburger opens a dropdown; outside click closes it.
 7. FR-009: hamburger, toggle, and "+" are focusable and activatable with Enter.

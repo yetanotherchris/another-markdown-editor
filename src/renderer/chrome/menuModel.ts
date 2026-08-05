@@ -7,11 +7,12 @@ export type Platform = 'win32' | 'darwin' | 'linux'
 /**
  * Pure model for the spec-010 hamburger menu (contracts/renderer.md). Electron-
  * free and unit-testable; `HamburgerMenu` renders this structure. The recent
- * group is a slot filled at render time from `window.api.getRecentItems()`.
+ * items entry is a parent submenu (mirroring the native `File > Recent Items`);
+ * its content is filled at render time from `window.api.getRecentItems()`.
  */
 export type HamburgerItem =
   | { kind: 'command'; label: string; command: MenuCommand; accelerator?: string }
-  | { kind: 'recent-group' }
+  | { kind: 'recent-items' }
   | { kind: 'separator' }
   | { kind: 'action'; label: string; action: 'clear-recent' | 'toggle-devtools' | 'quit' }
 
@@ -50,7 +51,7 @@ export function hamburgerMenuStructure(platform: Platform): HamburgerItem[] {
     { kind: 'command', label: 'New File', command: 'new-file', accelerator: formatAccelerator('new-file', platform) },
     { kind: 'command', label: 'Open File…', command: 'open-file', accelerator: formatAccelerator('open-file', platform) },
     { kind: 'command', label: 'Open Folder…', command: 'open-folder', accelerator: formatAccelerator('open-folder', platform) },
-    { kind: 'recent-group' },
+    { kind: 'recent-items' },
     { kind: 'separator' },
     { kind: 'command', label: 'Save', command: 'save', accelerator: formatAccelerator('save', platform) },
     { kind: 'command', label: 'Save As…', command: 'save-as', accelerator: formatAccelerator('save-as', platform) },

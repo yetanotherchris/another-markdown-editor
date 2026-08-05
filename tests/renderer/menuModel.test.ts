@@ -13,17 +13,22 @@ function item(path: string, kind: RecentKind): RecentItem {
 }
 
 describe('hamburgerMenuStructure (spec 010)', () => {
-  it('orders File actions, recent group, Save/Close, devtools, Quit with separators', () => {
+  it('orders File actions, the Recent Items submenu parent, Save/Close, devtools, Quit with separators', () => {
     const items = hamburgerMenuStructure('win32')
-    expect(items.map((i) => (i.kind === 'separator' || i.kind === 'recent-group') ? i.kind : i.label)).toEqual([
+    expect(items.map((i) => (i.kind === 'separator' || i.kind === 'recent-items') ? i.kind : i.label)).toEqual([
       'New File', 'Open File…', 'Open Folder…',
-      'recent-group', 'separator',
+      'recent-items', 'separator',
       'Save', 'Save As…', 'Close Tab',
       'separator',
       'Toggle Developer Tools',
       'separator',
       'Quit'
     ])
+  })
+
+  it('exposes Recent Items as its own parent submenu entry (like File > Recent Items)', () => {
+    const recent = hamburgerMenuStructure('win32').find((i) => i.kind === 'recent-items')
+    expect(recent).toBeDefined()
   })
 
   it('maps every File command to a MenuCommand the renderer bus handles', () => {

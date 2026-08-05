@@ -8,11 +8,10 @@ import { atomicWrite } from '../fs/atomicWrite'
 import { mkdir, createFile, moveEntry, trashEntry } from '../fs/mutate'
 import { loadSettings, saveSettings } from '../settings'
 import { WorkspaceState } from '../workspace'
-import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem } from '../recentItems'
+import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem, normalizeRecentItems } from '../recentItems'
 import { recentItemsConfigPath } from '../recentItemsPath'
 import { reportRecentItemsWarning, notifyRecentItemsOk } from '../recentItemsWarning'
 import { scrubAbsolutePaths } from '../scrubPaths'
-import { refreshApplicationMenu } from '../menu'
 import { showNativeConfirmation } from '../dialogs'
 import { validateNativeDialogRequest } from './dialogValidation'
 import type {
@@ -167,7 +166,6 @@ export function setupHandlers(window: BrowserWindow): void {
     } catch (e: unknown) {
       reportRecentItemsWarning(e, 'save')
     }
-    refreshApplicationMenu()
   }
 
   function removeRecent(path_: string, kind: RecentKind): void {
@@ -179,7 +177,6 @@ export function setupHandlers(window: BrowserWindow): void {
     } catch (e: unknown) {
       reportRecentItemsWarning(e, 'save')
     }
-    refreshApplicationMenu()
   }
 
   /** Realpath-canonical form of an absolute path for recording (FR-006: raw
@@ -647,7 +644,21 @@ export function setupHandlers(window: BrowserWindow): void {
   // menu, so the actions that lived there move behind named operations) ----
 
   ipcMain.handle('recent:list', (): Result<RecentItem[]> => {
-    return ok(loadRecentItems(recentItemsConfigPath()))
+    const configPath = recentItemsConfigPath()
+    try {
+      // Strict read: a genuinely MISSING config (first run, or a cleared
+      // history that never re-wrote) is an empty history; an unreadable or
+      // broken config must surface as an error so the hamburger keeps offering
+      // Clear Recent Items (FR-011) instead of claiming the history is empty.
+      // Windows reports a file-as-parent as ENOENT, so probe the parent
+      // directory's type BEFORE reading the file to tell the two apart.
+      const dirStat = fs.statSync(path.dirname(configPath))
+      if (!dirStat.isDirectory()) throw new Error('config parent is not a directory')
+      return ok(normalizeRecentItems(JSON.parse(fs.readFileSync(configPath, 'utf-8'))))
+    } catch (e: unknown) {
+      if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return ok([])
+      return err('IO', 'Recent Items could not be loaded')
+    }
   })
 
   // FR-011: clearing is best-effort like record/remove — on a persistence
@@ -660,7 +671,6 @@ export function setupHandlers(window: BrowserWindow): void {
     } catch (e: unknown) {
       reportRecentItemsWarning(e, 'clear')
     }
-    refreshApplicationMenu()
     return ok(null)
   })
 

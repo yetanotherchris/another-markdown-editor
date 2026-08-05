@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, clickHamburgerItem } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -46,7 +46,7 @@ test.afterAll(async () => {
 })
 
 async function openFolder(): Promise<void> {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
 }
 
 async function openFile(name: string): Promise<void> {
@@ -113,31 +113,35 @@ test('US1 keyboard access to expand/collapse via the focused row (FR-013)', asyn
   await expect(window.getByRole('treeitem').getByText('gamma.md')).toBeVisible()
 })
 
-// ---------- US2: toolbar action buttons use icons ----------
+// ---------- US2: chrome action buttons use icons ----------
 
-test('US2 New and Open Folder buttons show icons with accessible names', async () => {
-  // Accessible names are preserved (text labels retained).
-  await expect(window.getByRole('button', { name: 'New' })).toBeVisible()
-  await expect(window.getByRole('button', { name: 'Open Folder' })).toBeVisible()
+test('US2 chrome buttons show icons with accessible names', async () => {
+  // The spec-010 chrome: hamburger, explorer toggle, and "+" new-file button
+  // all carry icons with accessible names (FR-009, FR-011).
+  await expect(window.getByRole('button', { name: 'Open menu' })).toBeVisible()
+  await expect(window.getByRole('button', { name: 'Toggle file explorer' })).toBeVisible()
+  await expect(window.getByRole('button', { name: 'New file' })).toBeVisible()
 
-  // Each carries a lucide icon inside the button.
-  const newIcon = await window.getByRole('button', { name: 'New' })
-    .locator('svg').count()
-  const openIcon = await window.getByRole('button', { name: 'Open Folder' })
-    .locator('svg').count()
+  // Each carries a heroicon inside the button.
+  const menuIcon = await window.getByRole('button', { name: 'Open menu' }).locator('svg').count()
+  const toggleIcon = await window.getByRole('button', { name: 'Toggle file explorer' }).locator('svg').count()
+  const newIcon = await window.getByRole('button', { name: 'New file' }).locator('svg').count()
+  expect(menuIcon).toBe(1)
+  expect(toggleIcon).toBe(1)
   expect(newIcon).toBe(1)
-  expect(openIcon).toBe(1)
 
-  // The two toolbar glyphs are genuinely different (Plus vs FolderOpen) — an
-  // "every button renders the same icon" regression must fail here.
-  const plusIcon = await window.getByRole('button', { name: 'New' }).locator('svg').innerHTML()
-  const folderOpenIcon = await window.getByRole('button', { name: 'Open Folder' }).locator('svg').innerHTML()
-  expect(plusIcon).not.toBe(folderOpenIcon)
+  // The chrome glyphs are genuinely distinct (Bars3 vs Squares2X2 vs Plus) —
+  // an "every button renders the same icon" regression must fail here.
+  const menuSvg = await window.getByRole('button', { name: 'Open menu' }).locator('svg').innerHTML()
+  const toggleSvg = await window.getByRole('button', { name: 'Toggle file explorer' }).locator('svg').innerHTML()
+  const newSvg = await window.getByRole('button', { name: 'New file' }).locator('svg').innerHTML()
+  expect(menuSvg).not.toBe(toggleSvg)
+  expect(toggleSvg).not.toBe(newSvg)
 })
 
-test('US2 toolbar buttons show a visible keyboard focus ring (FR-013)', async () => {
-  // First Tab in a fresh window lands on the first toolbar button (the toolbar
-  // precedes the tree in the DOM). A mouse click would not match :focus-visible,
+test('US2 chrome buttons show a visible keyboard focus ring (FR-013)', async () => {
+  // First Tab in a fresh window lands on the hamburger trigger (the first
+  // focusable chrome control). A mouse click would not match :focus-visible,
   // so drive focus with the keyboard.
   await window.keyboard.press('Tab')
   const focused = await window.evaluate(() => {
@@ -145,11 +149,11 @@ test('US2 toolbar buttons show a visible keyboard focus ring (FR-013)', async ()
     if (!el) return null
     const style = getComputedStyle(el)
     return {
-      label: el.textContent?.trim(),
+      label: el.getAttribute('aria-label') ?? el.textContent?.trim() ?? '',
       ring: style.outlineStyle !== 'none' && style.outlineWidth !== '0px'
     }
   })
-  expect(focused?.label).toContain('New')
+  expect(focused?.label).toContain('Open menu')
   expect(focused?.ring).toBe(true)
 })
 
@@ -220,8 +224,8 @@ test('US3 placeholders show with no workspace and no document', async () => {
 test('US3 the header no longer shows the active document (FR-011)', async () => {
   await openFolder()
   await openFile('alpha.md')
-  // The header toolbar has no document-title span; the footer carries it.
-  await expect(window.locator('.toolbar .document-title')).toHaveCount(0)
+  // The header row has no document-title span; the footer carries it.
+  await expect(window.locator('.header-bar .document-title')).toHaveCount(0)
   await expect(window.locator('.app-footer .document-title')).toContainText('alpha.md')
 })
 
@@ -246,7 +250,7 @@ test('US4 Inter is loaded from bundled assets (no network dependency)', async ()
 // ---------- Edges ----------
 
 test('untitled document shows its display title in the footer', async () => {
-  await window.getByRole('button', { name: 'New' }).click()
+  await clickHamburgerItem(window, 'New File')
   await expect(window.getByTestId('footer-document')).toContainText(/Untitled-\d/)
 })
 

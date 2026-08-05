@@ -1,7 +1,7 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
-import { Panel, Group, Separator } from 'react-resizable-panels'
+import { Panel, Group, Separator, usePanelRef } from 'react-resizable-panels'
 import type { TreeApi } from 'react-arborist'
-import { Plus, FolderOpen } from 'lucide-react'
+import { Squares2X2Icon } from '@heroicons/react/24/outline'
 import type { MenuCommand, EntryKind, WorkspaceInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
@@ -24,6 +24,7 @@ import EditorPanel from './editor/EditorPanel'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import StatusFooter from './status/StatusFooter'
+import HamburgerMenu from './chrome/HamburgerMenu'
 import {
   renameTargetPath,
   moveTargetPath,
@@ -55,6 +56,15 @@ export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(workspaceReducer, initialWorkspaceState)
   const [pendingEditId, setPendingEditId] = useState<string | null>(null)
   const [footerNote, setFooterNote] = useState<string | null>(null)
+  // Spec 010, US2: the persisted explorer visibility drives the initial
+  // collapsed state; handleSidebarResize keeps it in sync while the panel is
+  // mounted (FR-007).
+  const [explorerCollapsed, setExplorerCollapsed] = useState(false)
+  const sidebarPanelRef = usePanelRef()
+  // Spec 010, US2 (FR-007): set once the initial restore has run. Before that,
+  // resize events are the panel settling into its layout (or the restore
+  // collapsing it) and must not be persisted as the user's visibility choice.
+  const explorerRestoreDoneRef = useRef(false)
   const pendingCreateRef = useRef(new Set<string>())
   const createCounterRef = useRef(0)
   const treeApiRef = useRef<TreeApi<TreeNode> | null>(null)
@@ -796,8 +806,45 @@ export default function App() {
   }, [applyMove])
 
   const handleSidebarResize = useCallback((size: { asPercentage: number; inPixels: number }) => {
+    const collapsed = size.asPercentage <= 0
+    setExplorerCollapsed(collapsed)
+    // Never persist a collapsed (0) width. Writing 0 would change the Panel's
+    // `defaultSize` prop, which re-runs its registration effect and replaces
+    // the panel object — wiping the library's `expandToSize` so a toggle-expand
+    // snaps to minSize instead of the previous width (spec 010 US2 scenario 2,
+    // verified 2026-08-05). The collapsed visibility is persisted separately.
+    if (collapsed) {
+      if (explorerRestoreDoneRef.current) {
+        updateSettings({ explorerVisible: false })
+        window.api.updateSettings({ explorerVisible: false }).catch(() => { /* ignore */ })
+      }
+      return
+    }
     updateSettings({ sidebarWidth: size.asPercentage })
     window.api.updateSettings({ sidebarWidth: size.asPercentage }).catch(() => { /* ignore */ })
+    // Spec 010, US2 (FR-007): a collapse (size 0) or expand also updates the
+    // persisted explorer visibility. Guarded by the restore flag: while the
+    // panel mounts the Group reports a transient size 0 before laying out
+    // (verified 2026-08-05), and the initial restore below may collapse it —
+    // neither is the user's choice and must not be persisted.
+    if (!explorerRestoreDoneRef.current) return
+    updateSettings({ explorerVisible: true })
+    window.api.updateSettings({ explorerVisible: true }).catch(() => { /* ignore */ })
+  }, [])
+
+  // Spec 010, US2: the explorer toggle collapses/expands the sidebar panel
+  // (FR-005). The panel only exists while a workspace is open; the button is
+  // disabled otherwise (spec edge case). The choice is persisted explicitly so
+  // it does not depend on a resize event firing (FR-007).
+  const handleToggleExplorer = useCallback(() => {
+    const panel = sidebarPanelRef.current
+    if (!panel) return
+    explorerRestoreDoneRef.current = true
+    const visible = panel.isCollapsed()
+    if (visible) panel.expand()
+    else panel.collapse()
+    updateSettings({ explorerVisible: visible })
+    window.api.updateSettings({ explorerVisible: visible }).catch(() => { /* ignore */ })
   }, [])
 
   // Spec 004, FR-010: a folder switch rebinds the workspace-relative paths of
@@ -809,6 +856,19 @@ export default function App() {
     ),
     [isDirtyLive]
   )
+
+  // Spec 010 (clarification 2026-08-05): opening a folder reveals the explorer
+  // even if it was previously hidden — an explicit open overrides the persisted
+  // hidden choice so the newly opened workspace is always browsable. Runs on
+  // every successful folder commit (both Open Folder and a recent-folder open
+  // route through commitFolderOpen).
+  const revealExplorer = useCallback(() => {
+    explorerRestoreDoneRef.current = true
+    updateSettings({ explorerVisible: true })
+    window.api.updateSettings({ explorerVisible: true }).catch(() => { /* ignore */ })
+    const panel = sidebarPanelRef.current
+    if (panel && panel.isCollapsed()) panel.expand()
+  }, [])
 
   const commitFolderOpen = useCallback(async () => {
     const result = await window.api.commitFolderOpen()
@@ -824,7 +884,8 @@ export default function App() {
         entries: result.value.entries
       }
     })
-  }, [])
+    revealExplorer()
+  }, [revealExplorer])
 
   // Both entry points (File > Open Folder and a recent-folder open, FR-007)
   // route through the same prepare → (confirm) → commit flow. A second folder
@@ -904,10 +965,6 @@ export default function App() {
       releaseDialogSurface()
     }
   }, [commitFolderOpen, dirtyWorkspaceRelativeDocs, doClose, releaseDialogSurface, saveDocument])
-
-  const handleOpenFolder = useCallback(() => {
-    void runFolderOpenFlow()
-  }, [runFolderOpenFlow])
 
   // Spec 010: the single command bus for menu-driven actions — shared by the
   // native-menu IPC listener, the renderer hamburger, and the keyboard
@@ -1056,17 +1113,51 @@ export default function App() {
   const sidebarWidth = getSettings().sidebarWidth
   const hasWorkspace = workspace.name !== null
 
+  // Spec 010, US2 scenario 3 / FR-007: when a workspace mounts, restore the
+  // persisted explorer visibility. The panel mounts expanded at its saved
+  // width; a prior "hidden" choice collapses it here. The imperative
+  // collapse/isCollapsed calls are deferred to the next frame because the
+  // panels library registers a new Panel with its Group asynchronously — the
+  // imperative handle's constraint lookup throws "Panel constraints not found"
+  // if called in the mount effect (verified 2026-08-05).
+  useEffect(() => {
+    if (!hasWorkspace) return
+    const id = requestAnimationFrame(() => {
+      const panel = sidebarPanelRef.current
+      if (!panel) return
+      explorerRestoreDoneRef.current = true
+      if (!getSettings().explorerVisible && !panel.isCollapsed()) {
+        panel.collapse()
+      }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [hasWorkspace])
+
   return (
     <div className="app-container">
-      <div className="toolbar">
-        <button onClick={handleNew} title="Create a new document">
-          <Plus size={14} aria-hidden="true" />
-          New
-        </button>
-        <button onClick={handleOpenFolder} title="Open a folder in the explorer">
-          <FolderOpen size={14} aria-hidden="true" />
-          Open Folder
-        </button>
+      {/* Spec 010 (clarification 2026-08-05): one header row holds the chrome
+          buttons and the tabs — `[hamburger] [toggle] [tabs… +]`. */}
+      <div className="header-bar">
+        <div className="chrome-bar">
+          <HamburgerMenu onCommand={handleMenuCommand} />
+          <button
+            type="button"
+            className="chrome-icon-button"
+            aria-label="Toggle file explorer"
+            title="Toggle file explorer"
+            onClick={handleToggleExplorer}
+            disabled={!hasWorkspace}
+          >
+            <Squares2X2Icon className="chrome-icon" aria-hidden="true" />
+          </button>
+        </div>
+        <TabBar
+          documents={session.documents}
+          activeId={session.activeId}
+          onActivate={handleActivate}
+          onClose={handleCloseRequest}
+          onNew={handleNew}
+        />
       </div>
       <div className="main-area">
         <Group orientation="horizontal" className="panel-group">
@@ -1077,12 +1168,12 @@ export default function App() {
                 minSize="15"
                 maxSize="50"
                 className="sidebar-panel"
+                collapsible
+                collapsedSize={0}
+                panelRef={sidebarPanelRef}
                 onResize={handleSidebarResize}
               >
                 <div className="sidebar">
-                  <div className="sidebar-header">
-                    <span className="workspace-title">{workspace.name}</span>
-                  </div>
                   <Tree
                     data={workspace.nodes}
                     selectedId={workspace.selectedId}
@@ -1100,16 +1191,13 @@ export default function App() {
                   />
                 </div>
               </Panel>
-              <Separator className="resize-handle" />
+              <Separator
+                className="resize-handle"
+                style={explorerCollapsed ? { visibility: 'hidden' } : undefined}
+              />
             </>
           )}
           <Panel className="editor-panel">
-            <TabBar
-              documents={session.documents}
-              activeId={session.activeId}
-              onActivate={handleActivate}
-              onClose={handleCloseRequest}
-            />
             <div className="editor-area">
               {session.documents.length === 0 ? (
                 <div className="empty-state">

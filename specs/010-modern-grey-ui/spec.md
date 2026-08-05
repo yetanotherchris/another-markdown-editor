@@ -38,7 +38,7 @@ A user can show or hide the file explorer panel on the left using a single click
 
 1. **Given** the explorer panel is visible, **When** the user clicks the explorer toggle icon, **Then** the panel hides and the editor area expands to use the available width.
 2. **Given** the explorer panel is hidden, **When** the user clicks the explorer toggle icon again, **Then** the panel reappears with its previous width.
-3. **Given** the user has hidden the explorer and closed the application, **When** they reopen the application, **Then** the explorer remains hidden.
+3. **Given** the user has hidden the explorer and closed the application, **When** they reopen the application, **Then** the persisted hidden choice is restored as the toggle's default; an explicit folder open (Open Folder or a recent folder) reveals the explorer regardless (clarification 2026-08-05).
 
 ---
 
@@ -115,8 +115,7 @@ A user can click the hamburger menu icon to open a dropdown containing the appli
 
 ## Assumptions
 
-- The modern grey color palette has been provided by the user as exact values: primary background `#FFFFFF`; secondary/surface background `#F9F9FB`/`#F8F8FA`; active tab pill background `#EAEAEA`; primary text `#1A1A1A`/`#222222`; secondary/muted text `#666666`/`#707070`; borders and dividers `#E5E5E5`/`#ECECEC`; accent orange `#D96B27`; control/button background `#2D2D2D`.
-- The file explorer panel is positioned on the left side of the application window.
+- The modern grey color palette has been provided by the user as exact values: primary background `#FFFFFF`; secondary/surface background `#F9F9FB`/`#F8F8FA`; active tab pill background `#EAEAEA`; primary text `#1A1A1A`/`#222222`; secondary/muted text `#666666`/`#707070`; borders and dividers `#E5E5E5`/`#ECECEC`; accent orange `#D96B27`; control/button background `#2D2D2D`.- The file explorer panel is positioned on the left side of the application window.
 - The tab bar behavior (reordering, closing, scrolling) remains functionally unchanged; only visual styling is updated.
 - The + button creates a new untitled file in the current workspace.
 - The hamburger menu exposes all existing top-level actions; no new commands are introduced by this feature.
@@ -126,3 +125,20 @@ A user can click the hamburger menu icon to open a dropdown containing the appli
 - The active tab is rendered as a light gray pill (`#EAEAEA`) with rounded corners, containing an edit icon, the filename label, and a close button; inactive tab labels truncate with ellipsis when too long.
 - The "+" new-file button is placed immediately after the active tab in the tab bar.
 - The window uses a clean white canvas background and the top-right controls follow the standard Windows-style minimize/maximize/close layout.
+
+## Clarifications
+
+- **2026-08-05 — Tabs live in the header bar.** The tab bar is NOT a separate
+  strip below the chrome: the document tabs (pill-shaped, with the active tab as
+  the `#EAEAEA` pill) occupy the same top header row as the hamburger menu and
+  the explorer toggle — one unified header bar (`[hamburger] [explorer toggle]
+  [tabs… +]`). The sidebar and editor content sit below that header.
+- **2026-08-05 — Native menus are fully gone.** When this feature is complete no
+  OS-native File or View menu is visible on any platform; every action is
+  reachable only through the hamburger menu (reaffirms FR-002).
+- **2026-08-05 — Opening a folder reveals the explorer.** US2 scenario 3 is
+  amended: an explicit folder open (File > Open Folder or a recent folder)
+  always reveals the explorer, overriding a persisted `explorerVisible`
+  "hidden" choice. The persisted choice governs the toggle's default on a fresh
+  launch, but every folder open overrides it. This supersedes the earlier
+  behaviour where a hidden explorer stayed hidden across folder opens.

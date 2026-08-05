@@ -25,13 +25,13 @@ is pinned in `contracts/renderer.md`.
 
 **Purpose**: Verify the branch baseline before any change; add the icon dependency.
 
-- [ ] T001 Establish a green baseline on the `010-modern-grey-ui` branch
+- [X] T001 Establish a green baseline on the `010-modern-grey-ui` branch
       (created from clean `main` per AGENTS.md): run `npm run lint`,
       `npm run typecheck`, `npm run test`, and confirm the e2e suite passes
       (`npm run test:e2e`). Record the results in this file. Confirm the
       artifacts (`spec.md`, `plan.md`, `research.md`, `data-model.md`,
       `contracts/renderer.md`, `quickstart.md`) are present and consistent.
-- [ ] T002 [P] Add `@heroicons/react@^2.2.0` to `dependencies` in
+- [X] T002 [P] Add `@heroicons/react@^2.2.0` to `dependencies` in
       `package.json`, run `npm install`, and verify the four icons
       (`Bars3`, `Squares2x2`, `Plus`, `XMark`, `PencilSquare`) import from
       `@heroicons/react/24/outline` and typecheck (React 19 peer range verified
@@ -46,18 +46,18 @@ is pinned in `contracts/renderer.md`.
 **Goal: the persistence, IPC, shortcut, and command-bus foundations every user
 story depends on.**
 
-- [ ] T003 Add `explorerVisible: boolean` (default `true`) to the `Settings`
+- [X] T003 Add `explorerVisible: boolean` (default `true`) to the `Settings`
       interface in `src/shared/ipc-contract.ts`; add the field to the defaults
       and to the field-by-field validation in `src/main/settings.ts`
       (`loadSettings`, `saveSettings`); add it to the renderer defaults in
       `src/renderer/state/settings.ts`; add the merge branch
       `explorerVisible: typeof p.explorerVisible === 'boolean' ? p.explorerVisible : current.explorerVisible`
       to the `settings:update` handler in `src/main/ipc/handlers.ts`.
-- [ ] T004 [P] Write unit tests for the settings change
+- [X] T004 [P] Write unit tests for the settings change
       (`tests/main/settings.test.ts`): `explorerVisible` defaults to `true` on
       a missing field, survives round-trips, and rejects non-boolean values on
       update (data-model.md, contracts/renderer.md).
-- [ ] T005 Add the four named IPC operations to `DesktopApi` in
+- [X] T005 Add the four named IPC operations to `DesktopApi` in
       `src/shared/ipc-contract.ts`, their handlers in `src/main/ipc/handlers.ts`
       (or a new `src/main/menuIpc.ts`), and their preload methods in
       `src/preload/index.ts`:
@@ -67,18 +67,18 @@ story depends on.**
       `app:requestQuit` (`mainWindow.close()` — re-enters the existing
       quit/dirty-doc flow, Principle III), `toggleDevTools()` →
       `devtools:toggle` (`webContents.toggleDevTools()`). No generic channel.
-- [ ] T006 [P] Implement `src/main/shortcuts.ts`: a pure `matchShortcut(event)`
+- [X] T006 [P] Implement `src/main/shortcuts.ts`: a pure `matchShortcut(event)`
       → `MenuCommand | 'devtools' | null` for the six combinations
       (Ctrl/Cmd+N, +O, +Shift+O, +S, +Shift+S, +W) plus F12/Ctrl+Shift+I, and a
       `registerShortcuts(window)` that installs a `before-input-event` handler,
       sends `menu:command` for matches, and `preventDefault()`s (research R1).
       Write `tests/main/shortcuts.test.ts` covering every combination and
       non-matches (contracts/renderer.md table).
-- [ ] T007 Extract the body of the `onMenuCommand` listener in
+- [X] T007 Extract the body of the `onMenuCommand` listener in
       `src/renderer/App.tsx` into a stable `handleMenuCommand(command:
       MenuCommand)` callback so the IPC listener, the hamburger, and the keyboard
       shortcuts share one command bus (data-model.md).
-- [ ] T008 [P] Implement the pure hamburger item model + unit tests
+- [X] T008 [P] Implement the pure hamburger item model + unit tests
       (`tests/renderer/hamburger.test.tsx`): the ordered item list
       (data-model.md `HamburgerAction`), the Recent Items grouping helper
       (folders → separator → files → separator → Clear Recent Items, mirroring
@@ -101,37 +101,37 @@ quickstart.md §1.
 
 ### Implementation
 
-- [ ] T009 [US1] [US4] Build `src/renderer/chrome/HamburgerMenu.tsx` + chrome
+- [X] T009 [US1] [US4] Build `src/renderer/chrome/HamburgerMenu.tsx` + chrome
       styles: a `Bars3` button (`aria-label="Open menu"`,
       `aria-haspopup="menu"`, `aria-expanded`) opening a React dropdown of
       `<button role="menuitem">` rows with hover/active states; closes on
       outside click and Escape; focus moves into the menu on open and returns to
       the trigger on close (FR-009, research R2). Supports a nested Recent Items
       submenu.
-- [ ] T010 [US1] Replace the `.toolbar` in `src/renderer/App.tsx` with a
+- [X] T010 [US1] Replace the `.toolbar` in `src/renderer/App.tsx` with a
       `.chrome-bar` containing the `HamburgerMenu` and a `Squares2x2` explorer
       toggle button (`aria-label="Toggle file explorer"`); delete the lucide
       `Plus`/`FolderOpen` toolbar buttons (data-model.md aria contract).
-- [ ] T011 [US2] Wire the explorer collapse in `src/renderer/App.tsx`: the
+- [X] T011 [US2] Wire the explorer collapse in `src/renderer/App.tsx`: the
       sidebar `Panel` becomes `collapsible` with `collapsedSize={0}` and a
       `panelRef` from `usePanelRef()`; the toggle calls `collapse()`/`expand()`;
       `onResize` syncs `explorerCollapsed` (`asPercentage <= 0`) and persists
       `explorerVisible` via `updateSettings` + `window.api.updateSettings`; the
       Separator renders only while visible; the initial state applies on mount
       from the loaded setting (US2 scenarios 1–3, FR-008, research R3).
-- [ ] T012 [US1] Add the palette as CSS custom properties in
+- [X] T012 [US1] Add the palette as CSS custom properties in
       `src/renderer/App.css` and restyle the chrome rules (`.toolbar`→
       `.chrome-bar`, `.sidebar*`, `.resize-handle`, `.app-footer`, tab-bar base)
       with the FR-006 colors and rounded corners; leave every `.editor-host`,
       `.milkdown`, `.ProseMirror`, and `.source-*` rule byte-identical
       (FR-010).
-- [ ] T013 [US4] Dispatch the hamburger items in `App.tsx`: New File /
+- [X] T013 [US4] Dispatch the hamburger items in `App.tsx`: New File /
       Open File / Open Folder / Save / Save As / Close Tab via
       `handleMenuCommand`; Recent Items fetched with `getRecentItems()` on open
       (file → `openRecentFile(path)`, folder → `runFolderOpenFlow(path)`,
       Clear Recent Items → `clearRecentItems()`); Quit → `requestQuit()`;
       View > Toggle Developer Tools → `toggleDevTools()` (contracts/renderer.md).
-- [ ] T014 [US1] Confirm all chrome buttons are focusable with a visible focus
+- [X] T014 [US1] Confirm all chrome buttons are focusable with a visible focus
       ring and Enter/Space activation (FR-009); assert `aria-expanded` toggles
       with the dropdown.
 
@@ -149,22 +149,22 @@ replaces the old "New File" text button (FR-003, FR-004).
 
 ### Implementation
 
-- [ ] T015 [US1] [US3] Add `onNew: () => void` to `TabBarProps` in
+- [X] T015 [US1] [US3] Add `onNew: () => void` to `TabBarProps` in
       `src/renderer/tabs/TabBar.tsx`; render a Heroicons `Plus` button
       (`aria-label="New file"`) immediately after the active tab (FR-004
       literal); when `documents.length === 0` render the strip with only the
       "+" at its start (spec edge); keep the strip's overflow scrolling so the
       "+" stays reachable.
-- [ ] T016 [US1] Restyle tabs in `App.css`: the active tab is a `#EAEAEA`
+- [X] T016 [US1] Restyle tabs in `App.css`: the active tab is a `#EAEAEA`
       rounded pill containing a decorative `PencilSquare` edit indicator, the
       truncated label, and a Heroicons `XMark` close button (replacing the `×`
       glyph); inactive tabs keep truncated ellipsis labels and get grey hover
       states; recolour the dirty "•" and deleted-on-disk "!" markers to the
       palette while keeping their `aria-label`s.
-- [ ] T017 [US3] Pass `handleNew` as `TabBar`'s `onNew` in `App.tsx`; verify the
+- [X] T017 [US3] Pass `handleNew` as `TabBar`'s `onNew` in `App.tsx`; verify the
       "+" opens a new untitled tab without touching other tabs (US3 scenario 2:
       unsaved changes in the current tab are preserved).
-- [ ] T018 [US1] Update `tests/renderer` unit coverage for `TabBar` if present
+- [X] T018 [US1] Update `tests/renderer` unit coverage for `TabBar` if present
       (add a focused `TabBar.test.tsx` if none exists) asserting the "+"
       placement, the `XMark` close, and the active-pill classes.
 
@@ -184,22 +184,22 @@ so the suite stays green.
 
 ### Implementation
 
-- [ ] T019 Modify `src/main/index.ts` and `src/main/menu.ts`: on Windows/Linux
+- [X] T019 Modify `src/main/index.ts` and `src/main/menu.ts`: on Windows/Linux
       call `Menu.setApplicationMenu(null)` (the hamburger is the menu chrome)
       and `registerShortcuts(mainWindow)`; on macOS keep a minimal native
       application menu (About/Edit-roles/Quit + the File/View accelerators)
       since the system menu bar is mandatory (research R1, complexity table).
       `refreshApplicationMenu` is retained only for macOS recent-items rebuilds.
-- [ ] T020 [P] Add the shared e2e chrome helpers to `tests/e2e/launch.ts`:
+- [X] T020 [P] Add the shared e2e chrome helpers to `tests/e2e/launch.ts`:
       `openHamburger(window)`, `clickHamburgerItem(window, label)`,
       `clickHamburgerRecent(window, label)`, `hamburgerRecentState(window)`,
       `hamburgerRecentStructure(window)` per contracts/renderer.md §E2e.
-- [ ] T021 Migrate `tests/e2e/recent.spec.ts`: replace `clickFileMenu`,
+- [X] T021 Migrate `tests/e2e/recent.spec.ts`: replace `clickFileMenu`,
       `recentItemsState`, and `recentMenuStructure` (which read
       `Menu.getApplicationMenu()`) with the hamburger helpers, and update every
       call site (30+ `clickFileMenu('Open File'/'Open Folder')` usages). This
       task ships atomically with T019 — the native menu is gone after it.
-- [ ] T022 Update the `settings:get` fallback branch in
+- [X] T022 Update the `settings:get` fallback branch in
       `src/main/ipc/handlers.ts` (currently a hand-built `{ sidebarWidth: 30,
       themeOverride: null }` literal) to include `explorerVisible` so a settings
       read failure still returns a complete `Settings` object.
@@ -214,21 +214,21 @@ shortcuts still work, and the Recent Items suite passes against the hamburger.
 **Goal**: every spec that referenced the removed toolbar buttons is migrated,
 and the new chrome behaviours get end-to-end coverage.
 
-- [ ] T023 Migrate `getByRole('button', { name: 'Open Folder' })` to
+- [X] T023 Migrate `getByRole('button', { name: 'Open Folder' })` to
       `clickHamburgerItem(window, 'Open Folder')` in `tests/e2e/app.spec.ts`,
       `tests/e2e/tabs.spec.ts`, `tests/e2e/organize.spec.ts`, and
       `tests/e2e/source.spec.ts`.
-- [ ] T024 Migrate `tests/e2e/native.spec.ts`: the "New and Open Folder buttons
+- [X] T024 Migrate `tests/e2e/native.spec.ts`: the "New and Open Folder buttons
       show icons with accessible names" test and the focus-ring test target the
       new chrome (`Open menu`, `Toggle file explorer`, `New file`), and "New"
       clicks become `clickHamburgerItem(window, 'New File')`.
-- [ ] T025 [US2] [US3] [US4] Write `tests/e2e/chrome.spec.ts`:
+- [X] T025 [US2] [US3] [US4] Write `tests/e2e/chrome.spec.ts`:
       explorer toggle hides/expands the panel and restores its width (US2
       scenarios 1–2); hide → app restart → stays hidden (US2 scenario 3, via a
       fresh launch with the same `AME_CONFIG_DIR`); "+" creates a new untitled
       tab without discarding unsaved changes (US3); the hamburger opens and an
       outside click closes it (US4).
-- [ ] T026 [US1] In `chrome.spec.ts`, assert the visual anchors: active tab is
+- [X] T026 [US1] In `chrome.spec.ts`, assert the visual anchors: active tab is
       the `#EAEAEA` pill with an edit icon, label, and close button; inactive
       labels truncate; hamburger + toggle sit top-left; shortcuts (Ctrl+N,
       Ctrl+S) work after the menu-bar removal (contracts/renderer.md §E2e).
@@ -241,15 +241,17 @@ and the new chrome behaviours get end-to-end coverage.
 
 **Purpose**: remove dead references, verify per-OS presentation, run the full gate.
 
-- [ ] T027 Grep for retired selectors (`name: 'New'`, `name: 'Open Folder'`,
+- [X] T027 Grep for retired selectors (`name: 'New'`, `name: 'Open Folder'`,
       `clickFileMenu`, `Menu.getApplicationMenu`) across `src/` and `tests/`;
       remove `lucide-react` from `package.json` only after `rg "lucide-react"`
-      confirms no import remains.
+      confirms no import remains. Selector grep is clean; `lucide-react` is
+      retained because `src/renderer/explorer/Tree.tsx` still imports it.
 - [ ] T028 [US1] Run quickstart.md on Windows; walk the macOS and Linux sections
       and record any platform discrepancy (menu-bar behaviour, shortcut
       behaviour) — fix `src/main/shortcuts.ts`/`menu.ts` and the contracts if
-      reality diverges.
-- [ ] T029 Final gates: `npm run lint`, `npm run typecheck`, `npm run test`,
+      reality diverges. (PENDING: requires a manual walkthrough on macOS/Linux
+      that cannot be completed from a Windows host.)
+- [X] T029 Final gates: `npm run lint`, `npm run typecheck`, `npm run test`,
       `npm run test:e2e` all green; verify plan/research/data-model/contracts
       are consistent with the final code; mark this task `[X]` only then.
 

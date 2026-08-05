@@ -108,6 +108,11 @@ closed list of `<button role="menuitem">` rows with hover/active states, opened
 on click, closed on outside click and on Escape, with `aria-expanded` on the
 trigger (research R2).
 
+The `.chrome-bar` sits inside a single `.header-bar` row that also holds the
+tab bar (clarification 2026-08-05): `[hamburger] [explorer toggle] [tabs… +]`.
+`TabBar` moves out of the editor `Panel` and up into that header; the sidebar
+and editor content render below it.
+
 - Item set (the current native menu's actions, FR-001/002):
   New File (Ctrl+N), Open File… (Ctrl+O), Open Folder… (Ctrl+Shift+O),
   Recent Items ▸ (folders, separator, files, separator, Clear Recent Items — same
@@ -135,9 +140,15 @@ collapse/expand is detected in `onResize` (`asPercentage <= 0` ⇒ collapsed) an
 synced back to `explorerVisible` + persisted (same `updateSettings` +
 `window.api.updateSettings` pair as `handleSidebarResize`). `expand()` restores
 the pre-collapse width (US2 scenario 2); drag-resize still persists
-`sidebarWidth` as today. The Separator renders only while visible. The initial
-state is applied on mount from the loaded setting before first paint. Editor
-panel expands to fill the space (FR-008).
+`sidebarWidth` as today. The Separator stays mounted and is hidden with
+`visibility: hidden` while collapsed — unmounting it (or persisting a collapsed
+`sidebarWidth: 0`, which changes the Panel's `defaultSize` prop) re-runs the
+Panel's registration effect and wipes the library's `expandToSize`, so a
+toggle-expand snaps to `minSize` instead of the previous width (verified
+2026-08-05, see Decision log). The initial state is applied on mount from the
+loaded setting before first paint. Editor panel expands to fill the space
+(FR-008). Opening a folder always reveals the explorer, overriding a persisted
+hidden choice (clarification 2026-08-05; US2 scenario 3 amended).
 
 **Menu-bar removal + accelerators** — Windows/Linux: `Menu.setApplicationMenu(
 null)` (research R1) so the native menu bar is not shown (FR-002). The six
@@ -304,3 +315,23 @@ unchanged.
   Phase 5 and 6 split it so the suite stays green.
 - `lucide-react` becomes unused by the chrome after Phase 4; Phase 7 removes the
   dependency only if a repo-wide grep confirms no other import remains.
+- US2 scenario 2 fix (2026-08-05, verified): the Separator between the sidebar
+  and the editor is ALWAYS mounted and hidden with `visibility: hidden` while
+  collapsed, and a collapsed (0) width is never persisted. Originally the
+  Separator was conditionally rendered (`{!collapsed && <Separator/>}`) and
+  `handleSidebarResize` persisted `sidebarWidth: 0`. Both actions re-ran the
+  Panel's registration effect (`registerPanel` rebuilds `group.panels` with a
+  fresh `mutableValues`), resetting `expandToSize` so `expand()` fell back to
+  `minSize` (15%) instead of the previous width (30%). Kept mounted + never
+  persisting 0 keeps the panel object stable across collapse/expand, so
+  `expand()` restores exactly.
+- Reveal-on-open (2026-08-05, user decision): every successful folder open
+  (Open Folder or a recent folder) calls `revealExplorer()` — it persists
+  `explorerVisible: true` and calls `panel.expand()` if collapsed. This
+  overrides a persisted "hidden" choice, which US2 scenario 3 did not anticipate;
+  the spec and the e2e contract were amended accordingly.
+- E2e accelerator tests use `webContents.sendInputEvent` (2026-08-05, verified):
+  Playwright's CDP-synthesized `keyboard.press` does NOT reach the main process's
+  `before-input-event` handler, so Ctrl+N/O/S could not be exercised that way.
+  `sendInputEvent` goes through the real shortcut pipeline. `pressShortcut` in
+  `chrome.spec.ts` wraps it.

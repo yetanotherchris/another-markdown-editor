@@ -53,7 +53,14 @@ Verified in `node_modules/react-resizable-panels/dist/react-resizable-panels.d.t
   returns `RefObject<PanelImperativeHandle | null>`.
 - `PanelImperativeHandle` exposes `collapse()`, `expand()`, `isCollapsed()`.
   `collapse()` collapses to `collapsedSize`; `expand()` restores "its most
-  recent size" (US2 scenario 2 — previous width preserved).
+  recent size" (US2 scenario 2 — previous width preserved). **Caveat (verified
+  2026-08-05):** "its most recent size" is stored on the registered panel object
+  (`expandToSize`), which is replaced whenever the Panel's registration effect
+  re-runs — that happens if its `defaultSize` prop changes (e.g. because a
+  collapsed `sidebarWidth: 0` was persisted) or the panel re-registers. A
+  re-registered panel has `expandToSize: undefined`, so `expand()` falls back to
+  `minSize`. Hence the App keeps the Separator mounted (hidden via
+  `visibility: hidden` while collapsed) and never persists a collapsed width.
 - Props: `collapsible?: boolean`, `collapsedSize?: number | string` (default 0).
 - There is **no `onCollapse` / `onExpand` prop** in v4.12.2. The only size
   callback is `onResize(panelSize: { asPercentage, inPixels }, id, prevPanelSize)`.
@@ -61,9 +68,12 @@ Verified in `node_modules/react-resizable-panels/dist/react-resizable-panels.d.t
   `panelSize.asPercentage <= collapsedSize` ⇒ collapsed. On mount
   `prevPanelSize` is undefined and `onResize` still fires, so the initial
   collapse-from-settings applies the persisted state cleanly.
-- The `Separator` must be a direct child of the `Group`. It is conditionally
-  rendered only while the explorer is visible so a collapsed panel leaves no
-  stray resize strip.
+- The `Separator` must be a direct child of the `Group`. It is ALWAYS mounted
+  and hidden with `visibility: hidden` while collapsed: a conditional render
+  (`{!collapsed && <Separator/>}`) makes the Group re-register the separator on
+  every collapse/expand, re-running the Panel's registration effect and wiping
+  `expandToSize` (US2 scenario 2 regression, verified 2026-08-05). Hidden keeps
+  the panel object stable and leaves no stray resize strip.
 
 ## R4 — Quit path and no data loss
 
@@ -103,4 +113,9 @@ Verified in `node_modules/react-resizable-panels/dist/react-resizable-panels.d.t
   menu removal (Phase 5, atomic).
 - `recentItemsState()` / `recentMenuStructure()` in recent.spec.ts read the
   native menu; they migrate to reading the hamburger DOM.
+- `chrome.spec.ts` (new) covers contracts/renderer.md §E2e. Main-side
+  accelerators are tested via `webContents.sendInputEvent` (NOT
+  `page.keyboard.press`): CDP-synthesized keyboard events never reach the
+  `before-input-event` handler in the main process, so `keyboard.press` cannot
+  drive Ctrl+N/O/S (verified 2026-08-05).
 - These migrations are required by FR-002, not optional cleanup.

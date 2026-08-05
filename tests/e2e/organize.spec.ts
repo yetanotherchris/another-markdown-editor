@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -88,7 +88,7 @@ test.afterAll(async () => {
 })
 
 async function openFolder(): Promise<void> {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
 }
 
 async function openFile(name: string): Promise<void> {

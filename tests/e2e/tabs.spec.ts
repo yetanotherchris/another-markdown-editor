@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -56,7 +56,7 @@ test.afterAll(async () => {
 })
 
 async function openFolderAndFile(fileName: string): Promise<void> {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   await window.getByRole('treeitem').getByText(fileName).click()
 }
 
@@ -340,7 +340,7 @@ test('external deletion of an open document: OK keeps it in memory', async () =>
 })
 
 test('switching to the oldest tab at the instance cap keeps its editor alive', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   // Fill the pool to the 8-instance cap.
   for (let i = 1; i <= 8; i++) {
     await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
@@ -354,7 +354,7 @@ test('switching to the oldest tab at the instance cap keeps its editor alive', a
 })
 
 test('reopening an evicted document from the tree brings its editor back', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   // Open nine files so the oldest (f01) is evicted by the LRU cap.
   for (let i = 1; i <= 9; i++) {
     await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
