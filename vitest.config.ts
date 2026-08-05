@@ -12,13 +12,6 @@ export default defineConfig({
       },
       {
         test: {
-          name: 'release',
-          environment: 'node',
-          include: ['tests/release/**/*.test.ts']
-        }
-      },
-      {
-        test: {
           name: 'renderer',
           environment: 'jsdom',
           include: ['tests/renderer/**/*.test.ts', 'tests/renderer/**/*.test.tsx'],

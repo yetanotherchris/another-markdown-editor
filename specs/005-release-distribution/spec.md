@@ -264,5 +264,9 @@ definition is published for that version.
   to `ameditor-<v>-<os>-<arch>.<ext>`, superseding the artifact names named
   throughout this spec (FR-005). The packaged application identity (product
   name, `.app`/`.exe` bundle names) is unchanged; only the asset file names
-  changed. Recorded in `specs/009-release-binary-naming/` and enforced by
-  `tests/release/release-contracts.test.ts`.
+  changed. Recorded in `specs/009-release-binary-naming/`.
+- **2026-08-05 — No release-contract test suite**: the automated
+  `tests/release/release-contracts.test.ts` suite was removed; the release
+  artifacts and package definitions are verified manually via
+  `specs/005-release-distribution/quickstart.md` (spec 009 Assumptions / plan
+  Decision log).

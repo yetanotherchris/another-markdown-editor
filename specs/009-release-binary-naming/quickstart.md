@@ -3,19 +3,17 @@
 **Date**: 2026-08-04 | **Feature**: [009-release-binary-naming](./spec.md) |
 **Contracts**: [contracts/release.md](./contracts/release.md)
 
-Manual validation of the asset rename. The machine-checkable parts are covered
-by `npm run test` (`tests/release/release-contracts.test.ts`).
+Manual validation of the asset rename.
 
 ## 1. Automate gate (local)
 
 ```bash
 npm run lint
 npm run typecheck
-npm run test          # includes tests/release/release-contracts.test.ts
+npm run test          # unit tests; no release-contract suite (removed 2026-08-05)
 ```
 
-Expected: all green; the release-contract tests assert the `ameditor-*` asset
-names and the current version (`0.0.83`).
+Expected: all green.
 
 ## 2. Package locally (proves electron-builder naming)
 
@@ -44,8 +42,8 @@ scoop install another-markdown-editor                      # Windows
 ```
 
 Expected: installs succeed against the renamed assets and the installed app
-version equals the tag version. The command names (`another-markdown-editor`)
-are unchanged.
+version equals the tag version. The command is `ameditor` on every package
+manager (`ameditor --version` launches the app).
 
 ## Exit criteria
 

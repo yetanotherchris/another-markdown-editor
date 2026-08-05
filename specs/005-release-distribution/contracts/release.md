@@ -4,8 +4,9 @@
 **Data model**: [data-model.md](./data-model.md)
 
 The authoritative contract between the release workflow, the package
-definitions, the README, and the tests that validate them. `tests/release/release-contracts.test.ts`
-enforces the machine-checkable parts of this document.
+definitions, and the README. Release verification is manual via
+`quickstart.md` (the `tests/release/release-contracts.test.ts` suite that once
+enforced this document was removed 2026-08-05 — see §7).
 
 ---
 
@@ -49,9 +50,9 @@ Valid JSON with:
 - `description`, `homepage`, `license`
 - `architecture.64bit.url` → the windows portable zip release URL
 - `architecture.64bit.hash` → sha256 of that zip
-- `architecture.64bit.bin` → `[["Another Markdown Editor.exe", "another-markdown-editor"]]`
+- `architecture.64bit.bin` → `[["ameditor.exe", "ameditor"]]`
 
-The URL embeds the version: `.../releases/download/v<version>/Another Markdown Editor-<version>-windows-x64.zip`.
+The URL embeds the version: `.../releases/download/v<version>/ameditor-<version>-windows-x64.zip`.
 
 ## 4. Homebrew formula contract (`Formula/another-markdown-editor.rb`)
 
@@ -94,23 +95,9 @@ same change (US3 scenarios 1–4; FR-011/012).
   *public* release, satisfying FR-010's core guarantee.)
 - `fail_on_unmatched_files` → a release cannot be created with a missing asset.
 
-## 7. Test contract (`tests/release/release-contracts.test.ts`)
+## 7. Verification contract
 
-Structural assertions over the committed files (research R7 — deliberately not a
-YAML parse):
-
-- Workflow: trigger glob present; `validate` job with strict semver regex,
-  reachability gate and duplicate-release check; job-scoped `permissions`
-  (`contents: read` default, `contents: write` on `release` only); the four
-  matrix legs; `fail-fast: false`; no `continue-on-error: true` on required
-  legs; `--publish never` AND `--config.extraMetadata.version` on build legs;
-  `updatepackagejson.ps1` syncing `package.json` version to the tag; curated upload globs;
-  `CSC_IDENTITY_AUTO_DISCOVERY=false` on macOS legs; `needs: build`; the
-  required artifact set; `draft: true` + `fail_on_unmatched_files: true` +
-  `tag_name` publish; `git checkout -B main`; `updatescoop.ps1` / `updatebrew.ps1`
-  invoked with `branch: main` on the commit; the SHA pins for the third-party
-  actions.
-- Scoop manifest: parses as JSON; required fields present and typed.
-- Formula: class name, `version` line, `on_macos`/`on_linux` blocks, `sha256`,
-  the linux-arm64 `odie` guard, `app.install` / `bin.install` presence.
-- README: `## Installation` section and the two exact commands.
+The release artifacts and package definitions are verified manually via
+`quickstart.md`. The automated `tests/release/` contract suite was removed
+2026-08-05 (spec 009 Assumptions / plan Decision log) — release verification is
+manual, not a unit-test assertion.

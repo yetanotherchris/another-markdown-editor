@@ -10,7 +10,7 @@
       "bin": [
         [
           "ameditor.exe",
-          "another-markdown-editor"
+          "ameditor"
         ]
       ]
     }
