@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-05
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Remember window location and size, which should be stored in the same application config file location as the MRU files."
 
@@ -126,6 +126,17 @@ A user's file explorer panel width and visibility (open or closed) are remembere
 - **SC-005**: In 100% of startup tests, the application starts successfully even when the configuration file cannot be read or written.
 - **SC-006**: In 100% of startup tests with a valid saved explorer state and an open folder, the explorer panel restores to the saved width and open/closed state.
 - **SC-007**: In 100% of startup tests with no open folder, the explorer panel is closed and the persisted state records it as closed.
+
+## Clarifications
+
+- **2026-08-06** — FR-016 ("closing a folder while the explorer is open MUST
+  close the explorer and persist the closed state") is **not reachable**: the
+  application has no close-folder action (a folder is only ever replaced by
+  opening another, per spec 010's reveal-on-open clarification). The reachable
+  part of the no-folder-open persistence rule is FR-013: when the application
+  starts with no folder open, the persisted explorer state records the panel as
+  closed. The FR-016 scenario is deferred to a future feature that adds a
+  close-folder action.
 
 ## Assumptions
 

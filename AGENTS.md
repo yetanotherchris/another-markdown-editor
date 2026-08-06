@@ -279,7 +279,7 @@ AGENTS.md                         This file
 | 008-native-dialogs | Archived | Complete |
 | 009-release-binary-naming | Archived | Complete |
 | 010-modern-grey-ui | Archived | Complete |
-| 011-window-state-persistence | Spec only | Not yet planned |
+| 011-window-state-persistence | Archived | Complete |
 | 012-settings-dialog | Archived | Complete |
 | 013-theme-setting | Spec only | Not yet planned |
 | 014-view-source-icon | Spec only | Not yet planned |
