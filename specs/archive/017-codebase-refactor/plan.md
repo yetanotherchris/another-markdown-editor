@@ -427,6 +427,22 @@ decisions that differed from the plan as written:
 - **E2E describe blocks use `test.describe(...)`** (not a top-level `describe`
   import): this Playwright version types `describe` only as a property of
   `test`.
+- **Describe blocks were added only to `source.spec.ts` and `native.spec.ts`**
+  (T042's text mentioned organize/tabs too): those two specs have no banner
+  comments (verified by the pre-implementation analysis — they are single
+  thematic files), so there was no group to mirror. The recent split files are
+  each already a focused concern. This is a plan-wording overreach, not a spec
+  gap; US4's acceptance (split by concern, clearly named purpose) is met.
+- **Code-review round (PR #29)**: security review — no findings; all
+  constitution invariants intact (process isolation, resolveWithinRoot path
+  validation, atomic writes, single-dialog guard, no generic invoke, path
+  scrubbing on all 23 sanitizeError call sites). Correctness review — all eight
+  areas PASS, no behavioural changes (bodies diff-verified against the old
+  App.tsx/handlers.ts). Spec-compliance review — PASS on all 11 items; only
+  benign observations: `useDialogQueue`'s returned object is recreated each
+  render (the App subscription effect re-runs idempotently) and
+  `openPathInFormatted` calls enforcePoolCap once more via handleActivate
+  (no observable change).
 - **Final gate** (recorded at archive): `npm run lint` clean, `npm run typecheck`
   clean, `npm run check` — no violations, `npm run test` 355/355 (33 files),
   `npm run test:e2e` 119/119. The single pre-existing e2e flake
