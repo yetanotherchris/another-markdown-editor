@@ -53,6 +53,20 @@ export default tseslint.config(
     }
   },
   {
+    files: ['scripts/**/*.mjs', 'scripts/**/*.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly'
+      }
+    },
+    rules: {
+      'no-restricted-imports': 'off'
+    }
+  },
+  {
     ignores: ['out/', 'node_modules/', 'dist/']
   }
 )

@@ -197,6 +197,14 @@ AGENTS.md                         This file
   down.
 - Keep changes scoped to the task in hand. Note unrelated problems, do not
   opportunistically fix them.
+- Use Beck's **"Tidy First"** methodology: separate structural changes from
+  behavioral changes into distinct commits.
+- **Never mix structural and behavioral changes in the same commit.**
+  - **Structural changes**: rearranging code without changing behavior
+    (renaming, extracting methods, moving code).
+  - **Behavioral changes**: adding or modifying actual functionality.
+  This separation makes code reviews easier, reduces bugs, and creates clearer
+  git history.
 - Report honestly. If something is stubbed, partly done, or unverified, say so
   plainly. A confident wrong summary is worse than an uncertain accurate one.
 - Do not commit, push, or open PRs unless asked.

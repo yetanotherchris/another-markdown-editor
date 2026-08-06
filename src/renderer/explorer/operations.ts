@@ -6,6 +6,13 @@ const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown'])
 
 export { isWithinOrEqual }
 
+/** True when `path` is a workspace-relative path. Absolute paths come from the
+ *  OS file dialog (e.g. `C:\...` or `/...`) and are not under the workspace. */
+export function isWorkspaceRelative(path: string): boolean {
+  if (path.startsWith('/') || path.startsWith('\\')) return false
+  return !/^[a-zA-Z]:[\\/]/.test(path)
+}
+
 export function entryName(id: string): string {
   const segments = id.split('/')
   return segments[segments.length - 1]

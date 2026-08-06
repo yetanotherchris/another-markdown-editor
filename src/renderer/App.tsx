@@ -34,6 +34,7 @@ import {
   entryName,
   planDelete,
   deleteDescription,
+  isWorkspaceRelative,
   DeletePlan,
 } from './explorer/operations'
 import './App.css'
@@ -42,13 +43,6 @@ const initialSession: EditingSession = {
   documents: [],
   activeId: null,
   untitledCounter: 0
-}
-
-/** True when `path` is a workspace-relative path. Absolute paths come from the
- *  OS file dialog (e.g. `C:\...` or `/...`) and are not under the workspace. */
-function isWorkspaceRelative(path: string): boolean {
-  if (path.startsWith('/') || path.startsWith('\\')) return false
-  return !/^[a-zA-Z]:[\\/]/.test(path)
 }
 
 type SaveResult = 'saved' | 'cancelled' | 'failed'
