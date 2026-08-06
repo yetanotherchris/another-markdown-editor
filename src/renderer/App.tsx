@@ -4,7 +4,7 @@ import type { TreeApi } from 'react-arborist'
 import { Squares2X2Icon } from '@heroicons/react/24/outline'
 import { EditingSession, documentsReducer, getActiveDocument, DocumentState } from './state/documents'
 import { initialWorkspaceState, workspaceReducer, TreeNode } from './state/workspace'
-import { loadSettingsFromMain, updateSettings, getSettings } from './state/settings'
+import { getSettings } from './state/settings'
 import { instancePool } from './editor/instancePool'
 import { isDirtyLive as domainIsDirtyLive } from './domain/dirty'
 import { useDialogQueue } from './hooks/useDialogQueue'
@@ -16,13 +16,13 @@ import { useExternalFileEvents } from './hooks/useExternalFileEvents'
 import { useMenuCommands } from './hooks/useMenuCommands'
 import { useWorkspaceFolder } from './hooks/useWorkspaceFolder'
 import { useSidebarLayout } from './hooks/useSidebarLayout'
+import { useSettingsState } from './hooks/useSettingsState'
 import EditorPanel from './editor/EditorPanel'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import StatusFooter from './status/StatusFooter'
 import HamburgerMenu from './chrome/HamburgerMenu'
 import SettingsDialog from './chrome/SettingsDialog'
-import type { EditorFont } from './chrome/SettingsDialog'
 import { isWorkspaceRelative } from './explorer/operations'
 import './App.css'
 import './chrome/chrome.css'
@@ -44,9 +44,13 @@ export default function App() {
   // Spec 010, US2 (FR-007): persisted explorer visibility drives the collapsed
   // state; handleSidebarResize keeps it in sync while the panel is mounted.
   const [explorerCollapsed, setExplorerCollapsed] = useState(false)
-  // Spec 012: settings dialog open state (single instance); editor font.
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [editorFont, setEditorFont] = useState<EditorFont>(getSettings().editorFont)
+  // Spec 012/013: the settings-dialog state — open flag, editor font, theme
+  // choice, and the effective data-theme mode (useSettingsState owns them).
+  const {
+    settingsOpen, setSettingsOpen,
+    editorFont, handleEditorFontChange,
+    themeChoice, handleThemeChange, themeMode
+  } = useSettingsState()
   const sidebarPanelRef = usePanelRef()
   // Spec 010, US2 (FR-007): set once the initial restore has run, so resize
   // events while the panel settles are not persisted as the user's choice.
@@ -106,19 +110,6 @@ export default function App() {
     dispatch,
     enforcePoolCap: pool.enforcePoolCap
   })
-
-  // Spec 012, US2: apply the editor font immediately and persist (FR-006).
-  const handleEditorFontChange = useCallback((font: EditorFont) => {
-    setEditorFont(font)
-    updateSettings({ editorFont: font })
-    window.api.updateSettings({ editorFont: font }).catch(() => { /* ignore */ })
-  }, [])
-
-  useEffect(() => {
-    void loadSettingsFromMain().then(() => {
-      setEditorFont(getSettings().editorFont)
-    })
-  }, [])
 
   const { handleMenuCommand } = menu
   const { handleQuitRequest } = sessionApi
@@ -194,7 +185,7 @@ export default function App() {
   const hasWorkspace = workspace.name !== null
 
   return (
-    <div className="app-container" data-editor-font={editorFont}>
+    <div className="app-container" data-editor-font={editorFont} data-theme={themeMode}>
       {/* Spec 010 (2026-08-05): one header row — chrome buttons + tabs. */}
       <div className="header-bar">
         <div className="chrome-bar">
@@ -291,6 +282,8 @@ export default function App() {
         <SettingsDialog
           editorFont={editorFont}
           onEditorFontChange={handleEditorFontChange}
+          theme={themeChoice}
+          onThemeChange={handleThemeChange}
           onClose={() => setSettingsOpen(false)}
         />
       )}

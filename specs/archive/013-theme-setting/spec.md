@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-05
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "A dark and light theme as a setting, and being able to use the system default."
 
@@ -77,7 +77,7 @@ A user's theme choice is remembered across application restarts.
 - What happens when the configuration file is missing or malformed? The application uses a default theme (light or system default) and writes a valid configuration when the user changes it.
 - What happens when the theme changes while a transition is in progress? The transition completes cleanly and shows the correct theme.
 - What happens when the user is in the settings dialog and the OS theme changes? The dialog and the rest of the application update consistently.
-- What happens when the application has a custom color theme in the future? The light/dark/system-default setting takes precedence over any ad-hoc color overrides for the UI chrome.
+- What happens when the application has a custom color theme in the future? The light/dark/system-default setting takes precedence over any ad-hoc color overrides for the UI chrome and the editor surface.
 
 ## Requirements *(mandatory)*
 
@@ -92,7 +92,7 @@ A user's theme choice is remembered across application restarts.
 - **FR-007**: The theme setting MUST be accessible from the settings dialog.
 - **FR-008**: The theme change MUST apply without requiring an application restart.
 - **FR-009**: The theme change MUST apply to the main window UI chrome and other in-scope UI surfaces.
-- **FR-010**: The WYSIWYG editor content area MUST retain its existing styling and not be changed by this feature unless explicitly specified by a future setting.
+- **FR-010**: The WYSIWYG editor content area MUST follow the theme: in light mode it keeps its existing light styling, and in dark mode it renders a dark editing surface (canvas, text, and the surrounding editor region). The editor must remain fully readable in both modes.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -109,12 +109,33 @@ A user's theme choice is remembered across application restarts.
 - **SC-003**: When the system-default option is selected, the application matches the OS theme in 100% of tests.
 - **SC-004**: When the OS theme changes while the application is running and system default is selected, the application updates within 5 seconds.
 - **SC-005**: In 100% of tests, the theme change does not require an application restart.
-- **SC-006**: In 100% of tests, the WYSIWYG editor content area remains visually unchanged by theme changes.
+- **SC-006**: In 100% of tests, the WYSIWYG editor content area follows the selected theme — a dark surface in dark mode, the existing light surface in light mode — and stays readable in both.
 
 ## Assumptions
 
 - The theme setting is stored in the per-user application configuration file, at the same platform-appropriate location used by the Recent Items feature and other settings.
-- The theme applies to the main window UI chrome; the WYSIWYG editor content area is explicitly excluded from this feature.
+- The theme applies to the main window UI chrome AND the WYSIWYG editor content area (FR-010): the editor canvas and source view use a dark surface in dark mode and keep their light styling in light mode.
 - The light and dark palettes will be defined during planning and will align with the application's existing or planned color tokens.
 - Custom themes, per-workspace themes, and automatic time-based theme switching are out of scope.
 - If the operating system does not provide a theme preference, the system-default option falls back to the light theme.
+
+## Clarifications
+
+- **2026-08-06**: The theme setting is the existing persisted `themeOverride`
+  field (`'light' | 'dark' | null`) introduced in spec 010 — `null` is the
+  "System default" option and is the default for a fresh install. No new setting
+  or storage was added; the spec's "Theme Setting" entity maps to that field.
+- **2026-08-06**: The palettes are defined in `plan.md` — the existing light
+  `--ame-*` tokens plus a dark block under `.app-container[data-theme='dark']`.
+  The effective appearance resolves through the renderer's
+  `prefers-color-scheme` query (light/dark are forced by the choice; system
+  follows the query live), with `nativeTheme.themeSource` set in main for the
+  native chrome. The OS-never-reports case is satisfied by Chromium always
+  answering light or dark (light is the fallback when the OS reports none).
+- **2026-08-06**: FR-010 was amended (user decision) to bring the WYSIWYG editor
+  content area into scope: in dark mode the editor renders a dark surface that
+  is slightly lighter than the window chrome, via Crepe's `--crepe-color-*`
+  tokens, with the surrounding editor region, empty state, and source view
+  following. This takes the editing-surface slice that the future
+  `016-editor-theme` spec would otherwise own; 016 should build on the tokens
+  introduced here rather than re-decide them.

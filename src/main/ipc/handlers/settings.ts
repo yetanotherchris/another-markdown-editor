@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { loadSettings, updateSettings } from '../../settings'
+import { applyThemeOverride } from '../../theme'
 import type { Result, Settings } from '../../../shared/ipc-contract'
 import { ctx, ok, err, sanitizeError } from './context'
 
@@ -24,7 +25,12 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
       // Merge in MAIN against the authoritative in-memory settings (not a stale
       // disk read), so two updates inside the 500 ms debounce window do not
       // clobber each other (review #27). Only the four known fields are read.
-      return ok(updateSettings(patch as Partial<Settings>))
+      const updated = updateSettings(patch as Partial<Settings>)
+      // Spec 013: a theme change applies immediately (FR-008) — the merged
+      // override resolves onto nativeTheme so the renderer re-renders now,
+      // without waiting for the debounced disk write.
+      applyThemeOverride(updated.themeOverride)
+      return ok(updated)
     } catch (e: unknown) {
       return err('IO', sanitizeError(e, null))
     }

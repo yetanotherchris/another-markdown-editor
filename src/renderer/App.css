@@ -51,7 +51,9 @@ button, input, select, textarea {
 }
 
 /* Spec 010, FR-006: the modern grey palette. Prefixed custom properties scoped
-   to the chrome — the WYSIWYG editor content area is untouched (FR-010). */
+   to the chrome. Spec 013 FR-010: the editor canvas and source view resolve the
+   --ame-editor-bg token (white in light, dark in dark) so the editing surface
+   follows the theme. */
 :root {
   --ame-bg: #ffffff;
   --ame-surface: #f9f9fb;
@@ -65,6 +67,57 @@ button, input, select, textarea {
   --ame-border-secondary: #ececec;
   --ame-accent: #d96b27;
   --ame-control: #2d2d2d;
+  --ame-editor-bg: #ffffff;
+}
+
+/* Spec 013, FR-002/FR-003: the dark palette. Every chrome surface (header bar,
+   tab strip, hamburger menus, sidebar, status footer, settings dialog) resolves
+   the --ame-* tokens from .app-container, so redefining them here retints the
+   whole chrome in one place when the effective theme (nativeTheme.themeSource →
+   prefers-color-scheme → data-theme, see useEffectiveTheme) is dark. The editor
+   canvas and source view resolve --ame-editor-bg and the Crepe --crepe-color-*
+   overrides below — the editing surface follows the theme (FR-010). */
+.app-container[data-theme='dark'] {
+  --ame-bg: #1b1d21;
+  --ame-surface: #232529;
+  --ame-surface-secondary: #1e2023;
+  --ame-active-tab: #2f3237;
+  --ame-text: #e6e6e6;
+  --ame-text-secondary: #cfcfcf;
+  --ame-muted: #9a9a9a;
+  --ame-muted-secondary: #8b8b8b;
+  --ame-border: #3a3d42;
+  --ame-border-secondary: #33363b;
+  --ame-accent: #e08a4a;
+  --ame-control: #4b4e54;
+  /* The editing surface — slightly lighter than the window (--ame-bg) so the
+     document reads as a "page" on a dark desk, but still dark (FR-010). */
+  --ame-editor-bg: #26292e;
+}
+
+/* Spec 013 FR-010: the dark editing surface. Crepe's whole theme is driven by
+   the --crepe-color-* tokens on `.milkdown` (canvas, text, toolbar, headings,
+   code, blockquotes), so redefining them under the dark app container retints
+   the editor in one place. A neutral grey scale aligned with the --ame-* chrome
+   tokens; the canvas is a step lighter than the window background. */
+.app-container[data-theme='dark'] .milkdown {
+  --crepe-color-background: #26292e;
+  --crepe-color-on-background: #d8dce2;
+  --crepe-color-surface: #2b2f35;
+  --crepe-color-surface-low: #282c31;
+  --crepe-color-on-surface: #e2e6ec;
+  --crepe-color-on-surface-variant: #b6bcc4;
+  --crepe-color-outline: #7c838c;
+  --crepe-color-primary: #e08840;
+  --crepe-color-secondary: #3d4148;
+  --crepe-color-on-secondary: #f0f2f5;
+  --crepe-color-inverse: #e2e6ec;
+  --crepe-color-on-inverse: #20232a;
+  --crepe-color-inline-code: #f2a65e;
+  --crepe-color-error: #ffb4ab;
+  --crepe-color-hover: #30343a;
+  --crepe-color-selected: #3c4149;
+  --crepe-color-inline-area: #2f343b;
 }
 
 .app-container {
@@ -98,6 +151,9 @@ button, input, select, textarea {
   overflow: hidden;
   background: var(--ame-surface-secondary);
   border-right: 1px solid var(--ame-border);
+  /* The explorer tree has no color of its own; pinning the token here keeps its
+     text readable in both the light and dark palettes (spec 013). */
+  color: var(--ame-text);
 }
 
 .sidebar {

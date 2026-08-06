@@ -281,7 +281,7 @@ AGENTS.md                         This file
 | 010-modern-grey-ui | Archived | Complete |
 | 011-window-state-persistence | Archived | Complete |
 | 012-settings-dialog | Archived | Complete |
-| 013-theme-setting | Spec only | Not yet planned |
+| 013-theme-setting | Archived | Complete |
 | 014-view-source-icon | Spec only | Not yet planned |
 | 015-explorer-reveal-location | Spec only | Not yet planned |
 | 016-editor-theme | Spec only | Not yet planned |

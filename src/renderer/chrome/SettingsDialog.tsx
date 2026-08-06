@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import type { ThemeChoice } from '../hooks/useEffectiveTheme'
 import './settings.css'
 
 export type EditorFont = 'sans-serif' | 'serif'
@@ -8,23 +9,36 @@ export const EDITOR_FONT_OPTIONS: { value: EditorFont; label: string }[] = [
   { value: 'serif', label: 'Serif' }
 ]
 
+/** Spec 013: the theme choices; `'system'` maps to the persisted override
+ *  `null` (the setting's default and "follow the OS"). */
+export const THEME_CHOICES: { value: ThemeChoice; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System default' }
+]
+
 interface SettingsDialogProps {
   /** The currently selected editor font (from persisted settings). */
   editorFont: EditorFont
   /** Spec 012: the apply-immediately model — a selection persists at once. */
   onEditorFontChange: (font: EditorFont) => void
+  /** The currently selected theme (from persisted settings). */
+  theme: ThemeChoice
+  /** Spec 013: the apply-immediately model — a selection persists at once. */
+  onThemeChange: (theme: ThemeChoice) => void
   onClose: () => void
 }
 
 /**
- * Spec 012 settings dialog (contracts/renderer.md). A keyboard-accessible React
- * modal: `role="dialog"` + `aria-modal="true"`, focus trapped on open, closed by
- * Escape or the Close button with focus returning to the hamburger trigger
- * (FR-007). Its first — and, for this feature, only — setting is the editor
- * font-family choice between sans-serif and serif (FR-003/FR-004), applied
- * immediately on selection. Never touches the document session (FR-008).
+ * Spec 012/013 settings dialog (contracts/renderer.md). A keyboard-accessible
+ * React modal: `role="dialog"` + `aria-modal="true"`, focus trapped on open,
+ * closed by Escape or the Close button with focus returning to the hamburger
+ * trigger (FR-007). Its settings are the editor font-family choice between
+ * sans-serif and serif (spec 012 FR-003/FR-004) and the theme choice between
+ * Light, Dark, and System default (spec 013 FR-001), both applied immediately
+ * on selection. Never touches the document session (FR-008).
  */
-export default function SettingsDialog({ editorFont, onEditorFontChange, onClose }: SettingsDialogProps) {
+export default function SettingsDialog({ editorFont, onEditorFontChange, theme, onThemeChange, onClose }: SettingsDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const fontGroupRef = useRef<HTMLFieldSetElement>(null)
   const onCloseRef = useRef(onClose)
@@ -113,6 +127,21 @@ export default function SettingsDialog({ editorFont, onEditorFontChange, onClose
                   value={option.value}
                   checked={editorFont === option.value}
                   onChange={() => onEditorFontChange(option.value)}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="settings-fieldset">
+            <legend className="settings-legend">Theme</legend>
+            {THEME_CHOICES.map((option) => (
+              <label key={option.value} className="settings-radio">
+                <input
+                  type="radio"
+                  name="theme"
+                  value={option.value}
+                  checked={theme === option.value}
+                  onChange={() => onThemeChange(option.value)}
                 />
                 <span>{option.label}</span>
               </label>
