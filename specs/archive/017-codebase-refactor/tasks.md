@@ -412,12 +412,12 @@ comments.
 
 **Purpose**: final gate, quickstart, and spec archive.
 
-- [ ] T053 Run the complete gate: `npm run lint`, `npm run typecheck`,
+- [X] T053 Run the complete gate: `npm run lint`, `npm run typecheck`,
       `npm run test`, `npm run test:e2e`, `npm run check` — all green. Run
       quickstart.md §1–§5 and note any platform discrepancy. Verify
       plan/research/data-model/contracts are consistent with the final code
       (US3 scenario 5, SC-003/SC-006/SC-009/SC-010/SC-011).
-- [ ] T054 Archive the spec as part of this PR (AGENTS.md workflow): `git mv`
+- [X] T054 Archive the spec as part of this PR (AGENTS.md workflow): `git mv`
       `specs/017-codebase-refactor` → `specs/archive/017-codebase-refactor`, set
       the spec's `**Status**` to `Archived`, and update the Current
       implementation status table in `AGENTS.md` (row 017 → Archived).

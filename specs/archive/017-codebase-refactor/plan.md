@@ -400,7 +400,38 @@ production layout exactly (US4 scenario 1) with shared helpers centralised
   into `src/shared/` during this refactor (FR-022); the `shared/` surface is
   unchanged apart from the internal `messagesFor` map in `nativeDialog.ts`.
 
-### Post-implementation (recorded after code review, before archive)
+### Post-implementation (recorded 2026-08-06, before archive)
 
-*(Populated by the implementation PR's review round; the four-command gate plus
-`npm run check` must be green before archive.)*
+The implementation PR completed all ten phases. Recorded deviations and
+decisions that differed from the plan as written:
+
+- **`handleOpen`/`openPathInFormatted` live in `useSourceViewToggle`**, not
+  `useDocumentSession` (data-model §1.1 step 2). The claude document puts
+  `openPathInFormatted` in the source-view hook; the session hook has no clean
+  reference to it without a render-cycle dependency. `handleOpen` is a thin
+  wrapper there. The task list (T014/T015) described the same split.
+- **`entry:*` channels moved to `handlers/files.ts`** rather than a separate
+  `entries.ts` — the grok layout's `files.ts` ("read / write / open dialogs")
+  and the plan's module map only listed six modules; the entry mutations are
+  file operations, so they co-locate with `file:*`.
+- **The `shouldFlushLive` domain function became the flush decision** in
+  `useDocumentSession.flushLiveContent` (the plan's R3 described a
+  `shouldFlushLive` decision; it is consumed exactly there).
+- **`npm run check` is green with zero violations** after Phase 8 (SC-006);
+  the complexity reductions (resolveWithinRoot, normalizeRecentItems,
+  applyWatchEvent) extracted pure helpers with identical control flow rather
+  than recording exceptions, which the constitution prefers.
+- **`src/shared/errors.ts` was deleted** (FR-017): its two exports
+  (`isErrorCode`, `AppError`) were unused anywhere; `toAppError` in
+  `handlers/context.ts` is the surviving error mapper.
+- **E2E describe blocks use `test.describe(...)`** (not a top-level `describe`
+  import): this Playwright version types `describe` only as a property of
+  `test`.
+- **Final gate** (recorded at archive): `npm run lint` clean, `npm run typecheck`
+  clean, `npm run check` — no violations, `npm run test` 355/355 (33 files),
+  `npm run test:e2e` 119/119. The single pre-existing e2e flake
+  (`source.spec.ts` US5 task-backspace) passed on the final run.
+- **`docs/codingstandards.md`** was amended during the refactor (by the
+  maintainer) to frame shape metrics as signals-not-gates; the spec's SC-001/
+  SC-006/SC-008 limits remain binding acceptance criteria for this feature,
+  while the guardrail remains a reporting check per the spec Assumption.

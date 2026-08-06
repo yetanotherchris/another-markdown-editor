@@ -285,3 +285,4 @@ AGENTS.md                         This file
 | 014-view-source-icon | Spec only | Not yet planned |
 | 015-explorer-reveal-location | Spec only | Not yet planned |
 | 016-editor-theme | Spec only | Not yet planned |
+| 017-codebase-refactor | Archived | Complete |
