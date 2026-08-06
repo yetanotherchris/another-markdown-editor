@@ -65,6 +65,15 @@ describe('fitWindowToDisplays (FR-007)', () => {
     const bounds = { x: 1, y: 2, width: 300, height: 200 }
     expect(fitWindowToDisplays(bounds, [])).toEqual(bounds)
   })
+
+  it('skips a zero-area work-area and fits to a usable one instead', () => {
+    const bounds = { x: 0, y: 0, width: 500, height: 400 }
+    const disabled = { x: 0, y: 0, width: 0, height: 0 }
+    const primary = { x: 0, y: 0, width: 1920, height: 1040 }
+    const fitted = fitWindowToDisplays(bounds, [disabled, primary])
+    expect(fitted).toEqual(bounds)
+    expect(fitted.x + fitted.width).toBeLessThanOrEqual(primary.width)
+  })
 })
 
 describe('centerIn (FR-006 default position)', () => {
@@ -100,6 +109,12 @@ describe('resolveLaunchState (FR-001/FR-005/FR-006)', () => {
 
   it('centres on the primary when no displays are reported', () => {
     const { bounds } = resolveLaunchState(null, [])
+    expect(bounds).toEqual({ x: 0, y: 0, ...DEFAULT_WINDOW })
+  })
+
+  it('falls back to the centered default when only zero-area displays are reported', () => {
+    const saved: WindowState = { x: 99999, y: 99999, width: 500, height: 400, isMaximized: false }
+    const { bounds } = resolveLaunchState(saved, [{ x: 0, y: 0, width: 0, height: 0 }])
     expect(bounds).toEqual({ x: 0, y: 0, ...DEFAULT_WINDOW })
   })
 })

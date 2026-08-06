@@ -239,3 +239,26 @@ in the spec's Assumptions + decision log; no code invents it.)*
   `scripts/check-maintainability.mjs` (pre-existing `main` defect that broke
   `npm run test` under vitest's transform on this machine; the CLI still runs via
   `node scripts/check-maintainability.mjs`).
+
+### 2026-08-06 (code-review round, PR #30)
+
+- **Maximize after `ready-to-show`** (review M1): constructing the window with
+  `show: false` and calling `maximize()` in `ready-to-show` avoids a Linux/X11
+  no-op when `maximize()` runs before the window is realized, and avoids the
+  normal-bounds flash on other platforms. Verified headless (the window
+  maximizes and fills the display).
+- **Zero-area display guard** (review M2): a disabled display can still appear
+  in `screen.getAllDisplays()` with a 0×0 work-area; fitting to it would create
+  a degenerate 0×0 window. `fitWindowToDisplays` now skips zero-area work-areas,
+  and `resolveLaunchState` falls back to the centered default when every display
+  is unusable. Unit tests added.
+- **No redundant write on close** (review LOW): the debounce timer now clears
+  `pendingState` after writing, so `flushWindowState` does not re-write an
+  already-persisted state on every close.
+- Review notes kept on file (not fixed): partial per-field recovery is
+  documented rather than implemented (geometry stays all-or-nothing, matching
+  FR-006's "malformed → default"); the primary-display fallback uses
+  `getAllDisplays()[0]` per the plan's documented "first display" assumption;
+  SC-002 e2e polls with a 2 s budget against a 500 ms debounce; FR-008 and
+  FR-010/011/012/015 coverage relies on unit tests and the existing
+  `chrome.spec.ts` restart suites, per the e2e-contract scope.

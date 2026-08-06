@@ -18,6 +18,7 @@ function createWindow(): void {
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -25,7 +26,13 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js')
     }
   })
-  if (isMaximized) mainWindow.maximize()
+  // Spec 011 FR-005 (review #30 M1): maximize after the window is ready to be
+  // shown — on Linux/X11 a maximize issued before the window is realized can be
+  // a no-op, and showing the maximized window avoids a normal-bounds flash.
+  mainWindow.once('ready-to-show', () => {
+    if (isMaximized) mainWindow?.maximize()
+    mainWindow?.show()
+  })
   trackWindowState(mainWindow)
 
   // Spec 010 FR-002: the native menu bar is replaced by the renderer hamburger.

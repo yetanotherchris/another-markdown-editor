@@ -44,8 +44,11 @@ function displayContainsCenter(display: Rect, bounds: Rect): boolean {
  * correctly — FR-007 scenario 3.
  */
 export function fitWindowToDisplays(bounds: Rect, displays: Rect[]): Rect {
-  if (displays.length === 0) return bounds
-  const target = displays.find((d) => displayContainsCenter(d, bounds)) ?? displays[0]
+  // Skip zero-area work-areas (a disabled display can still be listed): fitting
+  // to one would produce a degenerate 0×0 window.
+  const usable = displays.filter((d) => d.width > 0 && d.height > 0)
+  if (usable.length === 0) return bounds
+  const target = usable.find((d) => displayContainsCenter(d, bounds)) ?? usable[0]
   const width = Math.min(bounds.width, target.width)
   const height = Math.min(bounds.height, target.height)
   const x = clamp(bounds.x, target.x, target.x + target.width - width)
@@ -72,12 +75,18 @@ export function resolveLaunchState(
   saved: WindowState | null,
   displays: Rect[]
 ): { bounds: Rect; isMaximized: boolean } {
+  const usable = displays.filter((d) => d.width > 0 && d.height > 0)
   if (!saved) {
-    const primary = displays[0]
+    const primary = usable[0]
     return {
       bounds: primary ? centerIn(primary) : { x: 0, y: 0, ...DEFAULT_WINDOW },
       isMaximized: false
     }
   }
-  return { bounds: fitWindowToDisplays(saved, displays), isMaximized: saved.isMaximized }
+  // With no usable display, fall back to the centered default rather than
+  // trusting a possibly off-screen rect (FR-006/FR-007).
+  if (usable.length === 0) {
+    return { bounds: { x: 0, y: 0, ...DEFAULT_WINDOW }, isMaximized: saved.isMaximized }
+  }
+  return { bounds: fitWindowToDisplays(saved, usable), isMaximized: saved.isMaximized }
 }

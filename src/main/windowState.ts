@@ -62,7 +62,11 @@ function scheduleWrite(state: WindowState): void {
   if (writeTimer) clearTimeout(writeTimer)
   writeTimer = setTimeout(() => {
     writeTimer = null
-    if (pendingState) writeState(pendingState)
+    if (pendingState) {
+      const toWrite = pendingState
+      pendingState = null
+      writeState(toWrite)
+    }
   }, 500)
 }
 
