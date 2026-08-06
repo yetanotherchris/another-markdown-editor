@@ -57,6 +57,25 @@ A user can open the application even when the display that previously held the w
 
 ---
 
+### User Story 4 - Persist File Explorer State (Priority: P2)
+
+A user's file explorer panel width and visibility (open or closed) are remembered across sessions, so the layout they prefer is restored on the next launch. When no folder is open, the explorer is always closed and this closed state is persisted.
+
+**Why this priority**: The explorer layout is a secondary but frequent part of the user's workspace; restoring it avoids repetitive resizing and toggling.
+
+**Independent Test**: Open a folder, resize the explorer panel, close the application, reopen it, and verify the explorer is open at the saved width. Then close the folder, close the application, reopen it, and verify the explorer is closed.
+
+**Acceptance Scenarios**:
+
+1. **Given** a folder is open and the explorer panel is visible, **When** the user resizes the explorer panel, **Then** the new width is saved without requiring an explicit save action.
+2. **Given** a folder is open and the application was previously closed, **When** the user launches the application, **Then** the explorer panel opens at the saved width.
+3. **Given** the explorer panel was toggled closed, **When** the application is closed and reopened, **Then** the explorer panel remains closed.
+4. **Given** no folder is currently open, **When** the application starts, **Then** the explorer panel is closed.
+5. **Given** no folder is currently open, **When** the application saves its configuration, **Then** the persisted explorer state records the panel as closed.
+6. **Given** the saved explorer state is missing or malformed, **When** the application launches, **Then** the explorer panel opens at a sensible default width.
+
+---
+
 ### Edge Cases
 
 - What happens when the configuration file is missing or unreadable? The window uses a default position and size.
@@ -64,6 +83,10 @@ A user can open the application even when the display that previously held the w
 - What happens when the window is minimized on close? The restored window should not remain minimized; it should restore to the previous non-minimized state.
 - What happens when the user has multiple virtual desktops or spaces? The window restores to a visible position on the available display, even if the original virtual desktop is unavailable.
 - What happens when the window is maximized across a multi-monitor setup? The application restores the maximized state on the primary or available display.
+- What happens when the saved explorer width is smaller than the minimum usable width or larger than the window? The application clamps the restored width to a sensible range.
+- What happens when a folder is closed while the explorer is open? The explorer closes and the closed state is persisted.
+- What happens when a folder is opened and the previously persisted explorer state was open? The explorer restores to the saved width and open state.
+- What happens when a folder is opened and no prior explorer state exists? The explorer opens at a default width.
 
 ## Requirements *(mandatory)*
 
@@ -78,11 +101,19 @@ A user can open the application even when the display that previously held the w
 - **FR-007**: If the saved window rectangle would be partially or fully off-screen, the application MUST reposition and/or resize it so it is fully visible on an available display.
 - **FR-008**: The window state MUST NOT be saved while the window is minimized or during a transition that would produce invalid values.
 - **FR-009**: A failure to read or write the window state MUST be handled gracefully and MUST NOT prevent the application from starting or closing.
+- **FR-010**: The application MUST restore the file explorer panel's width from the saved state when it starts with an open folder.
+- **FR-011**: The application MUST persist the file explorer panel's width whenever it is resized, without requiring an explicit save action.
+- **FR-012**: The application MUST restore the file explorer panel's open or closed state from the saved value when it starts.
+- **FR-013**: When no folder is currently open, the file explorer panel MUST be closed, and this closed state MUST be persisted to the configuration.
+- **FR-014**: The explorer panel state MUST be stored in the same per-user application configuration file used for the recent-items list and window state.
+- **FR-015**: If the saved explorer panel state is missing or malformed, the application MUST fall back to a sensible default width and open state.
+- **FR-016**: Closing a folder while the explorer is open MUST close the explorer and persist the closed state.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Window State**: The persisted representation of the main application window's position (x, y), size (width, height), and maximized state. It is stored in the per-user application configuration file.
-- **Application Configuration File**: The per-user JSON file that holds both recent items and window state, located at the platform-appropriate configuration location.
+- **Explorer State**: The persisted representation of the file explorer panel's width and open/closed visibility. It is stored in the per-user application configuration file. When no folder is open, the persisted open/closed value is always closed.
+- **Application Configuration File**: The per-user JSON file that holds recent items, window state, and explorer state, located at the platform-appropriate configuration location.
 
 ## Success Criteria *(mandatory)*
 
@@ -93,6 +124,8 @@ A user can open the application even when the display that previously held the w
 - **SC-003**: In 100% of tests with a missing, malformed, or off-screen saved state, the window opens at a safe default position and size.
 - **SC-004**: In 100% of multi-monitor tests where the saved display is disconnected, the window opens on a remaining display and is fully visible.
 - **SC-005**: In 100% of startup tests, the application starts successfully even when the configuration file cannot be read or written.
+- **SC-006**: In 100% of startup tests with a valid saved explorer state and an open folder, the explorer panel restores to the saved width and open/closed state.
+- **SC-007**: In 100% of startup tests with no open folder, the explorer panel is closed and the persisted state records it as closed.
 
 ## Assumptions
 
@@ -102,3 +135,5 @@ A user can open the application even when the display that previously held the w
 - Fullscreen state is not persisted; only normal and maximized states are covered.
 - Per-workspace or per-document window state is out of scope.
 - The feature does not persist the window's z-order, virtual desktop assignment, or workspace-specific layout.
+- The explorer panel state is global, not per-workspace; a single width and open/closed value is persisted regardless of which folder is open.
+- The explorer panel's open/closed state is only meaningful when a folder is open; when no folder is open, the panel is always closed and this is reflected in the persisted configuration.
