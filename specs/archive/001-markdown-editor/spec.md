@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-01
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Desktop markdown editor: native File menu (Open File, Open Folder, Save, Save As), WYSIWYG editing, sidebar file explorer to browse a folder, open files in tabs, rename/delete/move files and folders, save to disk, resizable sidebar|editor. Prior decisions: docs/DESIGN_DECISIONS.md"
 

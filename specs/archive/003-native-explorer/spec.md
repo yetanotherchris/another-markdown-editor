@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-02
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "This speckit spec is to make the treeview appear more OS-native. Currently it has small arrows and unusual icons. It should pick a free iconpack to make the tree look more appealing. The font should also be a free font (but as a downloaded font rather than loaded over the network). Something similar to Obsidian or OpenCode's font - sans serif. Similar to Inter. The \"new\" and \"open Folder\" buttons should use icons. The currently open file should appear in a footer rather than the header, in the bottom left. the Currently open folder should appear in the footer, on the right hand side, using the full path, or if necessary, a shortened version of the path with the final folder visible."
 

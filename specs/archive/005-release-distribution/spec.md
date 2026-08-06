@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-02
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "This speckit spec is to make a github action which produces a binary per platform, which is installable via brew or scoop. My existing repositories have examples: https://github.com/yetanotherchris/zolam/ https://github.com/yetanotherchris/tinycity. It should use tags, e.g. v1.0.0 to trigger this, from main per the example repositories. The readme should be updated with an example installing section."
 

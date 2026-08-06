@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-05
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "I want to create a new spec - to make the appearance look like a rounded corner, modern grey look. You may need to ask some clarifying questions for this, but this is largely about the hamburger menu, for '+' instead of 'new file', using the same tabbed interface. Next to the hamburger menu there should be an icon for the file explorer, to toggle the explorer on the left visible or not. The same colours as the rounded corner, modern grey look should be used which I can find if needed."
 

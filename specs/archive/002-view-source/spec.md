@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-02
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "I want to add a new feature. This is a \"view source\" button the milkdown toolbar, and also as a context menu item in the explorer. If the file is already open in the milkdown editor, I want an animation: the source view slides from the right side to take over as the tab's view.
 

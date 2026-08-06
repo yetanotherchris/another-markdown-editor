@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-02
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "This speckit spec is to make a recent items menu in the file menu. Recent items should be stored in a JSON config file: ~/.config/ame/config.json or if that's not standard, somewhere in the home directory. It should include files (if opened via file menu) and folders"
 

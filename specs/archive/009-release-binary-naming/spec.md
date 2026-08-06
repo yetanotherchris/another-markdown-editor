@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-04
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Change the release binary names to 'ameditor', they
 currently something like 'Another Markdown Editor-0.0.83-linux-x64.AppImage'."
