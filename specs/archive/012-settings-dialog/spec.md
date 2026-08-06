@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-05
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Settings dialog, which uses the same application config file location as the MRU files. For its first setting it should provide 2 fonts for the editor you can choose from: sans-serif and serif."
 

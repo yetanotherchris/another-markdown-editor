@@ -3,6 +3,7 @@ import { join } from 'path'
 import { registerIpcHandlers } from './ipc/register'
 import { createApplicationMenu } from './menu'
 import { registerShortcuts } from './shortcuts'
+import { flushSettings } from './settings'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -45,6 +46,9 @@ function createWindow(): void {
 app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {
+  // Review #27: flush any pending debounced settings write before exit so a
+  // font change made within the 500 ms window survives a fast quit (FR-006).
+  flushSettings()
   app.quit()
 })
 

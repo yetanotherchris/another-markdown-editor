@@ -49,6 +49,16 @@ export async function clickHamburgerItem(window: Page, label: string): Promise<v
   await window.getByRole('button', { name: 'Open menu' }).focus()
 }
 
+/** Open the hamburger and click `Settings…`, waiting for the settings dialog
+ *  (contracts/renderer.md §E2e). Returns the renderer page. */
+export async function openSettingsDialog(window: Page): Promise<Page> {
+  await openHamburger(window)
+  await window.getByRole('menuitem', { name: 'Settings…' }).click()
+  await window.getByRole('button', { name: 'Open menu' }).focus()
+  await window.getByTestId('settings-dialog').waitFor()
+  return window
+}
+
 /** Match a submenu label against a query the way the native menu helper did:
  *  exact, either-as-substring, or the path basenames agree. A full-path query
  *  must match a shortened label, and a tail query a full label. */

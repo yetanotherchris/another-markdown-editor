@@ -6,7 +6,7 @@ import { readDir, readFile, describeEntry } from '../fs/read'
 import { writeFile } from '../fs/write'
 import { atomicWrite } from '../fs/atomicWrite'
 import { mkdir, createFile, moveEntry, trashEntry } from '../fs/mutate'
-import { loadSettings, saveSettings } from '../settings'
+import { loadSettings, updateSettings } from '../settings'
 import { WorkspaceState } from '../workspace'
 import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem, normalizeRecentItems } from '../recentItems'
 import { recentItemsConfigPath } from '../recentItemsPath'
@@ -610,23 +610,13 @@ export function setupHandlers(window: BrowserWindow): void {
 
   ipcMain.handle('settings:update', (_e, patch: unknown): Result<Settings> => {
     try {
-      const current = loadSettings()
       if (!patch || typeof patch !== 'object') {
         return err('IO', 'Settings must be an object')
       }
-      const p = patch as Record<string, unknown>
-      const updated: Settings = {
-        sidebarWidth: typeof p.sidebarWidth === 'number' ? p.sidebarWidth : current.sidebarWidth,
-        themeOverride: p.themeOverride === 'light' || p.themeOverride === 'dark' || p.themeOverride === null
-          ? p.themeOverride as 'light' | 'dark' | null
-          : current.themeOverride,
-        explorerVisible: typeof p.explorerVisible === 'boolean' ? p.explorerVisible : current.explorerVisible,
-        editorFont: p.editorFont === 'sans-serif' || p.editorFont === 'serif'
-          ? p.editorFont as 'sans-serif' | 'serif'
-          : current.editorFont
-      }
-      saveSettings(updated)
-      return ok(updated)
+      // Merge in MAIN against the authoritative in-memory settings (not a stale
+      // disk read), so two updates inside the 500 ms debounce window do not
+      // clobber each other (review #27). Only the four known fields are read.
+      return ok(updateSettings(patch as Partial<Settings>))
     } catch (e: unknown) {
       return err('IO', sanitizeError(e, null))
     }

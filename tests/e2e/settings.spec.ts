@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, openHamburger } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, openHamburger, openSettingsDialog } from './launch'
 
 /**
  * Spec 012 settings suite (contracts/renderer.md §E2e): the Settings dialog,
@@ -68,16 +68,6 @@ async function openFile(): Promise<void> {
   await expect(window.locator('.ProseMirror:visible')).toBeVisible()
 }
 
-/** Open the settings dialog via the hamburger (idempotent-ish: the dialog is a
- *  single instance, so reopening is a no-op on the DOM — callers guard state). */
-async function openSettingsDialog(): Promise<Page> {
-  await openHamburger(window)
-  await window.getByRole('menuitem', { name: 'Settings…' }).click()
-  await window.getByRole('button', { name: 'Open menu' }).focus()
-  await expect(window.getByTestId('settings-dialog')).toBeVisible()
-  return window
-}
-
 /** The editor's `--crepe-font-default` computed value — the mechanism the serif
  *  override uses (plan R2). */
 async function editorFontVar(): Promise<string> {
@@ -102,7 +92,7 @@ async function persistedEditorFont(): Promise<string | undefined> {
 
 test('US1 the hamburger opens a Settings dialog whose first setting is the editor font', async () => {
   await openFile()
-  const dialog = await openSettingsDialog()
+  const dialog = await openSettingsDialog(window)
 
   // The dialog is a labelled, modal dialog.
   await expect(dialog.getByRole('heading', { name: 'Settings' })).toBeVisible()
@@ -123,7 +113,7 @@ test('US2 selecting Serif applies it to the editing surface and persists it', as
   const defaultToolbar = await toolbarFont()
   expect(defaultToolbar).toContain('Inter')
 
-  const dialog = await openSettingsDialog()
+  const dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
 
   // The editing surface re-renders in a serif face immediately (FR-005).
@@ -139,19 +129,19 @@ test('US2 selecting Serif applies it to the editing surface and persists it', as
 
 test('US2/FR-007 reopening the dialog shows the current font choice selected', async () => {
   await openFile()
-  let dialog = await openSettingsDialog()
+  let dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
   await dialog.getByRole('button', { name: 'Close settings' }).click()
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
-  dialog = await openSettingsDialog()
+  dialog = await openSettingsDialog(window)
   await expect(dialog.getByRole('radio', { name: 'Serif', exact: true })).toBeChecked()
   await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).not.toBeChecked()
 })
 
 test('US3 the font choice survives a restart', async () => {
   await openFile()
-  const dialog = await openSettingsDialog()
+  const dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
   await expect.poll(persistedEditorFont).toBe('serif')
 
@@ -171,7 +161,7 @@ test('US4 the dialog never discards or alters the open document', async () => {
   const alphaTab = window.getByRole('tab', { name: /alpha\.md/ })
   await expect(alphaTab.locator('.tab-dirty')).toBeVisible()
 
-  const dialog = await openSettingsDialog()
+  const dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
   await dialog.getByRole('button', { name: 'Close settings' }).click()
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
@@ -215,7 +205,7 @@ test('FR-007 the dialog is keyboard-accessible (open, navigate, close)', async (
 test('FR-009 a missing config opens with defaults and a change writes a valid config', async () => {
   // No config.json exists yet (fresh AME_CONFIG_DIR).
   await openFile()
-  const dialog = await openSettingsDialog()
+  const dialog = await openSettingsDialog(window)
   await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).toBeChecked()
 
   await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
@@ -228,8 +218,15 @@ test('FR-009 a missing config opens with defaults and a change writes a valid co
 })
 
 test('FR-009 a malformed config still opens the dialog with defaults', async () => {
-  fs.writeFileSync(path.join(configDir, 'config.json'), '{ not json', 'utf-8')
-  await openFile()
-  const dialog = await openSettingsDialog()
+  const configPath = path.join(configDir, 'config.json')
+  fs.writeFileSync(configPath, '{ not json', 'utf-8')
+
+  // Deliberately do NOT open a file/folder first: a folder open records a
+  // recent item, whose read-modify-write repairs the malformed file before the
+  // dialog reads it (review #27 #4 — the old test was vacuous). Opening the
+  // dialog directly exercises the true malformed-config tolerance path.
+  const dialog = await openSettingsDialog(window)
   await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).toBeChecked()
+  // The malformed file was not rewritten by merely opening the dialog.
+  expect(fs.readFileSync(configPath, 'utf-8')).toBe('{ not json')
 })

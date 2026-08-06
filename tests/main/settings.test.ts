@@ -8,6 +8,7 @@ import {
   hasSettingsKey,
   readConfigFile,
   migrateLegacySettingsFile,
+  mergeSettingsPatch,
   DEFAULTS
 } from '../../src/main/settingsFile'
 import type { RecentItem } from '../../src/shared/ipc-contract'
@@ -204,5 +205,46 @@ describe('migrateLegacySettingsFile (spec 012, one-time migration)', () => {
     const migrated = migrateLegacySettingsFile(configPath, legacyPath)
     expect(migrated?.editorFont).toBe('sans-serif')
     fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
+
+  it('migrates a legacy file that lacks the sidebarWidth key', () => {
+    const configPath = tempSettingsFile()
+    const legacyPath = path.join(path.dirname(configPath), 'settings.json')
+    fs.writeFileSync(legacyPath, JSON.stringify({ themeOverride: 'dark', explorerVisible: false }), 'utf-8')
+    const migrated = migrateLegacySettingsFile(configPath, legacyPath)
+    expect(migrated?.themeOverride).toBe('dark')
+    expect(migrated?.explorerVisible).toBe(false)
+    expect(migrated?.sidebarWidth).toBe(DEFAULTS.sidebarWidth)
+    expect(loadSettingsFile(configPath).themeOverride).toBe('dark')
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
+})
+
+describe('mergeSettingsPatch (review #27: authoritative in-memory merge)', () => {
+  const base: typeof DEFAULTS = { ...DEFAULTS, editorFont: 'sans-serif' }
+
+  it('applies a valid editorFont patch', () => {
+    expect(mergeSettingsPatch(base, { editorFont: 'serif' }).editorFont).toBe('serif')
+  })
+
+  it('rejects an invalid editorFont value, keeping the current one', () => {
+    expect(mergeSettingsPatch(base, { editorFont: 'comic-sans' as 'serif' }).editorFont).toBe('sans-serif')
+  })
+
+  it('rejects a non-finite sidebarWidth', () => {
+    expect(mergeSettingsPatch(base, { sidebarWidth: NaN }).sidebarWidth).toBe(30)
+    expect(mergeSettingsPatch(base, { sidebarWidth: Infinity }).sidebarWidth).toBe(30)
+  })
+
+  it('keeps un-patched fields unchanged', () => {
+    const result = mergeSettingsPatch(base, { editorFont: 'serif' })
+    expect(result.sidebarWidth).toBe(30)
+    expect(result.explorerVisible).toBe(true)
+  })
+
+  it('accepts valid themeOverride values only', () => {
+    expect(mergeSettingsPatch(base, { themeOverride: 'dark' }).themeOverride).toBe('dark')
+    expect(mergeSettingsPatch(base, { themeOverride: null }).themeOverride).toBe(null)
+    expect(mergeSettingsPatch(base, { themeOverride: 'sepia' as 'dark' }).themeOverride).toBe(null)
   })
 })

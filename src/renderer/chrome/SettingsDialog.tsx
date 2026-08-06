@@ -28,10 +28,18 @@ export default function SettingsDialog({ editorFont, onEditorFontChange, onClose
   const fontGroupRef = useRef<HTMLFieldSetElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  // The element that had focus when the dialog opened; focus returns to it on
+  // close (review #27 — the hamburger trigger, per the plan's FR-007 contract).
+  const returnFocusRef = useRef<HTMLElement | null>(null)
 
-  // Focus moves into the dialog on open (the first radio).
+  // Focus moves into the dialog on open (the first radio), remembering what to
+  // restore on close.
   useEffect(() => {
+    returnFocusRef.current = document.activeElement as HTMLElement | null
     fontGroupRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus()
+    return () => {
+      returnFocusRef.current?.focus()
+    }
   }, [])
 
   // Focus trap: Tab and Shift+Tab cycle within the dialog (FR-007).
@@ -52,12 +60,14 @@ export default function SettingsDialog({ editorFont, onEditorFontChange, onClose
       const first = focusables[0]
       const last = focusables[focusables.length - 1]
       const active = document.activeElement as HTMLElement | null
-      if (e.shiftKey && (active === first || !root.contains(active))) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && active === last) {
+      // Tab wraps forward from the last element, and also pulls focus back in
+      // when it has strayed outside the dialog (review #27, focus-trap gap).
+      if (!e.shiftKey && (active === last || !root.contains(active))) {
         e.preventDefault()
         first.focus()
+      } else if (e.shiftKey && (active === first || !root.contains(active))) {
+        e.preventDefault()
+        last.focus()
       }
     }
     document.addEventListener('keydown', onKeyDown)

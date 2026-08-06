@@ -233,3 +233,10 @@ valid config (FR-009); legacy settings are migrated once.
 - Every task leaves the repo in `npm run typecheck`-clean state.
 - MVP = end of Phase 4 (US1 + US2 with the dialog and font application);
   Phases 5–6 add the persistence and tolerance e2e coverage; Phase 7 polishes.
+- Code-review round 2026-08-06 (PR #27, review subagents): fixed a stale-snapshot
+  clobber in `settings:update` (now an authoritative in-memory merge), made
+  `writeSettingsFile` atomic with `0o600` + `mkdir`, added a quit flush for the
+  debounced settings write, restored focus return + the focus-trap gap in the
+  dialog, widened the migration gate, made the malformed-config e2e non-vacuous,
+  and moved `openSettingsDialog` into `tests/e2e/launch.ts` per
+  contracts/renderer.md. All deviations recorded in plan.md's decision log.

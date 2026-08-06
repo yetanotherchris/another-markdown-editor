@@ -243,7 +243,12 @@ flat.
 | One-time migration from the legacy `settings.json` | Existing installs (spec 010) persist `sidebarWidth`/`themeOverride`/`explorerVisible` there; moving storage without a migration silently discards those preferences | Starting from defaults on upgrade (drops persisted user preferences; cheap to migrate, so no reason not to) |
 | Source view keeps its monospace face | The spec Assumptions apply the font to "the WYSIWYG editor and source view, *if applicable*"; raw markdown source is conventionally monospace and is a separate inspection surface | Changing the source textarea to the selected serif/sans face (visually noisy for raw text; the spec's "if applicable" grants the latitude) |
 | The Crepe top bar keeps the sans-serif Inter face | The toolbar is editor **chrome**, not the editing surface; the spec's Assumptions scope the font change to "the document editing surface … not the surrounding UI chrome" (user decision 2026-08-06) | Letting the serif override leak into the toolbar via Crepe's `--crepe-font-default` (the heading selector re-applies it — verified in `top-bar.css`) |
-| Settings are written non-atomically (plain `writeFileSync`) | Settings are non-critical preferences, not user documents; Principle III's atomic-write rule guards the user's words, and `recentItems` already writes atomically on the same file | Routing settings through `atomicWrite` too (harmless, but adds a temp-file dance to a debounced background write) |
+
+*(Superseded by the code-review round below: settings writes were originally
+recorded as intentionally non-atomic. Review #27 M1/M2 showed the settings
+writer now shares the file holding the MRU list, so a plain `writeFileSync`
+could truncate it on a crash or create it world-readable; `writeSettingsFile`
+now routes through `atomicWrite(…, 0o600)` with `mkdirSync` first.)*
 
 ## Decision log
 
@@ -269,3 +274,30 @@ flat.
   serif.
 - **`settings:get` fallback literal** in handlers.ts is updated to include
   `editorFont` so a settings-read failure still returns a complete `Settings`.
+
+### 2026-08-06 (code-review round)
+
+- **Authoritative in-memory settings + `updateSettings` merge** (review #27
+  HIGH): `settings:update` used to rebuild its snapshot from a disk read, so
+  two updates inside the 500 ms debounce window clobbered each other (e.g. a
+  Serif choice followed within 500 ms by a sidebar resize reverted the font).
+  `src/main/settings.ts` now keeps an in-memory `currentSettings` seeded once
+  from disk; every merge goes through `mergeSettingsPatch` (pure,
+  electron-free, unit-tested in settingsFile.ts) and the debounced write always
+  persists the merged snapshot. The handler no longer duplicates the merge.
+- **`writeSettingsFile` is atomic + `0o600` + mkdir** (review #27 M1/M2, #2):
+  settings share the file holding the MRU list of absolute paths, so the
+  settings writer must not be able to truncate it on a crash or leave it
+  world-readable when it creates the `ame` directory on a fresh profile.
+  Routed through `atomicWrite(…, 0o600)` with `mkdirSync` first.
+- **Quit flush** (review #27 L1/#5): `flushSettings()` drains the debounced
+  write in `window-all-closed` so a font change survives a fast quit (FR-006).
+- **Focus return + focus-trap gap** (review #27 #3/#8): the dialog remembers
+  the previously-focused element and restores focus on unmount; Tab now also
+  pulls focus back in when it has strayed outside the dialog.
+- **Migration gate widened** (review #27 #7): a legacy file with any known
+  Settings key is imported (not just ones carrying `sidebarWidth`).
+- **Malformed-config e2e made non-vacuous** (review #27 #4): the old test
+  opened a folder first, whose recent-item write repaired the malformed file
+  before the dialog read it; it now opens the dialog directly and asserts the
+  malformed file is untouched.

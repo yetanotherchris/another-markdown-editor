@@ -258,6 +258,20 @@ describe('loadRecentItems / saveRecentItems', () => {
     expect(leftovers).toEqual([])
   })
 
+  it('preserves a pre-existing settings section (spec 012 FR-002, read-modify-write)', () => {
+    // The shared config.json holds both stores; recording a recent item must
+    // not clobber the settings dialog's data (review #27 coverage gap).
+    fs.writeFileSync(filePath, JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif' }
+    }), 'utf-8')
+    saveRecentItems(filePath, [item('/a.md', 'file', 1)])
+    const whole = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    expect(whole.settings).toEqual({
+      sidebarWidth: 30, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif'
+    })
+    expect(loadRecentItems(filePath).map(i => i.path)).toEqual(['/a.md'])
+  })
+
   it('reports a failed write (e.g. target is a directory) rather than corrupting', () => {
     const badPath = path.join(dir, 'adir')
     fs.mkdirSync(badPath)
