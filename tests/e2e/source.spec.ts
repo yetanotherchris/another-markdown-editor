@@ -1,4 +1,4 @@
-import { test, describe, expect, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -49,7 +49,7 @@ function getViewSourceButton(): ReturnType<Page['getByRole']> {
 
 // ---------- US1: toolbar View source, edit, return ----------
 
-describe('US1 toolbar view source', () => {
+test.describe('US1 toolbar view source', () => {
 test('view source slides in, takes the tab, and returns (US1)', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -97,7 +97,7 @@ test('US1 no-edit round trip keeps content and dirty state', async () => {
 
 // ---------- US2: explorer context menu ----------
 
-describe('US2 explorer context menu', () => {
+test.describe('US2 explorer context menu', () => {
 test('US2 opens an unopened file directly in source view', async () => {
   await openFolder()
 
@@ -130,7 +130,7 @@ test('US2 context-menu View source reuses the already-open formatted tab', async
 
 // ---------- US3: mutual exclusivity ----------
 
-describe('US3 mutual exclusivity', () => {
+test.describe('US3 mutual exclusivity', () => {
 test('US3 exactly one editing view is visible during a switch', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -162,7 +162,7 @@ test('US3 exactly one editing view is visible during a switch', async () => {
 
 // ---------- US4: tooltips ----------
 
-describe('US4 tooltips', () => {
+test.describe('US4 tooltips', () => {
 test('US4 every formatted toolbar control has a tooltip', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -187,7 +187,7 @@ test('US4 every formatted toolbar control has a tooltip', async () => {
 
 // ---------- US5: task backspace ----------
 
-describe('US5 task backspace', () => {
+test.describe('US5 task backspace', () => {
 test('US5: Backspace removes an empty task item', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -210,7 +210,7 @@ test('US5: Backspace removes an empty task item', async () => {
 
 // ---------- FR-12: normalization is preserved, not announced ----------
 
-describe('FR-12 normalization is preserved, not announced', () => {
+test.describe('FR-12 normalization is preserved, not announced', () => {
 test('FR-12: a construct Crepe normalises is preserved verbatim through a round trip', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -284,7 +284,7 @@ test('source-view save writes the exact raw bytes, never adding a trailing newli
 
 // ---------- US7: explorer context-menu Open ----------
 
-describe('US7 explorer context-menu Open', () => {
+test.describe('US7 explorer context-menu Open', () => {
 test('US7 Open opens an unopened file in a formatted tab', async () => {
   await openFolder()
 
@@ -333,7 +333,7 @@ test('US7 Open returns a source-view tab to visual editing', async () => {
 
 // ---------- Edges ----------
 
-describe('Edges', () => {
+test.describe('Edges', () => {
 test('tab-switch mid-view leaves the other tab usable', async () => {
   await openFolder()
   await openFile('alpha.md')
