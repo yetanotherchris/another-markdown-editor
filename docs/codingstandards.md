@@ -112,20 +112,267 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ## 5. Visual layout — Gestalt principles
 
-You spend more time reading code than writing it. The [Gestalt principles](https://yetanotherchris.dev/clean-code/gestalt-principles/) describe how the eye perceives groups of objects — apply them to make code scannable at a glance.
+You spend more time reading code than writing it (~90% reading). The [Gestalt principles](https://yetanotherchris.dev/clean-code/gestalt-principles/) describe how the eye perceives groups of objects. Apply them deliberately so TypeScript, React/TSX, Node/Electron main-process code, plain CSS, and tests in this repo are scannable at a glance.
 
-- **Similarity** — similar things appear grouped together. Group variables by type, parameters by role, and related statements by purpose. Aligned types and consistent character lengths help the eye form natural groups.
-- **Good form (Pragnanz)** — the mind perceives well-formed wholes, ignoring the parts. Use vertical tabulation for chained calls (LINQ, promise chains, method builders) so the eye reads the block as one object instead of parsing each line independently.
-- **Proximity** — things nearer each other appear grouped. Remove spurious blank lines between related declarations (fields, imports, properties). Vertically align constructor or function parameters so they read as a single group rather than a flat list.
-- **Closure** — the eye fills gaps to perceive a whole. Excessive whitespace inside a class or function breaks it into disconnected lines. Keep related members visually tight so the reader sees one cohesive unit first, then reads the details.
-- **Continuation** — the eye follows smooth paths. Use consistent formatting patterns (e.g. one attribute per line, aligned decorators, uniform chaining style) so the eye flows through the code without stumbling on irregular intersections.
+This section is **layout and whitespace**, not naming or architecture. Prettier (2 spaces, single quotes, no semicolons, `printWidth` 100) is the floor; Gestalt is how you structure what Prettier cannot decide: blank lines, grouping order, and when to break vertically.
 
-Practical rules:
+### 5.1 Similarity — similar things appear grouped together
 
-- Blank lines separate **logical chunks**, not individual statements. If two lines are part of the same thought, no blank line between them.
-- Align related declarations vertically (fields, imports, object literals) when it aids scanning.
-- Keep the subject of a block (the class name, the function being tested, the method under setup) visually close to its details — do not separate them with unrelated code or whitespace.
-- Prefer consistent formatting patterns across the codebase; inconsistency forces the reader to re-parse each block.
+The eye clusters items that look alike. Make same-kind constructs share shape, density, and position so the reader sees one group, not a mixed bag.
+
+**TypeScript**
+
+- Group local bindings by role, not by the order you typed them: inputs together, derived values together, side-effect handles together. Prefer `const` clusters of the same shape (`const a = …` / `const b = …`) without blank lines inside the cluster.
+- Discriminated unions and string unions: one `|` arm per line, same indent. The repeated `|` and similar arm length make the set read as one closed type.
+
+```ts
+// Good — one closed set
+export type Result<T> =
+  | { ok: true; value: T }
+  | { ok: false; code: ErrorCode; message: string }
+
+export type HamburgerItem =
+  | { kind: 'command'; label: string; command: MenuCommand; accelerator?: string }
+  | { kind: 'recent-items' }
+  | { kind: 'separator' }
+  | { kind: 'action'; label: string; action: 'clear-recent' | 'toggle-devtools' | 'settings' | 'quit' }
+```
+
+- Keep `import type { … }` and value imports in consistent blocks. Same-module relatives stay adjacent; do not interleave type-only and value imports randomly inside one block.
+- Reducers: every `case` should look like every other `case` — thin `case` → named handler or one-line return. Fat inline bodies next to thin ones break the group.
+
+```ts
+// Good — similar case shape
+switch (action.type) {
+  case 'OPEN_NEW':
+    return handleOpenNew(state)
+  case 'OPEN_EXISTING':
+    return handleOpenExisting(state, action.payload as OpenExistingPayload)
+  case 'ACTIVATE':
+    return handleActivateDoc(state, action.payload?.id as string)
+  default:
+    return state
+}
+```
+
+**React / TSX**
+
+- Props interfaces: one property per line, same colon alignment rhythm. Callback props named `on*` sit together; data props sit together when the list is long.
+- Destructured props and multi-prop JSX: one name/prop per line when the list is multi-line. Mixing “three props on one line, then one prop per line” in the same component forces re-parsing.
+
+```tsx
+// Good — similar prop lines
+<EditorPanel
+  key={doc.id}
+  document={doc}
+  isActive={doc.id === session.activeId}
+  onContentChange={sessionApi.handleContentChange}
+  onBaselineCapture={sessionApi.handleBaselineCapture}
+  onCursorState={sessionApi.handleCursorState}
+  onRequestViewSource={source.handleShowSource}
+  onReturnToFormatted={source.handleReturnToFormatted}
+/>
+```
+
+- Hooks of the same kind stack together: all `useState`, then all `useRef`, then `useCallback`/`useMemo`, then custom hooks, then `useEffect`. Same hook shape in a vertical run reads as one “hooks region.”
+
+**Node / Electron (main, preload)**
+
+- IPC registration maps and preload API objects: one channel or method per line, same arrow/`invoke` shape. A fixed list of named operations should look like a menu, not a paragraph.
+- Handler files group by domain (`fileHandlers`, dialog handlers). Inside a handler, validation calls (`validateShape`, `ensureString`) stay stacked in the same form before business logic.
+
+**CSS**
+
+- Custom properties in `:root` stay as one dense token block (same `--ame-*` prefix, one property per line).
+- Component rules that share a prefix (`.tree-node`, `.tree-node:hover`, `.tree-node.selected`) stay adjacent so the family is one visual group.
+- Prefer the same property order within a rule family (layout → box → type → color → misc) so scanning two rules feels like comparing two rows of a table.
+
+**Tests (Vitest / Playwright)**
+
+- Arrange bindings of the same kind together (`const state`, `const s1`, `const docId`). Sequential `expect(...)` lines for one outcome stay stacked with no blank lines between them.
+- Factory helpers (`tabDoc`, `createSession`) and `vi.fn()` stubs cluster at the top of the test or in a shared helper file — same shape every time.
+
+### 5.2 Good form (Prägnanz) — well-formed wholes, parts fade out
+
+The mind prefers a simple whole. Format so the reader first sees *one* operation (a chain, a component, a type, a handler), not a scatter of tokens.
+
+**TypeScript**
+
+- Method/promise/array chains that are the “sentence” of the function break vertically at each step. Short chains may stay one line; once the chain is the main idea, vertical form wins.
+
+```ts
+// Good — one pipeline as a single form
+return nodes
+  .filter(n => n.id !== id)
+  .map(n => {
+    if (n.kind === 'directory' && n.children) {
+      return { ...n, children: removeNode(n.children, id) }
+    }
+    return n
+  })
+```
+
+- Keep the subject close to its method: `documentsReducer(state, action)` not a blank line or unrelated binding between the function name and its primary arguments when writing call sites in tests.
+- Prefer a closed discriminated union over optional fields plus booleans — the union is one well-formed shape; a pile of `foo?:` + `isFoo` flags is many partial shapes.
+
+**React / TSX**
+
+- A component body should read as three bands when non-trivial: props/hooks → derived values and handlers → `return` JSX. That whole is easier than hooks, JSX fragments, and handlers interleaved.
+- Conditional UI that is itself a small whole can be extracted to a named variable or early return so the main `return` stays one form:
+
+```tsx
+if (document.editorState === 'evicted') {
+  return <div className="editor-host evicted" />
+}
+
+const sourceView = document.view === 'source' && (
+  <SourceView value={document.content} /* … */ />
+)
+```
+
+**Node / Electron**
+
+- An `ipcMain.handle` body is one form: try → validate → workspace/path guards → act → `ok` / `err`. Do not bury validation halfway through side effects.
+- Preload bridges stay a single object literal of named methods — that object *is* the API surface; keep it one dense, uniform map.
+
+**CSS**
+
+- A selector block is one form: properties inside, no blank lines mid-rule. Blank lines go *between* components, not between `display` and `align-items`.
+- Base + pseudo + state (`.btn`, `.btn:hover`, `.btn:disabled`) form one visual object; do not park an unrelated selector between them.
+
+**Tests**
+
+- One test = one story form: arrange → act → assert. Multi-step acts (`OPEN_EXISTING` → `UPDATE_CONTENT` → expect) stay a continuous narrative; only insert a blank line when a new chapter starts (e.g. baseline capture, then later undo).
+
+### 5.3 Proximity — nearer things appear grouped
+
+Whitespace is a grouping signal. Put related lines adjacent; put a blank line only where a new group starts.
+
+**TypeScript**
+
+- Guard clauses stack with no blank lines between them — one “validation wall.” A blank line after the last guard separates validation from the happy path.
+
+```ts
+// Good — proximity of guards
+export function isDirtyLive(doc: DocumentState, getMarkdown: MarkdownAccessor): boolean {
+  if (doc.dirty) return true
+  if (doc.view === 'source') return false
+  const live = getLiveContent(doc, getMarkdown)
+  if (live === null) return false
+  return !markdownSame(live, doc.editorBaseline)
+}
+```
+
+- Declaration and first use stay close. Do not open a long gap between `const x = …` and the only place `x` is read.
+- Multi-line parameter lists and options objects: parameters of one function stay in one tight vertical list; do not blank-line mid-list unless grouping required vs optional knobs and that grouping is intentional and consistent.
+- Imports: dense within a block. Optional single blank line between external packages and internal modules is fine; blank lines after every import are not.
+
+**React / TSX**
+
+- Hooks that implement one concern (e.g. focus restore: `returnFocusRef`, the effect that sets it, the cleanup) stay adjacent.
+- JSX children that form one control (icon + title + dirty dot on a tab) stay inside the parent with no extra blank lines between siblings of that control.
+- Related event handlers (`handleSave`, `handleSaveAndClose`) live next to each other in the component or hook file.
+
+**Node / Electron**
+
+- Path validation helpers and the `resolveWithinRoot` call site in a handler stay in the same region of the file as other path-sensitive code (cohesion + proximity).
+- `ok(receipt)` / `return err(...)` stay immediately after the operation they report; do not insert logging or unrelated assignments between success path and return when the return *is* the result.
+
+**CSS**
+
+- No blank line between a base rule and its `:hover` / `.selected` / `:focus-visible` variants.
+- Blank line between unrelated components (`.tab-bar` block vs `.status-footer` block).
+- Shorthand and related longhands stay together (`margin` next to `padding`, flex properties as a run).
+
+**Tests**
+
+- `beforeEach` setup variables that belong to one fixture stay adjacent (`root`, `subdir`, `markdownFile`).
+- Do not put a blank line between `expect(a)` and `expect(b)` when both assert the same act.
+- Playwright locators used together (get tab → click → assert dirty) stay in one proximity group.
+
+### 5.4 Closure — the eye fills gaps to see a whole
+
+Too much whitespace opens holes; the reader sees separate fragments instead of one class, function, type, or rule set. Keep members of a unit visually tight so the unit closes as a whole, then let the reader zoom into details.
+
+**TypeScript**
+
+- Interfaces, type aliases, and small pure functions: avoid blank lines between every property or every statement. Use blank lines only between logical phases inside a longer function (parse → decide → build result).
+- A module’s exported API should not be sprinkled with large empty regions; related exports (`planDelete`, `isWithinOrEqual`, path helpers) sit as a closed neighbourhood.
+- Thin `switch` + named handlers closes the reducer as one object; giant inline `case` bodies open holes and destroy the whole.
+
+**React / TSX**
+
+- A presentational component that is only props + short hooks + return should stay compact — do not pad with blank lines until it looks like three unrelated scripts.
+- Lists of tabs, tree nodes, or settings radios: map callbacks stay tight; the list is one closed UI region inside the parent.
+
+**Node / Electron**
+
+- One IPC handler function should read as a single closed procedure. If it needs more than a screen of body, extract helpers rather than stretching the handler with internal blank-line “chapters” that hide the try/catch envelope.
+- `Result` returns and `sanitizeError` usage stay inside that closed try/catch so error policy is one whole.
+
+**CSS**
+
+- One component’s rules form one closed section. Splitting `.tree-node` layout into a block at the top of the file and `.tree-node` colors a hundred lines later breaks closure — keep the component’s rules together (or split into a dedicated file, which restores closure at file level).
+
+**Tests**
+
+- Helper factories and the tests that use them: either same file in a tight “helpers then tests” structure, or a dedicated `helpers.ts`. Do not strand a one-off factory thirty lines below an unrelated `describe`.
+- A `describe` block is a closed suite; blank lines between `it`s are fine, but do not separate `it` from its immediately relevant `beforeEach` with unrelated suites.
+
+### 5.5 Continuation — the eye follows a smooth path
+
+Where lines or tokens intersect, the eye prefers a continuous trajectory. Consistent break patterns and alignment keep that path smooth; zigzag formatting makes every line a new intersection to re-parse.
+
+**TypeScript**
+
+- Pick a chaining style and keep it for chains of similar weight: either mostly vertical `.filter` / `.map` / `.reduce`, or short one-liners — not a random mix inside one function.
+- Multiline `import type { A, B, C }` and multiline destructuring should use the same trailing-comma/paren discipline Prettier already applies; do not hand-format one import as a single line of twenty symbols and the next as a vertical list without reason (length/`printWidth` is a valid reason).
+- Union arms, enum-like string unions, and exhaustive `switch` cases should continue down the page with the same indent so the eye rides the left edge of the `|` or `case` column.
+
+**React / TSX**
+
+- JSX attributes: once a tag is multi-line, *all* attributes are multi-line (continuation of “one prop per line”). Do not leave the first two props on the opening line and hang the rest below.
+- Children either stay inline when trivial (`<span className="tab-title">{doc.title}</span>`) or break consistently when nested structure matters.
+- Ternaries in JSX: prefer clear multi-line form when both branches are elements so `?` / `:` continue vertically:
+
+```tsx
+{session.documents.length === 0 ? (
+  <div className="empty-state">…</div>
+) : (
+  session.documents.map(doc => <EditorPanel key={doc.id} /* … */ />)
+)}
+```
+
+**Node / Electron**
+
+- Repeated `ipcRenderer.invoke('channel', payload)` lines in preload should share indentation and wrapping so the channel name column is easy to scan.
+- `fs` / `path` sequences (`join` → `resolve` → validate) read top-to-bottom as one path story; avoid interleaving unrelated IPC or dialog calls mid-sequence.
+
+**CSS**
+
+- Shared class prefixes (`.chrome-icon-button`, `.chrome-icon-button:hover`) create a vertical continuation the eye follows down the stylesheet.
+- Media queries and state variants that belong to a component continue immediately after it, not at the end of the file unless the file is exclusively breakpoints.
+
+**Tests**
+
+- Naming continues a pattern: `"discards changes when user declines save"` — behaviour phrases in a consistent grammar so the `it` list scans like a checklist.
+- E2E steps that are a user journey (launch → open folder → edit → quit) stay in order without unrelated setup injected mid-flow; shared launch belongs in `tests/e2e/launch.ts` so each spec continues from a known baseline.
+
+### 5.6 Cross-cutting rules for this repository
+
+| Do | Don't |
+|----|--------|
+| Blank lines separate **logical chunks** (phase changes), not every statement | Blank line after every `const` or between every JSX sibling |
+| Stack same-shaped lines (guards, `case`s, props, `|` arms, `expect`s) | Mix single-line and multi-line forms for the same construct in one region |
+| Vertical chains and attribute lists when the construct *is* the sentence | Zigzag: half a chain inline, half broken, props half-and-half |
+| Keep base CSS rule + `:hover` / state adjacent | Scatter a component’s selectors across the file |
+| Hooks clustered by kind; handlers by domain | Interleave unrelated hooks, effects, and JSX helpers |
+| Tests: arrange → act → assert as visible proximity groups | Interleave expects with further acts without a phase boundary |
+| Subject next to its details (type next to helpers, component next to its CSS file) | Large whitespace holes inside one function/type/component |
+
+Formatting conflicts: **Prettier wins** on what it controls. Use Gestalt for blank-line placement, declaration order, when to extract a vertical chain, and how to group imports, hooks, CSS rules, and test phases — the decisions Prettier leaves to you.
+
+When tidying layout only (no behaviour change), do it in a **tidy-first** commit per section 1. Do not mix Gestalt whitespace sweeps with feature work.
 
 ---
 
