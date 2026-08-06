@@ -74,6 +74,9 @@
   line-height: 1;
   display: inline-flex;
   color: var(--ame-muted);
+  /* A little breathing room around the file/folder icon (user decision
+     2026-08-06). */
+  padding: 0 3px;
 }
 
 .tree-node-name {
