@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-07
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Frontmatter should be stripped before loading into the visual editor, always visible at the top in view source mode, and recombined on save."
 

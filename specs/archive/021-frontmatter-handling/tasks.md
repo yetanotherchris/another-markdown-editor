@@ -28,8 +28,8 @@ implementation and testing of each story.
 
 **Purpose**: Test fixtures for frontmatter round-trip characterization
 
-- [ ] T001 [P] Add frontmatter fixture files to tests/fixtures/roundtrip/ (frontmatter.md with a YAML block + body, frontmatter-nested.md with nested lists/maps, frontmatter-no-closing.md with `---` and no closing delimiter, frontmatter-crlf.md with CRLF line endings)
-- [ ] T002 [P] Create the implementation branch phase-7-frontmatter-handling from clean main before any source work begins
+- [X] T001 [P] Add frontmatter fixture files to tests/fixtures/roundtrip/ (frontmatter.md with a YAML block + body, frontmatter-nested.md with nested lists/maps, frontmatter-no-closing.md with `---` and no closing delimiter, frontmatter-crlf.md with CRLF line endings)
+- [X] T002 [P] Create the implementation branch 021-frontmatter-handling from clean main before any source work begins
 
 ---
 
@@ -39,8 +39,8 @@ implementation and testing of each story.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Create src/renderer/domain/frontmatter.ts exporting `splitFrontmatter(text)` and `joinFrontmatter(frontmatter, body)` per contracts/frontmatter.md (byte partition: `frontmatter + body === text`; exact `---` delimiter lines; only first-line-opening blocks; CRLF tolerated; no YAML parsing)
-- [ ] T004 Write tests/renderer/frontmatter.test.ts covering every row of the split/join behaviour contract in contracts/frontmatter.md: plain, no-frontmatter, unclosed, empty frontmatter, no-trailing-newline, CRLF, and the byte-partition invariant `joinFrontmatter(...splitFrontmatter(t)) === t`
+- [X] T003 Create src/renderer/domain/frontmatter.ts exporting `splitFrontmatter(text)` and `joinFrontmatter(frontmatter, body)` per contracts/frontmatter.md (byte partition: `frontmatter + body === text`; exact `---` delimiter lines; only first-line-opening blocks; CRLF tolerated; no YAML parsing)
+- [X] T004 Write tests/renderer/frontmatter.test.ts covering every row of the split/join behaviour contract in contracts/frontmatter.md: plain, no-frontmatter, unclosed, empty frontmatter, no-trailing-newline, CRLF, and the byte-partition invariant `joinFrontmatter(...splitFrontmatter(t)) === t`
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -56,12 +56,12 @@ implementation and testing of each story.
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T005 [P] [US1] Add reducer test file tests/renderer/documents.frontmatter.test.ts asserting OPEN_EXISTING on a frontmatter payload stores `frontmatter` separately and `content` = body only (FR-001/FR-002/FR-003/FR-004)
-- [ ] T006 [P] [US1] Add e2e spec tests/e2e/frontmatter.spec.ts with a US1 scenario: open a file with frontmatter + nested YAML, assert only body text is visible in the editor and no `---`/YAML text appears
+- [X] T005 [P] [US1] Add reducer test file tests/renderer/documents.frontmatter.test.ts asserting OPEN_EXISTING on a frontmatter payload stores `frontmatter` separately and `content` = body only (FR-001/FR-002/FR-003/FR-004)
+- [X] T006 [P] [US1] Add e2e spec tests/e2e/frontmatter.spec.ts with a US1 scenario: open a file with frontmatter + nested YAML, assert only body text is visible in the editor and no `---`/YAML text appears
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Add `frontmatter: string` to `DocumentState` and to `createEmpty`/`openFile` in src/renderer/state/documents.ts (openFile splits the raw bytes via `splitFrontmatter`, storing `content` = body, `baseline` = raw full text)
+- [X] T007 [US1] Add `frontmatter: string` to `DocumentState` and to `createEmpty`/`openFile` in src/renderer/state/documents.ts (openFile splits the raw bytes via `splitFrontmatter`, storing `content` = body, `baseline` = raw full text)
 
 **Checkpoint**: A file with frontmatter opens with only the body visible in the visual editor.
 
@@ -75,16 +75,16 @@ implementation and testing of each story.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T008 [P] [US2] Add tests in tests/renderer/documents.frontmatter.test.ts for SAVE_SUCCESS on a frontmatter document: re-splits the written text, preserves frontmatter, clears dirty, baseline = written text (FR-005/FR-008)
-- [ ] T009 [P] [US2] Add tests in tests/renderer/documents.frontmatter.test.ts asserting `getContentToSave` recombines frontmatter + body for source view, clean formatted, and dirty formatted; and returns body unchanged when frontmatter is `''` (FR-010)
-- [ ] T010 [P] [US2] Add e2e scenarios in tests/e2e/frontmatter.spec.ts: (a) edit body, save, file = original frontmatter + edited body; (b) no-edit save is byte-identical to the original; (c) no-frontmatter file saves without an added block
+- [X] T008 [P] [US2] Add tests in tests/renderer/documents.frontmatter.test.ts for SAVE_SUCCESS on a frontmatter document: re-splits the written text, preserves frontmatter, clears dirty, baseline = written text (FR-005/FR-008)
+- [X] T009 [P] [US2] Add tests in tests/renderer/documents.frontmatter.test.ts asserting `getContentToSave` recombines frontmatter + body for source view, clean formatted, and dirty formatted; and returns body unchanged when frontmatter is `''` (FR-010)
+- [X] T010 [P] [US2] Add e2e scenarios in tests/e2e/frontmatter.spec.ts: (a) edit body, save, file = original frontmatter + edited body; (b) no-edit save is byte-identical to the original; (c) no-frontmatter file saves without an added block
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Update `getContentToSave` in src/renderer/domain/dirty.ts to return `joinFrontmatter(frontmatter, body)` for source view, clean formatted, and dirty formatted per research R5
-- [ ] T012 [US2] Update `handleSaveSuccess` in src/renderer/state/documents.ts to re-split the written full text (frontmatter + body) so store and disk stay in sync
-- [ ] T013 [P] [US2] Add reducer test for `handleReload` in tests/renderer/documents.frontmatter.test.ts: a re-read full file with frontmatter re-splits into frontmatter + body and resets baseline/dirty
-- [ ] T014 [US2] Update `handleReload` in src/renderer/state/documents.ts to re-split the re-read full text (frontmatter + body) and reset baseline/dirty/editorBaseline (research R3)
+- [X] T011 [US2] Update `getContentToSave` in src/renderer/domain/dirty.ts to return `joinFrontmatter(frontmatter, body)` for source view, clean formatted, and dirty formatted per research R5
+- [X] T012 [US2] Update `handleSaveSuccess` in src/renderer/state/documents.ts to re-split the written full text (frontmatter + body) so store and disk stay in sync
+- [X] T013 [P] [US2] Add reducer test for `handleReload` in tests/renderer/documents.frontmatter.test.ts: a re-read full file with frontmatter re-splits into frontmatter + body and resets baseline/dirty
+- [X] T014 [US2] Update `handleReload` in src/renderer/state/documents.ts to re-split the re-read full text (frontmatter + body) and reset baseline/dirty/editorBaseline (research R3)
 
 **Checkpoint**: Saving recombines frontmatter + body; byte-identical no-edit round trip; no empty block added.
 
@@ -98,15 +98,15 @@ implementation and testing of each story.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T015 [P] [US3] Add reducer tests in tests/renderer/documents.frontmatter.test.ts for UPDATE_CONTENT in source view: re-splits the full textarea value into frontmatter + body and sets dirty against the full-file baseline; and for REFRESH_FROM_SOURCE: re-splits full recombined text (FR-007)
-- [ ] T016 [P] [US3] Add e2e scenarios in tests/e2e/frontmatter.spec.ts: (a) source view shows frontmatter at top; (b) edit frontmatter, return, save → preserved; (c) add a frontmatter block in source to a plain file, return, save → block present; (d) remove the frontmatter block, return, save → no block on disk
+- [X] T015 [P] [US3] Add reducer tests in tests/renderer/documents.frontmatter.test.ts for UPDATE_CONTENT in source view: re-splits the full textarea value into frontmatter + body and sets dirty against the full-file baseline; and for REFRESH_FROM_SOURCE: re-splits full recombined text (FR-007)
+- [X] T016 [P] [US3] Add e2e scenarios in tests/e2e/frontmatter.spec.ts: (a) source view shows frontmatter at top; (b) edit frontmatter, return, save → preserved; (c) add a frontmatter block in source to a plain file, return, save → block present; (d) remove the frontmatter block, return, save → no block on disk
 
 ### Implementation for User Story 3
 
-- [ ] T017 [US3] Update `handleUpdateContent` in src/renderer/state/documents.ts so the source-view branch re-splits the payload via `splitFrontmatter` and sets dirty = `joinFrontmatter(...) !== baseline`
-- [ ] T018 [US3] Update `handleRefreshFromSource` in src/renderer/state/documents.ts to re-split the full recombined text (frontmatter + body)
-- [ ] T019 [US3] Update `EditorPanel` in src/renderer/editor/EditorPanel.tsx to pass `joinFrontmatter(document.frontmatter, document.content)` to `SourceView`
-- [ ] T020 [US3] Update `handleReturnToFormatted` in src/renderer/hooks/useSourceViewToggle.ts to dispatch `REFRESH_FROM_SOURCE` with the full recombined text so frontmatter edits survive the remount
+- [X] T017 [US3] Update `handleUpdateContent` in src/renderer/state/documents.ts so the source-view branch re-splits the payload via `splitFrontmatter` and sets dirty = `joinFrontmatter(...) !== baseline`
+- [X] T018 [US3] Update `handleRefreshFromSource` in src/renderer/state/documents.ts to re-split the full recombined text (frontmatter + body)
+- [X] T019 [US3] Update `EditorPanel` in src/renderer/editor/EditorPanel.tsx to pass `joinFrontmatter(document.frontmatter, document.content)` to `SourceView`
+- [X] T020 [US3] Update `handleReturnToFormatted` in src/renderer/hooks/useSourceViewToggle.ts to dispatch `REFRESH_FROM_SOURCE` with the full recombined text so frontmatter edits survive the remount
 
 **Checkpoint**: Source view shows and edits the full file; frontmatter edits survive view switches and saving.
 
@@ -120,12 +120,12 @@ implementation and testing of each story.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T021 [P] [US4] Extend tests/renderer/roundtrip.test.ts (or documents.frontmatter.test.ts) to load the new frontmatter fixtures and assert `content` = body, `baseline` = raw full text, `dirty` = false
-- [ ] T022 [P] [US4] Add e2e scenario in tests/e2e/frontmatter.spec.ts: open a file with complex frontmatter (comments, quoted strings, custom indentation), save without editing, assert the on-disk bytes equal the original file bytes
+- [X] T021 [P] [US4] Extend tests/renderer/roundtrip.test.ts (or documents.frontmatter.test.ts) to load the new frontmatter fixtures and assert `content` = body, `baseline` = raw full text, `dirty` = false
+- [X] T022 [P] [US4] Add e2e scenario in tests/e2e/frontmatter.spec.ts: open a file with complex frontmatter (comments, quoted strings, custom indentation), save without editing, assert the on-disk bytes equal the original file bytes
 
 ### Implementation for User Story 4
 
-- [ ] T023 [US4] Verify round-trip through the store: extend/review tests that OPEN_EXISTING → SAVE_SUCCESS (no edits) keeps `baseline === saved text` and dirty false for the frontmatter fixtures (no source code change expected beyond T007/T012; fix any store bug surfaced)
+- [X] T023 [US4] Verify round-trip through the store: extend/review tests that OPEN_EXISTING → SAVE_SUCCESS (no edits) keeps `baseline === saved text` and dirty false for the frontmatter fixtures (no source code change expected beyond T007/T012; fix any store bug surfaced)
 
 **Checkpoint**: Complex frontmatter round-trips byte-identically with no edits.
 
@@ -135,8 +135,8 @@ implementation and testing of each story.
 
 **Purpose**: Full validation, spec archive, and status-table update
 
-- [ ] T024 [P] Run `npm run lint`, `npm run typecheck`, and `npm run test` — all must pass
-- [ ] T025 [P] Run `npm run test:e2e` (build + Playwright) — full suite must pass including the new frontmatter spec
+- [X] T024 [P] Run `npm run lint`, `npm run typecheck`, and `npm run test` — all must pass
+- [X] T025 [P] Run `npm run test:e2e` (build + Playwright) — full suite must pass including the new frontmatter spec
 - [ ] T026 Archive the implemented spec: `git mv specs/021-frontmatter-handling specs/archive/021-frontmatter-handling`, set its **Status** to `Archived`, and update the Current implementation status table in AGENTS.md
 - [ ] T027 Open the phase PR against main with the changes, PR description ending with the AI usage line
 
