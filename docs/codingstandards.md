@@ -12,6 +12,10 @@ Day-to-day TypeScript and React code shape for this repository.
 
 Product invariants (process isolation, path trust, never lose the user's words, calm editing, test what can corrupt or escape) live in the constitution. Do not restate them here except where a coding rule enforces them.
 
+**Signals vs gates:** Most guidance in this file is a **smell signal**, not a hard gate. Line counts, function length, nesting depth, parameter counts, and similar shape metrics prompt a second look—split, extract, or justify—not an automatic reject. Do not fail CI or block a PR solely because a round number was crossed.
+
+**Real gates** are few and constitutional: process isolation, path validation in main, atomic saves / no silent data loss, no `any` at the IPC boundary, no generic preload `invoke`, and not skipping or weakening security or data-loss tests. Those are non-negotiable. Everything else is judgment guided by “one reason to change” and readability.
+
 ---
 
 ## 1. Tidy first
@@ -62,20 +66,24 @@ Follow Kent Beck's separation of **structure** and **behaviour**.
 
 ## 2. File and module size
 
-Soft limits—treat breaches as a signal to split, not as a hard CI failure unless the team chooses otherwise:
+Line count is a **smell signal**, not a hard gate. Do not fail CI solely on file length. Split when a second “reason to change” appears or the file is hard to navigate—not because a round number was crossed.
 
-| Kind of file | Soft limit | Notes |
-|--------------|------------|--------|
-| React component (`.tsx`) | ~300–400 lines | Composition roots should be thinner |
-| Pure module / reducer | ~400–500 lines | Split when a second "reason to change" appears |
-| Single function | Cyclomatic complexity roughly ≤ 10–15; flag > 20 | Prefer extract helper or guard clauses |
-| Single function | Max ~60-80 lines | If a function needs a comment to explain "step 2", that comment should be a function name instead |
-| Function parameters | Max ~4 | Beyond that, pass an options object |
+| Kind of file | Guidance | Notes |
+|--------------|----------|--------|
+| Presentational component (`.tsx`) | Comfortable under ~400; review past ~500 | Extract hooks/subcomponents when props, effects, and JSX compete |
+| Composition root (`App.tsx`, shell layouts) | Prefer thin; often 200–400 of wiring | Growth is OK if it only orchestrates; extract named hooks before the root owns policy |
+| Pure module / reducer / domain | Comfortable under ~500; review past ~700 | One domain per file; fat `switch` cases become named handlers first |
+| Shared contracts (`ipc-contract.ts`, menus) | Length is expected | Prefer clear grouping over artificial splits that scatter related types |
+| Unit test file | Follow the module it tests | Split when describes for unrelated concerns share one file |
+| E2E spec | One user-story area per file | Long journeys are fine; extract shared launch/setup, not arbitrary line cuts |
+| Single function | Complexity ~10–15 is comfortable; past ~20 is a signal | Prefer extract helper or guard clauses—not a hard complexity fail |
+| Single function | ~60–80 lines is a prompt to extract | If a function needs a comment for “step 2”, that comment should be a function name |
+| Function parameters | ~4 is comfortable; more is a signal | Prefer an options object when knobs multiply—not a hard arity fail |
 
-- **One module ≈ one reason to change.** If a PR description needs two unrelated "why"s for the same file, split the file.
+- **One module ≈ one reason to change.** That rule outranks any line budget. If a PR description needs two unrelated “why”s for the same file, split the file.
 - **One component/class per file.** No file should export two unrelated things.
-- Composition roots (`App.tsx`, IPC registration) stay **thin**. Orchestration belongs in named hooks or focused handler modules.
-- Prefer growing a new small module over growing a hotspot (`App.tsx`, `handlers.ts`, large e2e specs).
+- Composition roots stay **orchestration-only**. Policy lives in hooks, reducers, and pure modules—not a growing blob of inline logic in `App.tsx`.
+- Prefer growing a new small module over growing a hotspot when the hotspot is mixing concerns. A large file that is still one coherent concern is acceptable.
 
 ---
 
@@ -378,15 +386,17 @@ When tidying layout only (no behaviour change), do it in a **tidy-first** commit
 
 ## 6. Functions and control flow
 
+Shape metrics here are **signals**, not gates. Deep nesting or a long parameter list means “look for a seam,” not “the build is red.”
+
 - **Guard clauses** at the top; keep the main path least nested.
-- **No function with more than 2 levels of nesting.** If nesting goes deeper, extract.
+- **Nesting past ~2 levels** is a signal to extract. Deeper is fine briefly at a boundary; sustained pyramids usually want a helper or early return.
 - Domain decisions belong in **pure functions** (`planClose`, `getContentToSave`, path containment). Side effects stay at the edges: IPC handlers, React effects, preload bridges.
 - Pure functions over side-effecting ones wherever possible. Isolate I/O (filesystem, IPC, network) at the edges; keep business logic pure and testable without mocks.
-- Prefer explicit parameters when there are few arguments. Use an options object when there are many optional knobs; document which fields are required.
+- Prefer explicit parameters when there are few arguments. Use an options object when knobs multiply; document which fields are required. Parameter count is a signal, not a max-params gate.
 - **Avoid boolean flag parameters** (`save(doc, true)`) — use named options or separate functions (`saveAndClose(doc)`).
 - Extract a helper when a block has a clear purpose and limited interaction with the surrounding routine; **name it after the purpose**.
 - One level of abstraction per function: do not mix "resolve and validate path" with "show native dialog" in the same routine.
-- Fail closed at security and data-loss boundaries. Do not "best effort" past a failed validation.
+- Fail closed at security and data-loss boundaries. Do not "best effort" past a failed validation. (This bullet is a **gate**, not a signal.)
 
 ---
 
@@ -398,7 +408,7 @@ When tidying layout only (no behaviour change), do it in a **tidy-first** commit
 - Encapsulate ref + "current value" patterns (`sessionRef`, dialog guards) **inside** custom hooks so call sites stay declarative.
 - Effects synchronize with the outside world (IPC, subscriptions, DOM). They are not the place for business rules that belong in reducers or pure helpers.
 - Presentational pieces (tab bar, tree, status footer) receive data and callbacks; they do not own session policy.
-- Prefer many small components and hooks over one god component. If `App.tsx` (or any root) grows past the soft limit, extract hooks first.
+- Prefer many small components and hooks over one god component. If `App.tsx` (or any root) starts owning policy instead of wiring, that is the signal—extract hooks first. Length alone is not.
 
 ---
 
@@ -440,8 +450,8 @@ When tidying layout only (no behaviour change), do it in a **tidy-first** commit
 - When extracting a pure helper, move or add unit tests in the same change.
 - Prefer stable selectors (roles, test ids) in e2e so chrome refactors do not break the suite.
 - Shared e2e setup belongs in `tests/e2e/launch.ts` (or successors), not copy-pasted into every spec.
-- Large test files follow the same soft size pressure as production: split by domain or user story when a file becomes hard to navigate.
-- Set a coverage floor in CI config; treat a drop as a build failure, not a warning.
+- Large test files follow the same signal-not-gate size pressure as production: split by domain or user story when a file becomes hard to navigate, not because a line budget was crossed.
+- Coverage and suite health: constitution-required areas (path, save, dirty/close/quit, IPC shape) are **gates**—those tests must exist and pass. Broader coverage percentages are a **signal**; use CI floors if the team wants them, but do not treat a one-point coverage dip as more important than the non-negotiable scenarios.
 
 ---
 
@@ -467,13 +477,16 @@ When tidying layout only (no behaviour change), do it in a **tidy-first** commit
 
 ## 13. Enforcement
 
-- Encode limits (file size, function size, complexity, max params, no `any`) as ESLint rules (`complexity`, `max-lines-per-function`, `max-lines`, `max-params`, `@typescript-eslint/no-explicit-any`), not just this document. A guideline that isn't enforced by tooling erodes over time.
-- Run lint + typecheck + tests in CI on every PR; block merge on failure.
-- Review checklist should explicitly ask: "does this PR mix structural and behavioral changes?" before approving.
+- **Gates in CI:** lint errors that encode real defects, `tsc`/typecheck, unit + e2e tests, and especially path/save/data-loss coverage. Block merge when those fail. `@typescript-eslint/no-explicit-any` (at least at shared/IPC boundaries) is a gate.
+- **Signals in tooling (optional):** complexity, max-lines, max-lines-per-function, max-params may be configured as **warnings** or review prompts—not merge blockers—unless the team deliberately promotes a rule. A red build solely because a file hit 501 lines is the wrong kind of strictness.
+- Human review still asks: does this PR mix structural and behavioural changes? Did a shape smell get ignored when the file is clearly doing two jobs?
+- Constitution and security rules are never “soft signals.”
 
 ---
 
 ## 14. Quick "before you merge" checklist
+
+### Gates (must hold)
 
 - [ ] Behaviour matches spec; gaps recorded in spec/plan, not only in code comments  
 - [ ] No new `any` at IPC; types updated in `ipc-contract` when channels change  
@@ -481,7 +494,10 @@ When tidying layout only (no behaviour change), do it in a **tidy-first** commit
 - [ ] Saves atomic; failed save leaves dirty; no silent discard of unsaved work  
 - [ ] New pure logic has unit tests; user-visible behaviour has e2e where required  
 - [ ] No skipped/weakened security or data-loss tests  
-- [ ] Files/functions past soft limits either split or justified  
+
+### Signals (judgment)
+
+- [ ] Shape smells (size, nesting, arity, mixed concerns) noticed—split, extract, or consciously leave  
 - [ ] Tidying separated from behaviour when the structural diff is large  
 - [ ] Change scoped to the task; unrelated mess noted, not drive-by fixed  
 
