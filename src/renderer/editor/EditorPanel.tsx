@@ -4,6 +4,7 @@ import type { DocumentState } from '../state/documents'
 import { instancePool } from './instancePool'
 import CrepeHost, { type CursorState } from './CrepeHost'
 import SourceView from './SourceView'
+import './editor.css'
 
 interface EditorPanelProps {
   document: DocumentState

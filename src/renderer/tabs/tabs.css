@@ -1,0 +1,126 @@
+/* Spec 010 tabs: the document tab strip pills in the header row (co-located
+ * with tabs/TabBar.tsx; split from App.css in the 017 restructure). */
+
+/* Spec 010, FR-003: the tab bar lives in the header row next to the chrome
+   buttons. Tabs are rounded pills; the active tab is the `#EAEAEA` pill
+   (clarification 2026-08-05). */
+.tab-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 32px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ame-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  max-width: 220px;
+  min-width: 0;
+}
+
+.tab:hover {
+  background: var(--ame-surface-secondary);
+}
+
+.tab.active {
+  background: var(--ame-active-tab);
+  color: var(--ame-text);
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Spec 010 FR-003: the active tab's decorative edit indicator. */
+.tab-edit-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--ame-muted-secondary);
+}
+
+.tab-dirty {
+  color: var(--ame-accent);
+  font-weight: 700;
+}
+
+.tab-warning {
+  /* No red exists in the grey palette; a desaturated red keeps the warning
+     semantic while harmonising with it (decision log 2026-08-06, plan.md). */
+  color: #b8453a;
+  font-weight: 700;
+}
+
+.tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ame-muted);
+  padding: 2px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.tab-close-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.tab-close:hover {
+  background: var(--ame-border);
+  color: var(--ame-text);
+}
+
+.tab-close:focus-visible,
+.tab-new:focus-visible {
+  outline: 2px solid var(--ame-accent);
+  outline-offset: 1px;
+}
+
+/* Spec 010 FR-004: the "+" new-file button replaces the old text button. It
+   sits at the end of the tab strip and sticks to the right edge so it stays
+   reachable while the strip scrolls under overflow (spec edge). */
+.tab-new {
+  position: sticky;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ame-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.tab-new:hover {
+  background: var(--ame-active-tab);
+}
+
+.tab-new-icon {
+  width: 18px;
+  height: 18px;
+}

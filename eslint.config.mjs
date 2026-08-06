@@ -17,6 +17,10 @@ export default tseslint.config(
       'no-restricted-globals': ['error', {
         name: 'require',
         message: 'Use import syntax instead of require.'
+      }],
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_'
       }]
     }
   },
@@ -48,6 +52,20 @@ export default tseslint.config(
   },
   {
     files: ['*.config.{ts,js}'],
+    rules: {
+      'no-restricted-imports': 'off'
+    }
+  },
+  {
+    files: ['scripts/**/*.mjs', 'scripts/**/*.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly'
+      }
+    },
     rules: {
       'no-restricted-imports': 'off'
     }

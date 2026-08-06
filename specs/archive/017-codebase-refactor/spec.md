@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-06
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "These two files contain refactor suggestions and improvements for the codebase. This spec is to follow the refactor suggestions (add these two files as assets for the spec) to make the code base cleaner and more easily maintainable."
 

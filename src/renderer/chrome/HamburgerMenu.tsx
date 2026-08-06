@@ -3,6 +3,7 @@ import { Bars3Icon, ChevronRightIcon } from '@heroicons/react/24/outline'
 import type { MenuCommand, RecentItem } from '../../shared/ipc-contract'
 import { hamburgerMenuStructure, recentMenuEntries } from './menuModel'
 import type { Platform, HamburgerItem } from './menuModel'
+import './chrome.css'
 
 /** The sandboxed renderer exposes a minimal `process` with `platform`. */
 function currentPlatform(): Platform {
@@ -11,7 +12,7 @@ function currentPlatform(): Platform {
 }
 
 interface HamburgerMenuProps {
-  /** The shared renderer command bus (handleMenuCommand in App.tsx). */
+  /** The shared renderer command bus (handleMenuCommand from useMenuCommands). */
   onCommand: (command: MenuCommand) => void
   /** Spec 012 FR-001: open the settings dialog from the "main menu" (the
    *  hamburger replaced the native menu in spec 010). */

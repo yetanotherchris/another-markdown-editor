@@ -1,8 +1,8 @@
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, openHamburger } from './launch'
+import { launchApp, closeAppSafely, stubMessageBox, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, openHamburger } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -19,22 +19,7 @@ test.beforeAll(async () => {
 })
 
 test.beforeEach(async () => {
-  app = await electron.launch({
-    args: electronLaunchArgs
-  })
-  window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [folder as string]
-    })
-  }, testFolder)
-
-  // Native dialogs are stubbed in main (AGENTS.md); default to the safe
-  // cancellation decision so an unexpected prompt never blocks a test.
-  await stubMessageBox(app)
+  ;({ app, window } = await launchApp(undefined, testFolder))
 
   // Reset the fixture file in case a previous test modified it.
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
@@ -42,13 +27,7 @@ test.beforeEach(async () => {
 })
 
 test.afterEach(async () => {
-  // Native quit confirmation is stubbed to "Discard and Quit" so a dirty
-  // document left behind cannot block the window close.
-  try {
-    await closeAppDiscardingQuit(app)
-  } catch {
-    await app.close().catch(() => {})
-  }
+  await closeAppSafely(app)
 })
 
 test.afterAll(async () => {

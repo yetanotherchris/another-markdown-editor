@@ -1,8 +1,13 @@
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, openHamburger, openSettingsDialog } from './launch'
+import {
+  closeAppSafely,
+  launchApp,
+  openHamburger,
+  openSettingsDialog
+} from './launch'
 
 /**
  * Spec 012 settings suite (contracts/renderer.md §E2e): the Settings dialog,
@@ -21,32 +26,14 @@ test.beforeAll(async () => {
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
 
-async function launchApp(): Promise<{ app: ElectronApplication; window: Page }> {
-  const instance = await electron.launch({
-    args: electronLaunchArgs,
-    env: { ...process.env, AME_CONFIG_DIR: configDir }
-  })
-  const page = await instance.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await instance.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder as string] })
-  }, testFolder)
-  await stubMessageBox(instance)
-  return { app: instance, window: page }
-}
-
 test.beforeEach(async () => {
   configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-settings-config-'))
-  ;({ app, window } = await launchApp())
+  ;({ app, window } = await launchApp(configDir, testFolder))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
 
 test.afterEach(async () => {
-  try {
-    await closeAppDiscardingQuit(app)
-  } catch {
-    await app.close().catch(() => {})
-  }
+  await closeAppSafely(app)
   fs.rmSync(configDir, { recursive: true, force: true })
 })
 
@@ -145,10 +132,10 @@ test('US3 the font choice survives a restart', async () => {
   await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
   await expect.poll(persistedEditorFont).toBe('serif')
 
-  await closeAppDiscardingQuit(app)
+  await closeAppSafely(app)
 
   // Restart with the same config; the editor renders serif.
-  ;({ app, window } = await launchApp())
+  ;({ app, window } = await launchApp(configDir, testFolder))
   await openFile()
   await expect.poll(editorFontVar).toContain('Georgia')
 })

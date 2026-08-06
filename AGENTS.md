@@ -21,7 +21,8 @@ When guidance conflicts, higher wins:
 3. **`specs/<feature>/plan.md`** + `research.md` — how to build it
 4. **`specs/<feature>/tasks.md`** — order of work
 5. This file — working practice
-6. Existing code — precedent, not authority
+6. **`docs/codingstandards.md`** (@codingstandards.md) — how the code should look
+7. Existing code — precedent, not authority
 
 Code that contradicts the spec is a bug in the code *or* a bug in the spec.
 Decide which. Never assume the code is right because it exists.
@@ -183,6 +184,7 @@ Restated from the constitution because these are the ones most easily lost:
 specs/                            Active feature specs (not yet implemented)
 specs/archive/                    Completed and archived specs
 docs/DESIGN_DECISIONS.md          Fixed stack decisions, pre-dates the specs
+docs/codingstandards.md           Code style and standards (@codingstandards.md)
 .opencode/commands/               Spec Kit slash commands
 AGENTS.md                         This file
 ```
@@ -195,6 +197,14 @@ AGENTS.md                         This file
   down.
 - Keep changes scoped to the task in hand. Note unrelated problems, do not
   opportunistically fix them.
+- Use Beck's **"Tidy First"** methodology: separate structural changes from
+  behavioral changes into distinct commits.
+- **Never mix structural and behavioral changes in the same commit.**
+  - **Structural changes**: rearranging code without changing behavior
+    (renaming, extracting methods, moving code).
+  - **Behavioral changes**: adding or modifying actual functionality.
+  This separation makes code reviews easier, reduces bugs, and creates clearer
+  git history.
 - Report honestly. If something is stubbed, partly done, or unverified, say so
   plainly. A confident wrong summary is worse than an uncertain accurate one.
 - Do not commit, push, or open PRs unless asked.
@@ -223,9 +233,6 @@ AGENTS.md                         This file
   List the actual models or agents that contributed, including any that
   generated, reviewed, or edited the spec or code. Use the actual model name
   (e.g. "DeepSeek V4 Pro"), NOT the tool name (e.g. "opencode").
-
-- **Never use `.bat` (batch) files.** On Windows use `.ps1` PowerShell scripts.
-  On Linux/macOS use `.sh` shell scripts. Batch is fragile and non-portable.
 
 ## Branching and PR workflow
 
@@ -278,3 +285,4 @@ AGENTS.md                         This file
 | 014-view-source-icon | Spec only | Not yet planned |
 | 015-explorer-reveal-location | Spec only | Not yet planned |
 | 016-editor-theme | Spec only | Not yet planned |
+| 017-codebase-refactor | Archived | Complete |
