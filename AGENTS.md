@@ -180,7 +180,8 @@ Restated from the constitution because these are the ones most easily lost:
 
 ```text
 .specify/memory/constitution.md   Principles (authority 1)
-specs/001-markdown-editor/        Current feature's artifacts
+specs/                            Active feature specs (not yet implemented)
+specs/archive/                    Completed and archived specs
 docs/DESIGN_DECISIONS.md          Fixed stack decisions, pre-dates the specs
 .opencode/commands/               Spec Kit slash commands
 AGENTS.md                         This file
@@ -253,12 +254,21 @@ AGENTS.md                         This file
 
 ## Current implementation status
 
-| Phase | Status | Branch | PR |
-|-------|--------|--------|----|
-| Phase 1: Setup | Complete | `phase-1-setup` | #2 |
-| Phase 2: Security & IPC | Complete | `phase-1-setup` | #2 |
-| Phase 3: US1 — Editor MVP | Complete | `phase-3-editor` | — |
-| Phase 4: US2 — Folder Browser | Complete | `phase-4-explorer` | #6 |
-| Phase 5: US3 — Multiple Tabs | Complete | `phase-5-tabs` | #7 |
-| Phase 6: US4 — File Operations | Pending | — | — |
-| Phase 7: Polish | Pending | — | — |
+| Spec | Status | Notes |
+|------|--------|-------|
+| 001-markdown-editor | Archived | Phases 1-6 complete, Phase 7 pending |
+| 002-view-source | Archived | Complete |
+| 003-native-explorer | Archived | Complete |
+| 004-recent-items | Archived | Complete |
+| 005-release-distribution | Archived | Complete |
+| 006-file-association | Spec only | Not yet planned |
+| 007-help-menu | Spec only | Not yet planned |
+| 008-native-dialogs | Archived | Complete |
+| 009-release-binary-naming | Archived | Complete |
+| 010-modern-grey-ui | Archived | Complete |
+| 011-window-state-persistence | Spec only | Not yet planned |
+| 012-settings-dialog | Spec only | Not yet planned |
+| 013-theme-setting | Spec only | Not yet planned |
+| 014-view-source-icon | Spec only | Not yet planned |
+| 015-explorer-reveal-location | Spec only | Not yet planned |
+| 016-editor-theme | Spec only | Not yet planned |

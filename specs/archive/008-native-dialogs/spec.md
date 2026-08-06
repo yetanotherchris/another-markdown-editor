@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-02
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "This speckit spec is to make the confirmation dialogues appear more OS-native. So more like Windows, Mac or Linux dialogues - the button order should match the OS and the look and feel. List the dialogues used as well, I can think of the discard dialogue and exit dialogue"
 
