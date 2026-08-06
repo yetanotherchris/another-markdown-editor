@@ -604,7 +604,7 @@ export function setupHandlers(window: BrowserWindow): void {
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true })
+      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif' })
     }
   })
 
@@ -620,7 +620,10 @@ export function setupHandlers(window: BrowserWindow): void {
         themeOverride: p.themeOverride === 'light' || p.themeOverride === 'dark' || p.themeOverride === null
           ? p.themeOverride as 'light' | 'dark' | null
           : current.themeOverride,
-        explorerVisible: typeof p.explorerVisible === 'boolean' ? p.explorerVisible : current.explorerVisible
+        explorerVisible: typeof p.explorerVisible === 'boolean' ? p.explorerVisible : current.explorerVisible,
+        editorFont: p.editorFont === 'sans-serif' || p.editorFont === 'serif'
+          ? p.editorFont as 'sans-serif' | 'serif'
+          : current.editorFont
       }
       saveSettings(updated)
       return ok(updated)

@@ -1,16 +1,24 @@
 import { app } from 'electron'
 import * as path from 'path'
 import type { Settings } from '../shared/ipc-contract'
-import { loadSettingsFile, writeSettingsFile, DEFAULTS } from './settingsFile'
+import { loadSettingsFile, writeSettingsFile, migrateLegacySettingsFile, DEFAULTS } from './settingsFile'
+import { recentItemsConfigPath } from './recentItemsPath'
 
 export { DEFAULTS }
 
+/**
+ * Spec 012 FR-002: settings live in the SAME per-user configuration file as the
+ * recent-items list — `appData/ame/config.json` (see recentItemsPath.ts). Both
+ * `AME_CONFIG_DIR` (test seam) and the production path therefore resolve to the
+ * same file the MRU list uses; the settings section is a sibling key.
+ */
 function settingsPath(): string {
-  // AME_CONFIG_DIR is the same test/CI seam as recentItemsConfigPath: when set
-  // it names the directory holding settings.json directly, so the e2e suite can
-  // isolate per-test settings (including the persisted explorerVisible used by
-  // spec 010's restart scenario) without touching the developer's real
-  // userData. Production never sets it, so the default path is unchanged.
+  return recentItemsConfigPath()
+}
+
+/** The pre-012 legacy path: AME_CONFIG_DIR/settings.json in tests, otherwise
+ *  userData/settings.json. */
+function legacySettingsPath(): string {
   const override = process.env.AME_CONFIG_DIR
   if (override && override.length > 0) {
     return path.join(override, 'settings.json')
@@ -19,7 +27,10 @@ function settingsPath(): string {
 }
 
 export function loadSettings(): Settings {
-  return loadSettingsFile(settingsPath())
+  const configPath = settingsPath()
+  const migrated = migrateLegacySettingsFile(configPath, legacySettingsPath())
+  if (migrated) return migrated
+  return loadSettingsFile(configPath)
 }
 
 let writeTimer: ReturnType<typeof setTimeout> | null = null

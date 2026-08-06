@@ -115,6 +115,6 @@ A user can open and close the settings dialog without affecting the current docu
 - Settings are stored in the same per-user configuration file as the recent-items list, at the platform-appropriate location established by the Recent Items feature.
 - The first setting is the editor font-family choice; additional settings will be added in future features.
 - The specific font faces used for "sans-serif" and "serif" will be selected during planning from freely distributable fonts already available to the application.
-- The font change applies to the document editing surface (WYSIWYG editor and source view, if applicable), not to the surrounding UI chrome.
+- The font change applies to the document editing surface (WYSIWYG editor and source view, if applicable), not to the surrounding UI chrome. This includes the editor's toolbar/top bar: the toolbar stays in the application's sans-serif face while the document content uses the chosen font (clarification 2026-08-06).
 - The settings dialog applies changes immediately or on explicit confirmation; either model is acceptable as long as it is consistent and predictable.
 - Custom font uploads, font size, line height, and other typography settings are out of scope for this feature.

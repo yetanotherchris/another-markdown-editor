@@ -2,12 +2,24 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
-import { loadSettingsFile, writeSettingsFile, DEFAULTS } from '../../src/main/settingsFile'
+import {
+  loadSettingsFile,
+  writeSettingsFile,
+  hasSettingsKey,
+  readConfigFile,
+  migrateLegacySettingsFile,
+  DEFAULTS
+} from '../../src/main/settingsFile'
+import type { RecentItem } from '../../src/shared/ipc-contract'
+
+function tempDir(): string {
+  return path.join(os.tmpdir(), `ame-settings-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+}
 
 function tempSettingsFile(content?: string): string {
-  const dir = path.join(os.tmpdir(), `ame-settings-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const dir = tempDir()
   fs.mkdirSync(dir, { recursive: true })
-  const file = path.join(dir, 'settings.json')
+  const file = path.join(dir, 'config.json')
   if (content !== undefined) {
     fs.writeFileSync(file, content, 'utf-8')
   }
@@ -19,6 +31,7 @@ describe('loadSettingsFile', () => {
     const result = loadSettingsFile(path.join(os.tmpdir(), 'does-not-exist.json'))
     expect(result).toEqual(DEFAULTS)
     expect(result.explorerVisible).toBe(true)
+    expect(result.editorFont).toBe('sans-serif')
   })
 
   it('returns the defaults when the file is malformed', () => {
@@ -27,18 +40,25 @@ describe('loadSettingsFile', () => {
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
-  it('reads all three fields from a valid file', () => {
+  it('returns the defaults when the file has no settings key', () => {
+    const file = tempSettingsFile(JSON.stringify({ recentItems: [] }))
+    expect(loadSettingsFile(file)).toEqual(DEFAULTS)
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('reads all four fields from a valid settings section', () => {
     const file = tempSettingsFile(JSON.stringify({
-      sidebarWidth: 42,
-      themeOverride: 'dark',
-      explorerVisible: false
+      settings: { sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif' }
     }))
-    expect(loadSettingsFile(file)).toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false })
+    expect(loadSettingsFile(file))
+      .toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif' })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
   it('defaults explorerVisible to true when the field is missing (old configs)', () => {
-    const file = tempSettingsFile(JSON.stringify({ sidebarWidth: 30, themeOverride: null }))
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, editorFont: 'sans-serif' }
+    }))
     const result = loadSettingsFile(file)
     expect(result.explorerVisible).toBe(true)
     expect(result.sidebarWidth).toBe(30)
@@ -46,23 +66,143 @@ describe('loadSettingsFile', () => {
   })
 
   it('rejects a non-boolean explorerVisible', () => {
-    const file = tempSettingsFile(JSON.stringify({ sidebarWidth: 30, themeOverride: null, explorerVisible: 'yes' }))
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: 'yes', editorFont: 'serif' }
+    }))
     expect(loadSettingsFile(file).explorerVisible).toBe(true)
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
+  it('defaults editorFont to sans-serif when the field is missing', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true }
+    }))
+    expect(loadSettingsFile(file).editorFont).toBe('sans-serif')
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('rejects an invalid editorFont value (spec 012: closed union)', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'comic-sans' }
+    }))
+    expect(loadSettingsFile(file).editorFont).toBe('sans-serif')
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
   it('keeps recoverable fields from a partially-corrupt file', () => {
-    const file = tempSettingsFile(JSON.stringify({ sidebarWidth: 'wide', themeOverride: null, explorerVisible: false }))
-    expect(loadSettingsFile(file)).toEqual({ sidebarWidth: 30, themeOverride: null, explorerVisible: false })
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 'wide', themeOverride: null, explorerVisible: false, editorFont: 'serif' }
+    }))
+    expect(loadSettingsFile(file)).toEqual({
+      sidebarWidth: 30,
+      themeOverride: null,
+      explorerVisible: false,
+      editorFont: 'serif'
+    })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 })
 
-describe('writeSettingsFile', () => {
-  it('writes a file that round-trips', () => {
+describe('writeSettingsFile (shared config, spec 012 FR-002)', () => {
+  it('writes a settings section that round-trips', () => {
     const file = tempSettingsFile()
-    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false })
-    expect(loadSettingsFile(file)).toEqual({ sidebarWidth: 25, themeOverride: null, explorerVisible: false })
+    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false, editorFont: 'serif' })
+    expect(loadSettingsFile(file)).toEqual({
+      sidebarWidth: 25,
+      themeOverride: null,
+      explorerVisible: false,
+      editorFont: 'serif'
+    })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('preserves a pre-existing recentItems key (read-modify-write)', () => {
+    const file = tempSettingsFile()
+    const recentItems: RecentItem[] = [{
+      path: '/w/notes.md', kind: 'file', name: 'notes.md', lastOpenedAt: 123
+    }]
+    fs.writeFileSync(file, JSON.stringify({ recentItems }), 'utf-8')
+    writeSettingsFile(file, { ...DEFAULTS, editorFont: 'serif' })
+    const whole = readConfigFile(file)
+    expect(whole.recentItems).toEqual(recentItems)
+    expect(loadSettingsFile(file).editorFont).toBe('serif')
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('writes a valid config over a malformed one without throwing', () => {
+    const file = tempSettingsFile('{ not json')
+    writeSettingsFile(file, { ...DEFAULTS, editorFont: 'serif' })
+    expect(loadSettingsFile(file).editorFont).toBe('serif')
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+})
+
+describe('hasSettingsKey', () => {
+  it('is false for a missing file and true once a settings key is written', () => {
+    const file = tempSettingsFile(JSON.stringify({ recentItems: [] }))
+    expect(hasSettingsKey(file)).toBe(false)
+    writeSettingsFile(file, DEFAULTS)
+    expect(hasSettingsKey(file)).toBe(true)
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+})
+
+describe('migrateLegacySettingsFile (spec 012, one-time migration)', () => {
+  it('imports a legacy flat settings.json into config.json when no settings key exists', () => {
+    const configPath = tempSettingsFile(JSON.stringify({ recentItems: [] }))
+    const legacyPath = path.join(path.dirname(configPath), 'settings.json')
+    fs.writeFileSync(legacyPath, JSON.stringify({
+      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false
+    }), 'utf-8')
+
+    const migrated = migrateLegacySettingsFile(configPath, legacyPath)
+    expect(migrated).toEqual({
+      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false, editorFont: 'sans-serif'
+    })
+    // The values are now in config.json (read back through the shared file).
+    expect(loadSettingsFile(configPath)).toEqual(migrated)
+    expect(hasSettingsKey(configPath)).toBe(true)
+    // The recentItems key survived the migration write.
+    expect((readConfigFile(configPath) as { recentItems: unknown }).recentItems).toEqual([])
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
+
+  it('does not migrate when config.json already has a settings key', () => {
+    const configPath = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 20, themeOverride: null, explorerVisible: true, editorFont: 'serif' }
+    }))
+    const legacyPath = path.join(path.dirname(configPath), 'settings.json')
+    fs.writeFileSync(legacyPath, JSON.stringify({ sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false }), 'utf-8')
+
+    expect(migrateLegacySettingsFile(configPath, legacyPath)).toBeNull()
+    expect(loadSettingsFile(configPath).sidebarWidth).toBe(20)
+    expect(loadSettingsFile(configPath).editorFont).toBe('serif')
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
+
+  it('returns null when the legacy file is missing', () => {
+    const configPath = tempSettingsFile()
+    expect(migrateLegacySettingsFile(configPath, path.join(path.dirname(configPath), 'missing.json'))).toBeNull()
+    expect(loadSettingsFile(configPath)).toEqual(DEFAULTS)
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
+
+  it('returns null when the legacy file is not a settings object', () => {
+    const configPath = tempSettingsFile()
+    const legacyPath = path.join(path.dirname(configPath), 'settings.json')
+    fs.writeFileSync(legacyPath, JSON.stringify({ recentItems: [] }), 'utf-8')
+    expect(migrateLegacySettingsFile(configPath, legacyPath)).toBeNull()
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
+
+  it('rejects invalid legacy editorFont values during migration', () => {
+    const configPath = tempSettingsFile()
+    const legacyPath = path.join(path.dirname(configPath), 'settings.json')
+    fs.writeFileSync(legacyPath, JSON.stringify({
+      sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'cursive'
+    }), 'utf-8')
+    const migrated = migrateLegacySettingsFile(configPath, legacyPath)
+    expect(migrated?.editorFont).toBe('sans-serif')
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
   })
 })
