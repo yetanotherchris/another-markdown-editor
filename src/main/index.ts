@@ -3,7 +3,8 @@ import { join } from 'path'
 import { registerIpcHandlers } from './ipc/register'
 import { createApplicationMenu } from './menu'
 import { registerShortcuts } from './shortcuts'
-import { flushSettings } from './settings'
+import { loadSettings, flushSettings } from './settings'
+import { applyThemeOverride } from './theme'
 import { resolveLaunchBounds, trackWindowState, flushWindowState } from './windowState'
 import { reconcileExplorerClosedWithoutWorkspace } from './workspaceExplorerState'
 
@@ -64,6 +65,12 @@ app.whenReady().then(() => {
   // closed state is persisted. Runs before the window is created so the config
   // is already honest when the renderer loads it.
   reconcileExplorerClosedWithoutWorkspace()
+  // Spec 013: resolve the persisted theme override onto nativeTheme BEFORE the
+  // window is created, so the native chrome (macOS window frame, native
+  // scrollbars/context menus) reflects the choice from the start. The renderer's
+  // first paint is themed separately — main.tsx preloads the settings before
+  // rendering (research R1: themeSource does not propagate to the renderer).
+  applyThemeOverride(loadSettings().themeOverride)
   createWindow()
 })
 

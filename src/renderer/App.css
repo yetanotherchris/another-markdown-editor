@@ -51,7 +51,9 @@ button, input, select, textarea {
 }
 
 /* Spec 010, FR-006: the modern grey palette. Prefixed custom properties scoped
-   to the chrome — the WYSIWYG editor content area is untouched (FR-010). */
+   to the chrome. Spec 013 FR-010: the editor canvas and source view resolve the
+   --ame-editor-bg token (white in light, dark in dark) so the editing surface
+   follows the theme. */
 :root {
   --ame-bg: #ffffff;
   --ame-surface: #f9f9fb;
@@ -65,6 +67,69 @@ button, input, select, textarea {
   --ame-border-secondary: #ececec;
   --ame-accent: #d96b27;
   --ame-control: #2d2d2d;
+  --ame-editor-bg: #ffffff;
+}
+
+/* Spec 013, FR-002/FR-003: the dark palette (VS Code Dark, user decision
+   2026-08-06). Main Editor Background #1F1F1F, Sidebar #181818, Primary Text
+   #8C8C8C, Editor Header Text #CCCCCC, Links/Highlights #3794FF; buttons are a
+   neutral grey (the palette's #0E639C blue is deliberately not used). Every
+   chrome surface resolves the --ame-* tokens from .app-container, so redefining
+   them here retints the whole chrome in one place when the effective theme
+   (nativeTheme.themeSource → prefers-color-scheme → data-theme, see
+   useEffectiveTheme) is dark. The editor canvas and source view resolve
+   --ame-editor-bg and the Crepe --crepe-color-* overrides below — the editing
+   surface follows the theme (FR-010). */
+.app-container[data-theme='dark'] {
+  --ame-bg: #1f1f1f;
+  --ame-surface: #1f1f1f;
+  --ame-surface-secondary: #181818;
+  --ame-active-tab: #2d2d2d;
+  --ame-text: #8c8c8c;
+  --ame-text-secondary: #7a7a7a;
+  --ame-muted: #8c8c8c;
+  --ame-muted-secondary: #6e6e6e;
+  --ame-border: #3a3a3a;
+  --ame-border-secondary: #333333;
+  --ame-accent: #3794ff;
+  --ame-control: #3a3a3a;
+  --ame-editor-bg: #1f1f1f;
+}
+
+/* Spec 013 FR-010: the dark editing surface (VS Code Dark palette). Crepe's
+   whole theme is driven by the --crepe-color-* tokens on `.milkdown` (canvas,
+   text, toolbar, code, blockquotes), so redefining them under the dark app
+   container retints the editor in one place. Body text is the palette's Primary
+   Text #8C8C8C; links use #3794FF; headings are handled separately below. */
+.app-container[data-theme='dark'] .milkdown {
+  --crepe-color-background: #1f1f1f;
+  --crepe-color-on-background: #8c8c8c;
+  --crepe-color-surface: #2a2a2a;
+  --crepe-color-surface-low: #262626;
+  --crepe-color-on-surface: #cccccc;
+  --crepe-color-on-surface-variant: #9a9a9a;
+  --crepe-color-outline: #5a5a5a;
+  --crepe-color-primary: #3794ff;
+  --crepe-color-secondary: #2a2a2a;
+  --crepe-color-on-secondary: #cccccc;
+  --crepe-color-inverse: #cccccc;
+  --crepe-color-on-inverse: #1f1f1f;
+  --crepe-color-inline-code: #9cdcfe;
+  --crepe-color-error: #f14c4c;
+  --crepe-color-hover: #2a2a2a;
+  --crepe-color-selected: #264f78;
+  --crepe-color-inline-area: #2a2a2a;
+}
+
+/* "Header text in the editor" (VS Code palette): headings are the off-white
+   #CCCCCC while the body text stays the mid-gray #8C8C8C. */
+.app-container[data-theme='dark'] .milkdown h1,
+.app-container[data-theme='dark'] .milkdown h2,
+.app-container[data-theme='dark'] .milkdown h3,
+.app-container[data-theme='dark'] .milkdown h4,
+.app-container[data-theme='dark'] .milkdown h5,
+.app-container[data-theme='dark'] .milkdown h6 {
+  color: #cccccc;
 }
 
 .app-container {
@@ -98,6 +163,9 @@ button, input, select, textarea {
   overflow: hidden;
   background: var(--ame-surface-secondary);
   border-right: 1px solid var(--ame-border);
+  /* The explorer tree has no color of its own; pinning the token here keeps its
+     text readable in both the light and dark palettes (spec 013). */
+  color: var(--ame-text);
 }
 
 .sidebar {

@@ -84,9 +84,10 @@ test('US1 the hamburger opens a Settings dialog whose first setting is the edito
   // The dialog is a labelled, modal dialog.
   await expect(dialog.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
-  // The first (only) setting is Editor Font with exactly two options.
+  // The first setting is Editor Font with exactly two options (the Theme group
+  // from spec 013 sits below it, so the count is scoped to this group).
   await expect(dialog.getByRole('group', { name: 'Editor Font' })).toBeVisible()
-  const options = dialog.getByRole('radio')
+  const options = dialog.getByRole('group', { name: 'Editor Font' }).getByRole('radio')
   await expect(options).toHaveCount(2)
   await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).toBeVisible()
   await expect(dialog.getByRole('radio', { name: 'Serif', exact: true })).toBeVisible()
