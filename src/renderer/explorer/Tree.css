@@ -16,8 +16,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  /* Horizontal padding got 3 extra pixels each side (user decision 2026-08-06). */
-  padding: 4px 11px;
+  /* Horizontal padding +3 then +7 px each side (user decisions 2026-08-06). */
+  padding: 4px 18px;
   cursor: pointer;
   font-size: 13px;
   border-radius: 4px;
