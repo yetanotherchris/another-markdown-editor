@@ -256,6 +256,7 @@ AGENTS.md                         This file
   in the active `specs/` directory.
 - PR title format: `feat(phase-N): <description>` with the AI usage line at
   the end of the description.
+- Use bullet points for the changes in the PR description.
 - **Do not manually wrap PR body text.** GitHub renders the body verbatim, so
   line-wrapping the markdown by hand creates ragged, hard-to-diff text. Write
   the description as normal flowing paragraphs with a single newline between
