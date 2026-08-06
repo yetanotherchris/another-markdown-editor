@@ -269,13 +269,15 @@ SC-003).
 
 **Independent Test**: the full pre-existing suite passes after the refactor.
 
-- [ ] T036 [US3] Run `npm run lint`, `npm run typecheck`, `npm run test`, and
+- [X] T036 [US3] Run `npm run lint`, `npm run typecheck`, `npm run test`, and
       `npm run test:e2e`. Every pre-existing test passes unchanged (only test
       *layout* may be re-homed, which has not happened yet in this phase — the
       splits land in Phase 6). If any test fails, the preceding extraction is
       behaviourally wrong: fix the module, not the test. Record the exact suite
       counts here.
-
+      — Gate recorded 2026-08-06 after Phases 2–4: lint clean, typecheck clean,
+      unit 351/351, e2e 120/121 — the single failure is the pre-existing
+      `source.spec.ts` US5 flake (passes in isolation), identical to baseline.
 **Checkpoint**: US3 gate green — the refactor is behaviourally invisible.
 
 ---
