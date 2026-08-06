@@ -1,7 +1,7 @@
-# Specification Quality Checklist: Window State Persistence
+# Specification Quality Checklist: Editor Theme
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-08-05
+**Created**: 2026-08-06
 **Feature**: [spec.md](spec.md)
 
 ## Content Quality
@@ -32,6 +32,7 @@
 ## Notes
 
 - All validation items pass. The spec is ready for `/speckit.clarify` or `/speckit.plan`.
-- Shared configuration file with MRU list is assumed as the storage location.
-- File explorer panel width and open/closed state are now included (US4, FR-010 through FR-016).
-- When no folder is open, the explorer panel is always closed and this is persisted (FR-013).
+- Five editor themes: Rustic, Rustic Serif, Monotone, Monotone Serif, Scholarly.
+- Theme name stored in the shared per-user config file; visual values live in code.
+- Monotone themes depend on the resolved app theme from spec 013 (light/dark/system).
+- Themes apply to the formatted WYSIWYG canvas only; the source view is out of scope.
