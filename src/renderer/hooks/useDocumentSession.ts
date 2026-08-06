@@ -8,6 +8,7 @@ import {
   getContentToSave as domainGetContentToSave,
   shouldFlushLive as domainShouldFlushLive,
 } from '../domain/dirty'
+import { dirtyDocumentsToSave, shouldRePromptForFailedSave } from '../domain/quit'
 import type { DialogQueue } from './useDialogQueue'
 
 export type SaveResult = 'saved' | 'cancelled' | 'failed'
@@ -174,20 +175,25 @@ export function useDocumentSession(opts: {
     dispatch({ type: 'RELOAD', payload: { id: doc.id, content: result.value.content } })
   }, [dispatch, isDirtyLive, sessionRef])
 
+  // The quit flow decomposed into named sub-steps (FR-004): flush → dirty-check
+  // → confirm → discard-all/save-all → quit. A second trigger while any prompt
+  // is open is ignored (one prompt at a time) — checked BEFORE the no-dirty
+  // fast path, because quitting while a sheet is up (e.g. an external-removed
+  // rescue for a clean document) must not close the window and abandon the
+  // in-memory content it was offering (review 2026-08-04).
   const handleQuitRequest = useCallback(async () => {
-    // A second trigger while any prompt is open is ignored (one prompt at a
-    // time). Checked BEFORE the no-dirty fast path: quitting while
-    // a sheet is up (e.g. an external-removed rescue for a clean document) must
-    // not close the window and abandon the in-memory content it was offering
-    // (review 2026-08-04).
     if (dialogInFlightRef.current) return
     const current = sessionRef.current
     flushLiveContent()
-    const dirtyDocs = current.documents.filter(d => isDirtyLive(d))
+    const dirtyDocs = dirtyDocumentsToSave(current.documents, isDirtyLive)
+
+    // ---- dirty-check: nothing unsaved → quit immediately ----
     if (dirtyDocs.length === 0) {
       window.api.confirmQuit('quit')
       return
     }
+
+    // ---- confirm + save-or-discard (holds the single-prompt guard) ----
     dialogInFlightRef.current = true
     try {
       let error: string | undefined
@@ -219,7 +225,9 @@ export function useDocumentSession(opts: {
           if (saved === 'failed') {
             error = `Could not save ${doc.title}. The application stays open.`
           }
-          allSaved = false
+          // A failed save re-prompts with the failure explained (US2 scenario
+          // 4); a cancelled Save-As re-prompts with the tab staying open.
+          allSaved = !shouldRePromptForFailedSave(saved)
           break
         }
         if (allSaved) {

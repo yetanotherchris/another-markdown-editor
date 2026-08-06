@@ -4,6 +4,7 @@ import type { EditingSession, DocumentState } from '../state/documents'
 import type { WorkspaceAction } from '../state/workspace'
 import { isWorkspaceRelative } from '../explorer/operations'
 import { updateSettings } from '../state/settings'
+import { shouldRePromptForFailedSave } from '../domain/quit'
 import type { DialogQueue } from './useDialogQueue'
 import type { DocumentSessionApi } from './useDocumentSession'
 
@@ -79,7 +80,11 @@ export function useWorkspaceFolder(opts: {
   // route through the same prepare → (confirm) → commit flow. A second folder
   // open while the confirmation is up is ignored here (main also rejects new
   // prepares while one is pending) so the in-flight flow cannot be clobbered.
+  //
+  // The flow is decomposed into named sub-steps (FR-004): prepare → confirm →
+  // save-or-discard → commit, so the sequence reads top-down.
   const runFolderOpenFlow = useCallback(async (requestPath?: string) => {
+    // ---- step 1: prepare ----
     if (pendingFolderOpenRef.current) return
     const prepared = requestPath === undefined
       ? await window.api.prepareFolderOpen()
@@ -89,6 +94,8 @@ export function useWorkspaceFolder(opts: {
       return
     }
     if (!prepared.value) return // dialog cancelled — nothing pending
+
+    // ---- step 2: dirty-check (fast path commits when nothing is unsaved) ----
     if (dirtyWorkspaceRelativeDocs().length === 0) {
       await commitFolderOpen()
       return
@@ -97,16 +104,20 @@ export function useWorkspaceFolder(opts: {
       await window.api.cancelFolderOpen()
       return
     }
+
+    // ---- step 3: confirm (holds the single-prompt guard) ----
     dialogInFlightRef.current = true
     pendingFolderOpenRef.current = prepared.value
     try {
+      const confirm = async (error?: string) => window.api.showConfirmation({
+        kind: 'folder-open',
+        documentTitles: dirtyWorkspaceRelativeDocs().map(d => d.title),
+        ...(error ? { error } : {})
+      })
+      // ---- step 4: save-or-discard, then commit; a failure re-prompts ----
       let error: string | undefined
       for (;;) {
-        const result = await window.api.showConfirmation({
-          kind: 'folder-open',
-          documentTitles: dirtyWorkspaceRelativeDocs().map(d => d.title),
-          ...(error ? { error } : {})
-        })
+        const result = await confirm(error)
         if (!result.ok) {
           await window.api.cancelFolderOpen()
           return
@@ -137,7 +148,9 @@ export function useWorkspaceFolder(opts: {
             if (saved === 'failed') {
               error = `Could not save ${doc.title}.`
             }
-            allSaved = false
+            // A failed save re-prompts with the failure explained; a cancelled
+            // Save-As re-prompts with the confirmation still open.
+            allSaved = !shouldRePromptForFailedSave(saved)
             break
           }
         }

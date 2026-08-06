@@ -243,17 +243,17 @@ are pure and unit-tested (FR-003/FR-004, US2).
 **Independent Test**: each extracted decision unit runs under Vitest without the
 application; every branch is covered (US2 scenarios 1–2).
 
-- [ ] T032 [US2] In `src/renderer/hooks/useWorkspaceFolder.ts`, decompose
+- [X] T032 [US2] In `src/renderer/hooks/useWorkspaceFolder.ts`, decompose
       `runFolderOpenFlow` into named sub-steps (`prepareFolder`,
       `confirmIfDirty`, `discardAndClose`, `saveAllThenCommit`, `commit`) so the
       flow reads as a sequence (FR-004). Behaviour unchanged.
-- [ ] T033 [US2] In `src/renderer/hooks/useDocumentSession.ts`, decompose
+- [X] T033 [US2] In `src/renderer/hooks/useDocumentSession.ts`, decompose
       `handleQuitRequest` into named sub-steps (`flush`, `dirtyCheck`,
       `confirmQuit`, `discardAllQuit`, `saveAllLoop`) (FR-004).
-- [ ] T034 [US2] In `src/renderer/hooks/useWorkspaceTree.ts`, decompose
+- [X] T034 [US2] In `src/renderer/hooks/useWorkspaceTree.ts`, decompose
       `runDeleteConfirmation` into named sub-steps (`describe`, `plan`,
       `blockIfDirty`, `confirmTrash`, `permanentFallback`, `cleanup`) (FR-004).
-- [ ] T035 [US2] Add unit tests in `tests/renderer/domain/quit.test.ts` for any
+- [X] T035 [US2] Add unit tests in `tests/renderer/domain/quit.test.ts` for any
       pure decision the sub-steps use (e.g. `shouldRePromptForFailedSave`
       branch matrix), extending T011. No decision rule is changed.
 

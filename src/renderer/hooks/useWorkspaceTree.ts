@@ -210,13 +210,15 @@ export function useWorkspaceTree(opts: {
     }
   }, [dispatchWorkspace, doClose, isDirtyLive, sessionRef, workspaceRef])
 
-  // Spec 008 delete flow: describe → plan → (delete-blocked | delete-to-trash)
-  // → trash; on TRASH_UNAVAILABLE an explicit permanent-delete confirmation.
-  // The whole flow holds the single-prompt guard (FR-012).
+  // Spec 008 delete flow, decomposed into named sub-steps (FR-004): describe →
+  // plan → (delete-blocked | delete-to-trash) → trash; on TRASH_UNAVAILABLE an
+  // explicit permanent-delete confirmation. The whole flow holds the
+  // single-prompt guard (FR-012).
   const runDeleteConfirmation = useCallback(async (node: TreeNode) => {
     if (dialogInFlightRef.current) return
     dialogInFlightRef.current = true
     try {
+      // ---- describe: gather the entry info for the confirmation ----
       const result = await window.api.describeEntry(node.id)
       if (!result.ok) {
         // The guard is held, so the error is queued and shown once released.
@@ -224,7 +226,11 @@ export function useWorkspaceTree(opts: {
         return
       }
       const info = result.value
+
+      // ---- plan: which open documents the delete touches ----
       const plan = planDelete(sessionRef.current.documents, node.id, isDirtyLive)
+
+      // ---- block-if-dirty: refuse while a blocker has unsaved changes ----
       if (plan.dirtyBlockers.length > 0) {
         const blocked = await window.api.showConfirmation({
           kind: 'delete-blocked',
@@ -234,6 +240,8 @@ export function useWorkspaceTree(opts: {
         if (!blocked.ok) void showOperationError(blocked.message)
         return
       }
+
+      // ---- confirm-trash: the primary confirmation ----
       const deleteDecision = await window.api.showConfirmation({
         kind: 'delete-to-trash',
         targetName: node.name,
@@ -241,6 +249,8 @@ export function useWorkspaceTree(opts: {
         cleanToCloseTitles: plan.cleanToClose.map(d => d.title)
       })
       if (!deleteDecision.ok || deleteDecision.value !== 'delete') return
+
+      // ---- trash, with the permanent-delete fallback ----
       const trashed = await window.api.trashEntry(node.id)
       if (trashed.ok) {
         cleanupAfterDelete(node, plan)
