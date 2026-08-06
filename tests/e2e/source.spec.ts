@@ -1,4 +1,4 @@
-import { test, expect, ElectronApplication, Page } from '@playwright/test'
+import { test, describe, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -49,6 +49,7 @@ function getViewSourceButton(): ReturnType<Page['getByRole']> {
 
 // ---------- US1: toolbar View source, edit, return ----------
 
+describe('US1 toolbar view source', () => {
 test('view source slides in, takes the tab, and returns (US1)', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -92,9 +93,11 @@ test('US1 no-edit round trip keeps content and dirty state', async () => {
   // Clean document — no dirty dot appeared because nothing changed.
   await expect(window.locator('.document-title')).not.toContainText('\u2022')
 })
+})
 
 // ---------- US2: explorer context menu ----------
 
+describe('US2 explorer context menu', () => {
 test('US2 opens an unopened file directly in source view', async () => {
   await openFolder()
 
@@ -123,9 +126,11 @@ test('US2 context-menu View source reuses the already-open formatted tab', async
   await expect(window.getByRole('tab', { name: /alpha\.md/ })).toHaveCount(1)
   await expect(window.locator('.document-title')).toContainText('alpha.md')
 })
+})
 
 // ---------- US3: mutual exclusivity ----------
 
+describe('US3 mutual exclusivity', () => {
 test('US3 exactly one editing view is visible during a switch', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -153,9 +158,11 @@ test('US3 exactly one editing view is visible during a switch', async () => {
   const editable = window.locator('[contenteditable="true"]').first()
   await expect(editable).toBeAttached()
 })
+})
 
 // ---------- US4: tooltips ----------
 
+describe('US4 tooltips', () => {
 test('US4 every formatted toolbar control has a tooltip', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -176,9 +183,11 @@ test('US4 every formatted toolbar control has a tooltip', async () => {
   expect(labels).toContain('Bold')
   expect(labels[labels.length - 1]).toBe('View source')
 })
+})
 
 // ---------- US5: task backspace ----------
 
+describe('US5 task backspace', () => {
 test('US5: Backspace removes an empty task item', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -197,9 +206,11 @@ test('US5: Backspace removes an empty task item', async () => {
   await window.keyboard.press('Backspace')
   await expect(window.locator('.list-item .label-wrapper')).toHaveCount(0)
 })
+})
 
 // ---------- FR-12: normalization is preserved, not announced ----------
 
+describe('FR-12 normalization is preserved, not announced', () => {
 test('FR-12: a construct Crepe normalises is preserved verbatim through a round trip', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -269,9 +280,11 @@ test('source-view save writes the exact raw bytes, never adding a trailing newli
   const disk = fs.readFileSync(path.join(testFolder, 'no-newline.md'), 'utf-8')
   expect(disk).toBe('Edited raw source, no newline')
 })
+})
 
 // ---------- US7: explorer context-menu Open ----------
 
+describe('US7 explorer context-menu Open', () => {
 test('US7 Open opens an unopened file in a formatted tab', async () => {
   await openFolder()
 
@@ -316,9 +329,11 @@ test('US7 Open returns a source-view tab to visual editing', async () => {
   await expect(window.getByRole('tab', { name: /alpha\.md/ })).toHaveCount(1)
   await expect(window.locator('[contenteditable="true"]:visible').first()).toBeVisible()
 })
+})
 
 // ---------- Edges ----------
 
+describe('Edges', () => {
 test('tab-switch mid-view leaves the other tab usable', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -350,4 +365,5 @@ test('active document in a nested folder is highlighted in the explorer (FR-6)',
   const deepRow = window.getByRole('treeitem').filter({ hasText: 'deep.md' })
   await expect(deepRow).toBeVisible()
   await expect(deepRow).toHaveAttribute('aria-selected', 'true')
+})
 })

@@ -312,14 +312,14 @@ the mirrored path and uses shared helpers (US4 scenarios 1–3).
       repeated launch block, afterEach teardown, `openFolder`/`openFile`/
       `typeInEditor` local copies, and the deterministic-trash stubs with the
       launch.ts helpers. No spec loses a scenario.
-- [ ] T042 [P] [US4] Split `tests/e2e/recent.spec.ts` (774 lines) into
+- [X] T042 [P] [US4] Split `tests/e2e/recent.spec.ts` (774 lines) into
       `recent.open.spec.ts` (US1: reopen/dedupe/persistence of file+folder
       entries), `recent.deleted.spec.ts` (US3: unavailable entries, folder-open
       confirmation, OUTSIDE_WORKSPACE), `recent.persistence.spec.ts` (US4/FR-011/
       FR-012 caps, Clear, footer-note, ellipsis). Add `describe` blocks matching
       the existing banner comments in the other large specs (organize, source,
       tabs, native) so reporters can target US groups.
-- [ ] T043 [US4] Relocate low-level assertions duplicated in e2e to unit suites:
+- [X] T043 [US4] Relocate low-level assertions duplicated in e2e to unit suites:
       the IPC error-code probes from recent.spec.ts (lines 549–563, 399–403) to
       `tests/main` unit tests, and the ellipsis assertion (already covered by
       `tests/renderer/shortenPath.test.ts`) — remove the e2e duplicates

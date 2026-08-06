@@ -1,6 +1,5 @@
 import * as path from 'path'
 import * as fs from 'fs'
-import { dialog } from 'electron'
 import { resolveWithinRoot } from '../../fs/paths'
 import { readFile } from '../../fs/read'
 import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem } from '../../recentItems'
@@ -210,9 +209,6 @@ export function openFileFromPath(filePath: string): OpenedFile {
     size: stat.size
   }
 }
-
-/** Dialog helper kept in context (the file-open dialog reads a folder). */
-export { dialog }
 
 /** Path resolution helper re-exported for the handler modules. */
 export { resolveWithinRoot }

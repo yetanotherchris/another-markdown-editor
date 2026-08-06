@@ -1,4 +1,4 @@
-import { test, expect, ElectronApplication, Page } from '@playwright/test'
+import { test, describe, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -40,6 +40,7 @@ async function openFile(name: string): Promise<void> {
 
 // ---------- US1: native tree icons ----------
 
+describe('US1 native tree icons', () => {
 test('US1 tree rows render cohesive lucide icons (folder, file, chevron)', async () => {
   await openFolder()
 
@@ -97,9 +98,11 @@ test('US1 keyboard access to expand/collapse via the focused row (FR-013)', asyn
 
   await expect(window.getByRole('treeitem').getByText('gamma.md')).toBeVisible()
 })
+})
 
 // ---------- US2: chrome action buttons use icons ----------
 
+describe('US2 chrome action buttons use icons', () => {
 test('US2 chrome buttons show icons with accessible names', async () => {
   // The spec-010 chrome: hamburger, explorer toggle, and "+" new-file button
   // all carry icons with accessible names (FR-009, FR-011).
@@ -141,9 +144,11 @@ test('US2 chrome buttons show a visible keyboard focus ring (FR-013)', async () 
   expect(focused?.label).toContain('Open menu')
   expect(focused?.ring).toBe(true)
 })
+})
 
 // ---------- US3: status footer ----------
 
+describe('US3 status footer', () => {
 test('US3 footer left shows the active document and follows tab switches', async () => {
   await openFolder()
   await openFile('alpha.md')
@@ -213,9 +218,11 @@ test('US3 the header no longer shows the active document (FR-011)', async () => 
   await expect(window.locator('.header-bar .document-title')).toHaveCount(0)
   await expect(window.locator('.app-footer .document-title')).toContainText('alpha.md')
 })
+})
 
 // ---------- US4: offline font + icons ----------
 
+describe('US4 offline font + icons', () => {
 test('US4 Inter is loaded from bundled assets (no network dependency)', async () => {
   await openFolder()
   // The typeface must be available without a network fetch (FR-007).
@@ -231,9 +238,11 @@ test('US4 Inter is loaded from bundled assets (no network dependency)', async ()
   const font = await window.evaluate(() => getComputedStyle(document.body).fontFamily)
   expect(font).toContain('Inter')
 })
+})
 
 // ---------- Edges ----------
 
+describe('Edges', () => {
 test('untitled document shows its display title in the footer', async () => {
   await clickHamburgerItem(window, 'New File')
   await expect(window.getByTestId('footer-document')).toContainText(/Untitled-\d/)
@@ -287,4 +296,5 @@ test('US3 the workspace path in the footer is selectable text', async () => {
     return getComputedStyle(el).userSelect === 'text'
   })
   expect(selectable).toBe(true)
+})
 })
