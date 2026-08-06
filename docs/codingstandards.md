@@ -110,7 +110,26 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 5. Functions and control flow
+## 5. Visual layout — Gestalt principles
+
+You spend more time reading code than writing it. The [Gestalt principles](https://yetanotherchris.dev/clean-code/gestalt-principles/) describe how the eye perceives groups of objects — apply them to make code scannable at a glance.
+
+- **Similarity** — similar things appear grouped together. Group variables by type, parameters by role, and related statements by purpose. Aligned types and consistent character lengths help the eye form natural groups.
+- **Good form (Pragnanz)** — the mind perceives well-formed wholes, ignoring the parts. Use vertical tabulation for chained calls (LINQ, promise chains, method builders) so the eye reads the block as one object instead of parsing each line independently.
+- **Proximity** — things nearer each other appear grouped. Remove spurious blank lines between related declarations (fields, imports, properties). Vertically align constructor or function parameters so they read as a single group rather than a flat list.
+- **Closure** — the eye fills gaps to perceive a whole. Excessive whitespace inside a class or function breaks it into disconnected lines. Keep related members visually tight so the reader sees one cohesive unit first, then reads the details.
+- **Continuation** — the eye follows smooth paths. Use consistent formatting patterns (e.g. one attribute per line, aligned decorators, uniform chaining style) so the eye flows through the code without stumbling on irregular intersections.
+
+Practical rules:
+
+- Blank lines separate **logical chunks**, not individual statements. If two lines are part of the same thought, no blank line between them.
+- Align related declarations vertically (fields, imports, object literals) when it aids scanning.
+- Keep the subject of a block (the class name, the function being tested, the method under setup) visually close to its details — do not separate them with unrelated code or whitespace.
+- Prefer consistent formatting patterns across the codebase; inconsistency forces the reader to re-parse each block.
+
+---
+
+## 6. Functions and control flow
 
 - **Guard clauses** at the top; keep the main path least nested.
 - **No function with more than 2 levels of nesting.** If nesting goes deeper, extract.
@@ -124,7 +143,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 6. React and the renderer
+## 7. React and the renderer
 
 - **Components render. Hooks orchestrate. Reducers own transitions. Pure modules own rules.**
 - The renderer has **no** Node, **no** `fs`, **no** Electron module (constitution I). All disk access goes through the fixed preload API.
@@ -136,7 +155,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 7. Main process and IPC
+## 8. Main process and IPC
 
 - Handlers **orchestrate**. Modules under `fs/`, path helpers, mutate, recent-items, and settings stay free of UI/dialog policy where possible.
 - Path validation runs in **main**, against the resolved real path of the workspace root. Renderer checks are never trusted (constitution II).
@@ -149,7 +168,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 8. Comments and documentation in code
+## 9. Comments and documentation in code
 
 - Comments explain **why**: invariant, spec edge case, rejected alternative, non-obvious constraint.
 - Do not comment **what** the next line does if the name already says it. If a comment explains what the code does, rewrite the code to be self-explanatory instead.
@@ -162,7 +181,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 9. Tests as part of clean code
+## 10. Tests as part of clean code
 
 - **Pure domain and reducers:** unit tests without Electron (Vitest).
 - **Non-negotiable coverage** (constitution V): path containment (adversarial cases), atomic write and save-failure, dirty/close/quit confirmation, IPC contract shape, markdown round-trip where the editor might mangle content.
@@ -179,7 +198,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 10. Dependencies and project hygiene
+## 11. Dependencies and project hygiene
 
 - Dependencies must be justified. Prefer the platform and existing stack over new libraries (constitution technology constraints).
 - Do not re-litigate fixed stack choices (`docs/DESIGN_DECISIONS.md`) without recorded reason.
@@ -189,7 +208,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 11. Pull requests and change shape
+## 12. Pull requests and change shape
 
 - Prefer **small PRs**: one behaviour theme, or one tidying theme—not both at large scale.
 - If a behaviour change needs structure work first, tidy in a first PR (or first commits), then behaviour.
@@ -199,7 +218,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 12. Enforcement
+## 13. Enforcement
 
 - Encode limits (file size, function size, complexity, max params, no `any`) as ESLint rules (`complexity`, `max-lines-per-function`, `max-lines`, `max-params`, `@typescript-eslint/no-explicit-any`), not just this document. A guideline that isn't enforced by tooling erodes over time.
 - Run lint + typecheck + tests in CI on every PR; block merge on failure.
@@ -207,7 +226,7 @@ Soft limits—treat breaches as a signal to split, not as a hard CI failure unle
 
 ---
 
-## 13. Quick "before you merge" checklist
+## 14. Quick "before you merge" checklist
 
 - [ ] Behaviour matches spec; gaps recorded in spec/plan, not only in code comments  
 - [ ] No new `any` at IPC; types updated in `ipc-contract` when channels change  
