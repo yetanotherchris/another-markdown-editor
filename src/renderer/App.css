@@ -70,54 +70,66 @@ button, input, select, textarea {
   --ame-editor-bg: #ffffff;
 }
 
-/* Spec 013, FR-002/FR-003: the dark palette. Every chrome surface (header bar,
-   tab strip, hamburger menus, sidebar, status footer, settings dialog) resolves
-   the --ame-* tokens from .app-container, so redefining them here retints the
-   whole chrome in one place when the effective theme (nativeTheme.themeSource →
-   prefers-color-scheme → data-theme, see useEffectiveTheme) is dark. The editor
-   canvas and source view resolve --ame-editor-bg and the Crepe --crepe-color-*
-   overrides below — the editing surface follows the theme (FR-010). */
+/* Spec 013, FR-002/FR-003: the dark palette (VS Code Dark, user decision
+   2026-08-06). Main Editor Background #1F1F1F, Sidebar #181818, Primary Text
+   #8C8C8C, Editor Header Text #CCCCCC, Links/Highlights #3794FF; buttons are a
+   neutral grey (the palette's #0E639C blue is deliberately not used). Every
+   chrome surface resolves the --ame-* tokens from .app-container, so redefining
+   them here retints the whole chrome in one place when the effective theme
+   (nativeTheme.themeSource → prefers-color-scheme → data-theme, see
+   useEffectiveTheme) is dark. The editor canvas and source view resolve
+   --ame-editor-bg and the Crepe --crepe-color-* overrides below — the editing
+   surface follows the theme (FR-010). */
 .app-container[data-theme='dark'] {
-  --ame-bg: #1b1d21;
-  --ame-surface: #232529;
-  --ame-surface-secondary: #1e2023;
-  --ame-active-tab: #2f3237;
-  --ame-text: #e6e6e6;
-  --ame-text-secondary: #cfcfcf;
-  --ame-muted: #9a9a9a;
-  --ame-muted-secondary: #8b8b8b;
-  --ame-border: #3a3d42;
-  --ame-border-secondary: #33363b;
-  --ame-accent: #e08a4a;
-  --ame-control: #4b4e54;
-  /* The editing surface — slightly lighter than the window (--ame-bg) so the
-     document reads as a "page" on a dark desk, but still dark (FR-010). */
-  --ame-editor-bg: #26292e;
+  --ame-bg: #1f1f1f;
+  --ame-surface: #1f1f1f;
+  --ame-surface-secondary: #181818;
+  --ame-active-tab: #2d2d2d;
+  --ame-text: #8c8c8c;
+  --ame-text-secondary: #7a7a7a;
+  --ame-muted: #8c8c8c;
+  --ame-muted-secondary: #6e6e6e;
+  --ame-border: #3a3a3a;
+  --ame-border-secondary: #333333;
+  --ame-accent: #3794ff;
+  --ame-control: #3a3a3a;
+  --ame-editor-bg: #1f1f1f;
 }
 
-/* Spec 013 FR-010: the dark editing surface. Crepe's whole theme is driven by
-   the --crepe-color-* tokens on `.milkdown` (canvas, text, toolbar, headings,
-   code, blockquotes), so redefining them under the dark app container retints
-   the editor in one place. A neutral grey scale aligned with the --ame-* chrome
-   tokens; the canvas is a step lighter than the window background. */
+/* Spec 013 FR-010: the dark editing surface (VS Code Dark palette). Crepe's
+   whole theme is driven by the --crepe-color-* tokens on `.milkdown` (canvas,
+   text, toolbar, code, blockquotes), so redefining them under the dark app
+   container retints the editor in one place. Body text is the palette's Primary
+   Text #8C8C8C; links use #3794FF; headings are handled separately below. */
 .app-container[data-theme='dark'] .milkdown {
-  --crepe-color-background: #26292e;
-  --crepe-color-on-background: #d8dce2;
-  --crepe-color-surface: #2b2f35;
-  --crepe-color-surface-low: #282c31;
-  --crepe-color-on-surface: #e2e6ec;
-  --crepe-color-on-surface-variant: #b6bcc4;
-  --crepe-color-outline: #7c838c;
-  --crepe-color-primary: #e08840;
-  --crepe-color-secondary: #3d4148;
-  --crepe-color-on-secondary: #f0f2f5;
-  --crepe-color-inverse: #e2e6ec;
-  --crepe-color-on-inverse: #20232a;
-  --crepe-color-inline-code: #f2a65e;
-  --crepe-color-error: #ffb4ab;
-  --crepe-color-hover: #30343a;
-  --crepe-color-selected: #3c4149;
-  --crepe-color-inline-area: #2f343b;
+  --crepe-color-background: #1f1f1f;
+  --crepe-color-on-background: #8c8c8c;
+  --crepe-color-surface: #2a2a2a;
+  --crepe-color-surface-low: #262626;
+  --crepe-color-on-surface: #cccccc;
+  --crepe-color-on-surface-variant: #9a9a9a;
+  --crepe-color-outline: #5a5a5a;
+  --crepe-color-primary: #3794ff;
+  --crepe-color-secondary: #2a2a2a;
+  --crepe-color-on-secondary: #cccccc;
+  --crepe-color-inverse: #cccccc;
+  --crepe-color-on-inverse: #1f1f1f;
+  --crepe-color-inline-code: #9cdcfe;
+  --crepe-color-error: #f14c4c;
+  --crepe-color-hover: #2a2a2a;
+  --crepe-color-selected: #264f78;
+  --crepe-color-inline-area: #2a2a2a;
+}
+
+/* "Header text in the editor" (VS Code palette): headings are the off-white
+   #CCCCCC while the body text stays the mid-gray #8C8C8C. */
+.app-container[data-theme='dark'] .milkdown h1,
+.app-container[data-theme='dark'] .milkdown h2,
+.app-container[data-theme='dark'] .milkdown h3,
+.app-container[data-theme='dark'] .milkdown h4,
+.app-container[data-theme='dark'] .milkdown h5,
+.app-container[data-theme='dark'] .milkdown h6 {
+  color: #cccccc;
 }
 
 .app-container {

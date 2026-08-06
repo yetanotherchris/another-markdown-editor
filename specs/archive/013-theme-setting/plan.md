@@ -150,19 +150,19 @@ container already carries `data-editor-font`; it gains `data-theme={themeMode}`:
 
 ```css
 .app-container[data-theme='dark'] {
-  --ame-bg: #1b1d21;
-  --ame-surface: #232529;
-  --ame-surface-secondary: #1e2023;
-  --ame-active-tab: #2f3237;
-  --ame-text: #e6e6e6;
-  --ame-text-secondary: #cfcfcf;
-  --ame-muted: #9a9a9a;
-  --ame-muted-secondary: #8b8b8b;
-  --ame-border: #3a3d42;
-  --ame-border-secondary: #33363b;
-  --ame-accent: #e08a4a;
-  --ame-control: #4b4e54;
-  --ame-editor-bg: #26292e;
+  --ame-bg: #1f1f1f;                 /* Main Editor / window background */
+  --ame-surface: #1f1f1f;
+  --ame-surface-secondary: #181818;  /* Sidebar file explorer */
+  --ame-active-tab: #2d2d2d;
+  --ame-text: #8c8c8c;               /* Primary Text */
+  --ame-text-secondary: #7a7a7a;
+  --ame-muted: #8c8c8c;
+  --ame-muted-secondary: #6e6e6e;
+  --ame-border: #3a3a3a;
+  --ame-border-secondary: #333333;
+  --ame-accent: #3794ff;             /* Links / highlights / focus */
+  --ame-control: #3a3a3a;            /* Buttons — neutral, no blue */
+  --ame-editor-bg: #1f1f1f;
 }
 ```
 
@@ -180,31 +180,46 @@ theme css), so the dark editing surface is a single override:
 
 ```css
 .app-container[data-theme='dark'] .milkdown {
-  --crepe-color-background: #26292e;      /* canvas — a step lighter than the window */
-  --crepe-color-on-background: #d8dce2;   /* body text */
-  --crepe-color-surface: #2b2f35;         /* toolbar / surface */
-  --crepe-color-on-surface: #e2e6ec;
-  --crepe-color-on-surface-variant: #b6bcc4;
-  --crepe-color-outline: #7c838c;
-  --crepe-color-primary: #e08840;         /* matches the dark --ame-accent */
-  --crepe-color-secondary: #3d4148;
-  --crepe-color-on-secondary: #f0f2f5;
-  --crepe-color-inverse: #e2e6ec;
-  --crepe-color-on-inverse: #20232a;
-  --crepe-color-inline-code: #f2a65e;
-  --crepe-color-error: #ffb4ab;
-  --crepe-color-hover: #30343a;
-  --crepe-color-selected: #3c4149;
-  --crepe-color-inline-area: #2f343b;
+  --crepe-color-background: #1f1f1f;      /* canvas — same as the window */
+  --crepe-color-on-background: #8c8c8c;   /* body text — Primary Text */
+  --crepe-color-surface: #2a2a2a;         /* toolbar / surface */
+  --crepe-color-surface-low: #262626;
+  --crepe-color-on-surface: #cccccc;
+  --crepe-color-on-surface-variant: #9a9a9a;
+  --crepe-color-outline: #5a5a5a;
+  --crepe-color-primary: #3794ff;         /* links — Text Highlights & Links */
+  --crepe-color-secondary: #2a2a2a;
+  --crepe-color-on-secondary: #cccccc;
+  --crepe-color-inverse: #cccccc;
+  --crepe-color-on-inverse: #1f1f1f;
+  --crepe-color-inline-code: #9cdcfe;
+  --crepe-color-error: #f14c4c;
+  --crepe-color-hover: #2a2a2a;
+  --crepe-color-selected: #264f78;
+  --crepe-color-inline-area: #2a2a2a;
+}
+
+/* "Header text in the editor": headings are off-white #CCCCCC. */
+.app-container[data-theme='dark'] .milkdown h1,
+.app-container[data-theme='dark'] .milkdown h2,
+.app-container[data-theme='dark'] .milkdown h3,
+.app-container[data-theme='dark'] .milkdown h4,
+.app-container[data-theme='dark'] .milkdown h5,
+.app-container[data-theme='dark'] .milkdown h6 {
+  color: #cccccc;
 }
 ```
 
-A neutral grey scale aligned with the `--ame-*` chrome tokens; the canvas is
-slightly lighter than the window (`--ame-bg`) so the document reads as a "page" on
-a dark desk, but still dark (user decision 2026-08-06 — FR-010 amended). The
-`.editor-area` behind the canvas and the source view (`.source-view`,
+The VS Code Dark palette (user decision 2026-08-06): `#1F1F1F` editor/window
+background, `#181818` sidebar, `#8C8C8C` primary text, `#CCCCCC` editor headings,
+`#3794FF` links/highlights/focus; buttons use a neutral grey because the palette's
+`#0E639C` blue is deliberately excluded. Derived greys are shades of the two
+charcoal backgrounds so the theme is monochrome except for the link/highlight blue.
+The `.editor-area` behind the canvas and the source view (`.source-view`,
 `.source-toolbar`, `.source-textarea`) and the empty state are tokenized onto
-`--ame-editor-bg`/`--ame-*` so they follow the same palette in both modes.
+`--ame-editor-bg`/`--ame-*` so they follow the same palette in both modes; the
+source view also pins its text colour (a black-text regression on the dark
+surface). The Crepe canvas top padding is 16px (half the original 32px).
 
 **Settings dialog (`src/renderer/chrome/SettingsDialog.tsx`)** — a second fieldset,
 **Theme**, with three radios — **Light**, **Dark**, **System default** — below
@@ -326,12 +341,18 @@ in research R1/R2, the complexity table, and the decision log.
   custom properties on `.app-container`; every chrome surface follows.
 - **Dark editing surface (FR-010 amended, user decision 2026-08-06)**: the
   WYSIWYG editor content area now follows the theme. In dark mode Crepe's
-  `--crepe-color-*` tokens on `.milkdown` are overridden to a neutral grey scale
-  (canvas `#26292e`, slightly lighter than the window `#1b1d21`; body text
-  `#d8dce2`), and the `.editor-area`, empty state, and source view resolve
-  `--ame-editor-bg`/`--ame-*`. Light mode is unchanged (the tokens keep the
-  existing light values). This takes the editing-surface slice the future
-  `016-editor-theme` spec would own.
+  `--crepe-color-*` tokens on `.milkdown` are overridden to the VS Code Dark
+  palette and the `.editor-area`, empty state, and source view resolve
+  `--ame-editor-bg`/`--ame-*`. Light mode is unchanged. This takes the
+  editing-surface slice the future `016-editor-theme` spec would own.
+- **VS Code Dark palette (user decision 2026-08-06)**: the dark theme uses
+  `#1F1F1F` editor/window background, `#181818` sidebar, `#8C8C8C` primary text,
+  `#CCCCCC` editor headings, and `#3794FF` for links/highlights/focus. The
+  palette's `#0E639C` button blue is deliberately skipped — buttons use a neutral
+  grey (`--ame-control`) so the theme has no blue accent beyond the link colour.
+  The source view pins its text colour (`--ame-text`) to fix a black-text
+  regression on the dark surface, and the Crepe canvas top padding is halved to
+  16px (user decision).
 - **Live following = the `change` listener**: in System mode the renderer
   re-resolves `prefers-color-scheme` on every matchMedia change event (Chromium
   fires it when the OS theme changes). e2e simulates an OS switch with Playwright's

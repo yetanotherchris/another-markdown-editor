@@ -60,9 +60,20 @@ async function editorBackground(): Promise<string> {
   return window.locator('.milkdown').evaluate((el) => getComputedStyle(el).backgroundColor)
 }
 
+/** The sidebar's resolved background — the chrome's `--ame-surface-secondary`
+ *  token (the VS Code palette's "Sidebar file explorer" #181818). */
+async function sidebarBackground(): Promise<string> {
+  return window.locator('.sidebar-panel').evaluate((el) => getComputedStyle(el).backgroundColor)
+}
+
 /** The editor's default text colour (the `--crepe-color-on-background` token). */
 async function editorTextColor(): Promise<string> {
   return window.locator('.milkdown').evaluate((el) => getComputedStyle(el).color)
+}
+
+/** The editor's heading colour ("Header text in the editor", #CCCCCC). */
+async function headingColor(): Promise<string> {
+  return window.locator('.milkdown h1').evaluate((el) => getComputedStyle(el).color)
 }
 
 /** Sum the RGB channels of an `rgb(r, g, b)` string — a coarse "how light is
@@ -103,8 +114,8 @@ test('US2 choosing Dark applies the dark chrome palette and persists it', async 
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).check()
 
   await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark')
-  // The header bar resolves the dark --ame-surface (#232529).
-  await expect.poll(headerBackground).toBe('rgb(35, 37, 41)')
+  // The header bar resolves the dark --ame-surface (#1F1F1F, Main Editor Background).
+  await expect.poll(headerBackground).toBe('rgb(31, 31, 31)')
 
   // The choice is persisted to the shared config.json (FR-006).
   await expect.poll(persistedThemeOverride).toBe('dark')
@@ -137,7 +148,7 @@ test('US4 the theme survives a restart', async () => {
   ;({ app, window } = await launchApp(configDir, testFolder))
   await openFile(window, 'alpha.md')
   await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark')
-  await expect.poll(headerBackground).toBe('rgb(35, 37, 41)')
+  await expect.poll(headerBackground).toBe('rgb(31, 31, 31)')
 })
 
 test('FR-010 the WYSIWYG editor content area follows the dark theme', async () => {
@@ -150,17 +161,28 @@ test('FR-010 the WYSIWYG editor content area follows the dark theme', async () =
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).check()
   await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark')
 
-  // The editing surface flips to a dark "page" (FR-010): canvas #26292e and a
-  // light text colour so the document stays readable.
-  await expect.poll(editorBackground).toBe('rgb(38, 41, 46)') // #26292e
-  expect(await editorTextColor()).toBe('rgb(216, 220, 226)') // #d8dce2
+  // The editing surface flips to the VS Code Dark palette (FR-010): canvas
+  // #1F1F1F, body text #8C8C8C (Primary Text), headings #CCCCCC.
+  await expect.poll(editorBackground).toBe('rgb(31, 31, 31)') // #1F1F1F
+  expect(await editorTextColor()).toBe('rgb(140, 140, 140)') // #8C8C8C
+  expect(await headingColor()).toBe('rgb(204, 204, 204)') // #CCCCCC
 
-  // The canvas is slightly lighter than the window chrome (the header resolves
-  // --ame-surface #232529) but still dark.
+  // The canvas (#1F1F1F) is lighter than the sidebar (#181818) but still dark.
   const canvas = channelSum(await editorBackground())
-  const chrome = channelSum(await headerBackground())
-  expect(canvas).toBeGreaterThan(chrome)
+  const sidebar = channelSum(await sidebarBackground())
+  expect(sidebar).toBe(channelSum('rgb(24, 24, 24)'))
+  expect(canvas).toBeGreaterThan(sidebar)
   expect(canvas).toBeLessThan(channelSum('rgb(255, 255, 255)'))
+
+  // Close the dialog, then check the source view follows the theme — the "Back
+  // to visual editing" button must not fall back to black text on the dark
+  // surface (regression guard).
+  await dialog.getByRole('button', { name: 'Close settings' }).click()
+  await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
+  await window.getByRole('button', { name: 'View source' }).click()
+  await expect(window.getByTestId('source-view')).toBeVisible()
+  expect(await window.locator('.source-return').evaluate((el) => getComputedStyle(el).color))
+    .toBe('rgb(140, 140, 140)') // inherits --ame-text #8C8C8C
 })
 
 test('FR-007 the Theme group is keyboard-reachable and arrow-key navigable', async () => {

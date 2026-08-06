@@ -27,9 +27,11 @@
 }
 
 /* Milkdown's Crepe theme defaults the canvas to padding: 60px 120px
-   (reset.css), which is oversized for a desktop editor. Tighten it. */
+   (reset.css), which is oversized for a desktop editor. Tighten it — and halve
+   the top padding so the first line sits closer to the toolbar (user decision
+   2026-08-06). */
 .editor-host .milkdown .ProseMirror {
-  padding: 32px 48px;
+  padding: 16px 48px;
 }
 
 /* Crepe's top-bar icons are inline SVGs whose clip-path references a
@@ -56,6 +58,10 @@
   display: flex;
   flex-direction: column;
   background: var(--ame-editor-bg);
+  /* The whole source surface follows the theme text color; the "Back to visual
+     editing" button inherits it (fix: it previously fell back to default black,
+     which was unreadable on the dark surface). */
+  color: var(--ame-text);
   animation: source-slide-in 160ms ease-out;
   z-index: 20;
 }

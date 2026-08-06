@@ -133,9 +133,28 @@ A user's theme choice is remembered across application restarts.
   native chrome. The OS-never-reports case is satisfied by Chromium always
   answering light or dark (light is the fallback when the OS reports none).
 - **2026-08-06**: FR-010 was amended (user decision) to bring the WYSIWYG editor
-  content area into scope: in dark mode the editor renders a dark surface that
-  is slightly lighter than the window chrome, via Crepe's `--crepe-color-*`
-  tokens, with the surrounding editor region, empty state, and source view
-  following. This takes the editing-surface slice that the future
-  `016-editor-theme` spec would otherwise own; 016 should build on the tokens
-  introduced here rather than re-decide them.
+  content area into scope: in dark mode the editor renders a dark surface via
+  Crepe's `--crepe-color-*` tokens, with the surrounding editor region, empty
+  state, and source view following. This takes the editing-surface slice that the
+  future `016-editor-theme` spec would otherwise own; 016 should build on the
+  tokens introduced here rather than re-decide them.
+
+## Dark theme palette (user decision 2026-08-06)
+
+The dark theme uses the VS Code Dark palette below. The palette's deep-blue
+button accent (`#0E639C`) is deliberately **not** used — buttons are a neutral
+grey so the theme carries no blue accent; `#3794FF` is kept for links, text
+highlights, and focus indicators.
+
+| Role | Colour |
+|------|--------|
+| Main editor / window background | `#1F1F1F` (Dark Charcoal) |
+| Sidebar file explorer | `#181818` (Near Black) |
+| Primary text (editor body + UI text) | `#8C8C8C` (Mid Gray) |
+| Header text in the editor (headings) | `#CCCCCC` (Off-White) |
+| Links, text highlights, focus | `#3794FF` (Bright Sky Blue) |
+| Buttons (neutral, replacing `#0E639C`) | a mid-grey tone aligned with the chrome |
+
+Derived greys (borders, surfaces, active tabs, hover/selection states) are shades
+of the two charcoal backgrounds so the whole dark theme stays monochrome except
+for the link/highlight blue. Light mode is unchanged.
