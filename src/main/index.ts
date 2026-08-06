@@ -4,13 +4,21 @@ import { registerIpcHandlers } from './ipc/register'
 import { createApplicationMenu } from './menu'
 import { registerShortcuts } from './shortcuts'
 import { flushSettings } from './settings'
+import { resolveLaunchBounds, trackWindowState, flushWindowState } from './windowState'
+import { reconcileExplorerClosedWithoutWorkspace } from './workspaceExplorerState'
 
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
+  // Spec 011 FR-001/FR-005: restore the saved position/size (clamped to the
+  // available displays) and re-apply a maximized window.
+  const { bounds, isMaximized } = resolveLaunchBounds()
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -18,6 +26,14 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js')
     }
   })
+  // Spec 011 FR-005 (review #30 M1): maximize after the window is ready to be
+  // shown — on Linux/X11 a maximize issued before the window is realized can be
+  // a no-op, and showing the maximized window avoids a normal-bounds flash.
+  mainWindow.once('ready-to-show', () => {
+    if (isMaximized) mainWindow?.maximize()
+    mainWindow?.show()
+  })
+  trackWindowState(mainWindow)
 
   // Spec 010 FR-002: the native menu bar is replaced by the renderer hamburger.
   // Windows/Linux drop the bar entirely; macOS keeps only the OS-required
@@ -43,12 +59,21 @@ function createWindow(): void {
   })
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  // Spec 011 FR-013: with no folder open the explorer is closed and that
+  // closed state is persisted. Runs before the window is created so the config
+  // is already honest when the renderer loads it.
+  reconcileExplorerClosedWithoutWorkspace()
+  createWindow()
+})
 
 app.on('window-all-closed', () => {
   // Review #27: flush any pending debounced settings write before exit so a
   // font change made within the 500 ms window survives a fast quit (FR-006).
   flushSettings()
+  // Spec 011 FR-002/FR-009: drain any pending window-state write too so the
+  // last position/size survives a fast quit.
+  flushWindowState()
   app.quit()
 })
 

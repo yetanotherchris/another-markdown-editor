@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+// Maintainability guardrail (see npm run check).
 /**
  * Maintainability guardrail for the codebase refactor (spec 017, contracts/guardrails.md).
  *
