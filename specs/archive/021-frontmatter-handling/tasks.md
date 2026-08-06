@@ -137,7 +137,7 @@ implementation and testing of each story.
 
 - [X] T024 [P] Run `npm run lint`, `npm run typecheck`, and `npm run test` — all must pass
 - [X] T025 [P] Run `npm run test:e2e` (build + Playwright) — full suite must pass including the new frontmatter spec
-- [ ] T026 Archive the implemented spec: `git mv specs/021-frontmatter-handling specs/archive/021-frontmatter-handling`, set its **Status** to `Archived`, and update the Current implementation status table in AGENTS.md
+- [X] T026 Archive the implemented spec: `git mv specs/021-frontmatter-handling specs/archive/021-frontmatter-handling`, set its **Status** to `Archived`, and update the Current implementation status table in AGENTS.md
 - [ ] T027 Open the phase PR against main with the changes, PR description ending with the AI usage line
 
 ---
