@@ -21,7 +21,8 @@ When guidance conflicts, higher wins:
 3. **`specs/<feature>/plan.md`** + `research.md` — how to build it
 4. **`specs/<feature>/tasks.md`** — order of work
 5. This file — working practice
-6. Existing code — precedent, not authority
+6. **`docs/codingstandards.md`** (@codingstandards.md) — how the code should look
+7. Existing code — precedent, not authority
 
 Code that contradicts the spec is a bug in the code *or* a bug in the spec.
 Decide which. Never assume the code is right because it exists.
@@ -183,6 +184,7 @@ Restated from the constitution because these are the ones most easily lost:
 specs/                            Active feature specs (not yet implemented)
 specs/archive/                    Completed and archived specs
 docs/DESIGN_DECISIONS.md          Fixed stack decisions, pre-dates the specs
+docs/codingstandards.md           Code style and standards (@codingstandards.md)
 .opencode/commands/               Spec Kit slash commands
 AGENTS.md                         This file
 ```
@@ -223,9 +225,6 @@ AGENTS.md                         This file
   List the actual models or agents that contributed, including any that
   generated, reviewed, or edited the spec or code. Use the actual model name
   (e.g. "DeepSeek V4 Pro"), NOT the tool name (e.g. "opencode").
-
-- **Never use `.bat` (batch) files.** On Windows use `.ps1` PowerShell scripts.
-  On Linux/macOS use `.sh` shell scripts. Batch is fragile and non-portable.
 
 ## Branching and PR workflow
 
