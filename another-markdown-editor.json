@@ -1,12 +1,12 @@
 {
   "homepage": "https://github.com/yetanotherchris/another-markdown-editor",
   "description": "A WYSIWYG markdown editor for Windows, macOS, and Linux, built with Electron and Milkdown.",
-  "version": "0.0.95",
+  "version": "0.0.96",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.95/ameditor-0.0.95-windows-x64.zip",
-      "hash": "58ad031f946854d0a5e3ffe3ebe265b2f0b899d9011638c9f23724471e1ff62d",
+      "url": "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.96/ameditor-0.0.96-windows-x64.zip",
+      "hash": "133962ff1fe9fb66d9f3b18a4ee4e4c6a89a695ffc67e38f53af1a5b358a033e",
       "bin": [
         [
           "ameditor.exe",
