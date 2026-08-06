@@ -125,20 +125,20 @@ The hooks form one cohesive change (each imports the previous group's returned
 API). Create them in dependency order, then rewire App.tsx. Handler bodies are
 **moved verbatim** — only the module boundaries change.
 
-- [ ] T012 [US1] Create `src/renderer/hooks/useDialogQueue.ts`: owns
+- [X] T012 [US1] Create `src/renderer/hooks/useDialogQueue.ts`: owns
       `dialogInFlightRef`, `pendingErrorRef`, `pendingExternalPromptRef`,
       `handleExternalChangeRef`, `showOperationErrorRef`, and returns
       `releaseDialogSurface` (drain external-first-then-error, each re-acquiring
       the guard) and `showOperationError` (show or queue). Wired from the current
       App.tsx `releaseDialogSurface`/`showOperationError` bodies verbatim
       (contracts/renderer.md §useDialogQueue).
-- [ ] T013 [US1] Create `src/renderer/hooks/useEditorPool.ts`: returns
+- [X] T013 [US1] Create `src/renderer/hooks/useEditorPool.ts`: returns
       `enforcePoolCap(activeId)` — `!instancePool.hasSpace()` →
       `evictLRU(documents.filter(isDirtyLive), activeId)`, then
       `instancePool.remove(evictId)` + `dispatch({ type: 'EVICT', payload: { id:
       evictId } })`. Receives `dispatch`, `sessionRef`, `isDirtyLive`.
       (contracts/renderer.md §useEditorPool)
-- [ ] T014 [US1] Create `src/renderer/hooks/useDocumentSession.ts`: receives
+- [X] T014 [US1] Create `src/renderer/hooks/useDocumentSession.ts`: receives
       `{ dispatch, sessionRef, dialog, isDirtyLive, enforcePoolCap }`; returns
       `saveDocument`, `doClose`, `handleCloseRequest`, `reloadDocument`,
       `handleQuitRequest`, `flushLiveContent`, `handleContentChange`,
@@ -146,11 +146,11 @@ API). Create them in dependency order, then rewire App.tsx. Handler bodies are
       `handleNew`, `handleOpen`. Binds `domain/dirty.ts` to
       `(id) => instancePool.getMarkdown(id)` for its live checks. Bodies copied
       verbatim from App.tsx (contracts/renderer.md §useDocumentSession).
-- [ ] T015 [US1] Create `src/renderer/hooks/useSourceViewToggle.ts`: receives
+- [X] T015 [US1] Create `src/renderer/hooks/useSourceViewToggle.ts`: receives
       `{ dispatch, sessionRef, session }`; returns `handleShowSource`,
       `handleReturnToFormatted`, `openPathInSource`, `handleViewSource`
       (spec 002 transitions verbatim).
-- [ ] T016 [US1] Create `src/renderer/hooks/useWorkspaceTree.ts`: receives
+- [X] T016 [US1] Create `src/renderer/hooks/useWorkspaceTree.ts`: receives
       `{ dispatch, dispatchWorkspace, sessionRef, workspaceRef, dialog, session,
       treeApiRef, pendingCreateRef, createCounterRef }`; returns
       `handleTreeSelect`, `handleTreeActivate`, `handleTreeToggle`, `applyMove`,
@@ -158,25 +158,25 @@ API). Create them in dependency order, then rewire App.tsx. Handler bodies are
       `cleanupAfterDelete`, `runDeleteConfirmation`, `handleTreeMove` (bodies
       verbatim, including the delete flow, CONFLICT retry, and clean-to-close
       re-check).
-- [ ] T017 [US1] Create `src/renderer/hooks/useExternalFileEvents.ts`: receives
+- [X] T017 [US1] Create `src/renderer/hooks/useExternalFileEvents.ts`: receives
       `{ sessionRef, dialog, session }`; returns `handleExternalPrompt` and
       `handleExternalChange`, and sets `dialog.handleExternalChangeRef.current =
       handleExternalChange` each render (so the dialog queue can drain deferred
       notices). Bodies verbatim.
-- [ ] T018 [US1] Create `src/renderer/hooks/useWorkspaceFolder.ts`: receives
+- [X] T018 [US1] Create `src/renderer/hooks/useWorkspaceFolder.ts`: receives
       `{ dispatch, dispatchWorkspace, sessionRef, dialog, session }`; owns
       `pendingFolderOpenRef`; returns `commitFolderOpen`, `runFolderOpenFlow`,
       `dirtyWorkspaceRelativeDocs`, `revealExplorer` (two-phase prepare →
       confirm → commit verbatim).
-- [ ] T019 [US1] Create `src/renderer/hooks/useSidebarLayout.ts`: receives
+- [X] T019 [US1] Create `src/renderer/hooks/useSidebarLayout.ts`: receives
       `{ sidebarPanelRef, explorerRestoreDoneRef }`; returns
       `handleSidebarResize`, `handleToggleExplorer` (never-persist-0 rule,
       mount guard, explicit visibility persistence verbatim).
-- [ ] T020 [US1] Create `src/renderer/hooks/useMenuCommands.ts`: receives the
+- [X] T020 [US1] Create `src/renderer/hooks/useMenuCommands.ts`: receives the
       session/tree/source/folder APIs + `{ sessionRef, dialog }`; returns
       `handleMenuCommand` — the spec 010 command bus routing every `MenuCommand`
       to the same dispatch paths as today, verbatim.
-- [ ] T021 [US1] Rewrite `src/renderer/App.tsx` as a thin composition root
+- [X] T021 [US1] Rewrite `src/renderer/App.tsx` as a thin composition root
       (≤ ~250 lines): own the two `useReducer`s and the shared refs
       (`sessionRef`, `workspaceRef`, `sidebarPanelRef`, `explorerRestoreDoneRef`,
       `treeApiRef`, `pendingCreateRef`, `createCounterRef`), bind
@@ -184,7 +184,7 @@ API). Create them in dependency order, then rewire App.tsx. Handler bodies are
       window.api subscription effect, the pool-destroy effect, the workspace
       active-file reveal effect, and the existing JSX — with all handlers coming
       from the hooks. No business rules remain inline (FR-001).
-- [ ] T022 [US1] Thin `src/renderer/explorer/Tree.tsx`: extract the drag/drop
+- [X] T022 [US1] Thin `src/renderer/explorer/Tree.tsx`: extract the drag/drop
       target logic into `src/renderer/explorer/treeMove.ts` (`treeMoveTarget`,
       `treeWouldMoveIntoOwnDescendant`) and the inline-rename start/cancel flow
       into `src/renderer/explorer/treeRename.ts`; Tree.tsx keeps rendering +
@@ -197,34 +197,34 @@ equivalent. App.tsx ≤ 300 lines.
 
 ### Main — the handler split
 
-- [ ] T023 [US1] Create `src/main/ipc/handlers/context.ts`: module state
+- [X] T023 [US1] Create `src/main/ipc/handlers/context.ts`: module state
       (`workspaceState`, `workspaceRoot`, `allowClose`) + `ok`/`err`/
       `sanitizeError`/`toAppError`/`ensureString`/`validateKind`/`validateShape`/
       `withWorkspace`/`resolveAbsolutePath` + spec-004 helpers (`isRecentEntry`,
       `recordRecent`, `removeRecent`, `canonicalPath`, `openFileFromPath`),
       moved from handlers.ts verbatim (contracts/main.md §Shared context).
-- [ ] T024 [P] [US1] Create `src/main/ipc/handlers/files.ts`:
+- [X] T024 [P] [US1] Create `src/main/ipc/handlers/files.ts`:
       `registerFileHandlers(window, ctx)` registering `file:openDialog`,
       `file:read`, `file:write`, `file:saveDialog` (bodies verbatim).
-- [ ] T025 [P] [US1] Create `src/main/ipc/handlers/dialogs.ts`:
+- [X] T025 [P] [US1] Create `src/main/ipc/handlers/dialogs.ts`:
       `registerDialogHandlers(window, ctx)` registering `dialog:show` (via
       `validateNativeDialogRequest` + `showNativeConfirmation`).
-- [ ] T026 [P] [US1] Create `src/main/ipc/handlers/workspace.ts`:
+- [X] T026 [P] [US1] Create `src/main/ipc/handlers/workspace.ts`:
       `registerWorkspaceHandlers(window, ctx)` registering
       `workspace:prepareFolderOpen`, `workspace:commitFolderOpen`,
       `workspace:cancelFolderOpen`, `workspace:readDir` (the two-phase flow with
       the `pendingFolderOpen` guard verbatim).
-- [ ] T027 [P] [US1] Create `src/main/ipc/handlers/settings.ts`:
+- [X] T027 [P] [US1] Create `src/main/ipc/handlers/settings.ts`:
       `registerSettingsHandlers(window, ctx)` registering `settings:get`,
       `settings:update`.
-- [ ] T028 [P] [US1] Create `src/main/ipc/handlers/recent.ts`:
+- [X] T028 [P] [US1] Create `src/main/ipc/handlers/recent.ts`:
       `registerRecentHandlers(window, ctx)` registering `recent:openFile`,
       `recent:list`, `recent:clear`.
-- [ ] T029 [P] [US1] Create `src/main/ipc/handlers/app.ts`:
+- [X] T029 [P] [US1] Create `src/main/ipc/handlers/app.ts`:
       `registerAppHandlers(window, ctx)` registering `app:requestQuit`,
       `devtools:toggle`, `quit:respond`, and owning `setupWindowCloseHandler` +
       `tryCloseWindow` (the `allowClose` lifecycle).
-- [ ] T030 [US1] Update `src/main/ipc/register.ts` to call the six
+- [X] T030 [US1] Update `src/main/ipc/register.ts` to call the six
       `register*(window, ctx)` functions under the existing idempotent guard
       (app first — it owns the close handler). Delete `src/main/ipc/handlers.ts`
       (git mv the concern splits; no channel is dropped — FR-005, SC-011).

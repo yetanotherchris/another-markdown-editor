@@ -17,6 +17,10 @@ export default tseslint.config(
       'no-restricted-globals': ['error', {
         name: 'require',
         message: 'Use import syntax instead of require.'
+      }],
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_'
       }]
     }
   },
