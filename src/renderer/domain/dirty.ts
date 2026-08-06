@@ -1,5 +1,6 @@
 import type { DocumentState } from '../state/documents'
 import { markdownSame } from '../state/documents'
+import { joinFrontmatter } from './frontmatter'
 
 /** The instance-pool markdown accessor, injected so these functions stay pure
  *  and testable without the Crepe runtime (FR-003, US2). */
@@ -29,14 +30,16 @@ export function isDirtyLive(doc: DocumentState, getMarkdown: MarkdownAccessor): 
 }
 
 /** The bytes a save writes (spec 002 save model): source view writes the raw
- *  text the user sees; a formatted document that is clean in the live-dirty
- *  sense writes the stored raw bytes (a no-edit open/save stays byte-identical);
- *  only a document with real drift writes the Crepe serialization so the edits
- *  are kept. */
+ *  full text the user sees; a formatted document that is clean in the live-dirty
+ *  sense writes the stored raw body bytes (a no-edit open/save stays
+ *  byte-identical); only a document with real drift writes the Crepe
+ *  serialization so the edits are kept. Spec 021: the stored frontmatter block
+ *  is recombined at the top of every save (FR-005), and with no frontmatter the
+ *  body is returned unchanged so no empty block is ever added (FR-010). */
 export function getContentToSave(doc: DocumentState, getMarkdown: MarkdownAccessor): string {
-  if (doc.view === 'source') return doc.content
-  if (isDirtyLive(doc, getMarkdown)) return getMarkdown(doc.id) ?? doc.content
-  return doc.content
+  if (doc.view === 'source') return joinFrontmatter(doc.frontmatter, doc.content)
+  if (isDirtyLive(doc, getMarkdown)) return joinFrontmatter(doc.frontmatter, getMarkdown(doc.id) ?? doc.content)
+  return joinFrontmatter(doc.frontmatter, doc.content)
 }
 
 /** Per-document flush decision (raw-bytes policy): a source-view document's

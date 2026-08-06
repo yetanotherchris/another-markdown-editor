@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import type { Crepe } from '@milkdown/crepe'
 import type { DocumentState } from '../state/documents'
 import { instancePool } from './instancePool'
+import { joinFrontmatter } from '../domain/frontmatter'
 import CrepeHost, { type CursorState } from './CrepeHost'
 import SourceView from './SourceView'
 import './editor.css'
@@ -64,7 +65,7 @@ export default function EditorPanel({
 
   const sourceView = document.view === 'source' && (
     <SourceView
-      value={document.content}
+      value={joinFrontmatter(document.frontmatter, document.content)}
       onChange={(content) => onContentChange(document.id, content)}
       onReturnToFormatted={() => onReturnToFormatted(document.id)}
       isActive={isActive}
