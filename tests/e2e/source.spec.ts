@@ -1,8 +1,8 @@
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, clickHamburgerItem } from './launch'
+import { launchApp, closeAppSafely, stubTrash, stubMessageBox, messageBoxCallCount, openFolder as openWorkspaceFolder } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -18,40 +18,17 @@ test.beforeAll(async () => {
 })
 
 test.beforeEach(async () => {
-  app = await electron.launch({
-    args: electronLaunchArgs
-  })
-  window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [folder as string]
-    })
-  }, testFolder)
+  ;({ app, window } = await launchApp(undefined, testFolder))
 
   // Deterministic trash for the delete-related flows.
-  await app.evaluate(({ shell }) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fsMod = (process as any).getBuiltinModule('fs')
-    shell.trashItem = async (p: string) => {
-      fsMod.rmSync(p, { recursive: true, force: true })
-    }
-  })
+  await stubTrash(app)
 
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
-
-  await stubMessageBox(app)
 })
 
 test.afterEach(async () => {
-  try {
-    await closeAppDiscardingQuit(app)
-  } catch {
-    await app.close().catch(() => {})
-  }
+  await closeAppSafely(app)
 })
 
 test.afterAll(async () => {
@@ -59,7 +36,7 @@ test.afterAll(async () => {
 })
 
 async function openFolder(): Promise<void> {
-  await clickHamburgerItem(window, 'Open Folder…')
+  await openWorkspaceFolder(window)
 }
 
 async function openFile(name: string): Promise<void> {

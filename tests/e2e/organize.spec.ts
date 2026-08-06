@@ -1,8 +1,8 @@
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem } from './launch'
+import { launchApp, closeAppSafely, stubTrash, stubMessageBox, messageBoxCallCount, lastMessageBoxOptions, openFolder as openWorkspaceFolder } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -47,40 +47,17 @@ async function resetFixture(): Promise<void> {
 
 test.beforeEach(async () => {
   await resetFixture()
-  app = await electron.launch({
-    args: electronLaunchArgs
-  })
-  window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [folder as string]
-    })
-  }, testFolder)
+  ;({ app, window } = await launchApp(undefined, testFolder))
 
   // Deterministic trash: instead of the OS recycle bin, remove the files
   // directly. `trashed: true` is still returned, so the app behaves exactly
   // as if the OS trash succeeded. process.getBuiltinModule works in the
   // bundled main process regardless of its module format.
-  await app.evaluate(({ shell }) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fsMod = (process as any).getBuiltinModule('fs')
-    shell.trashItem = async (p: string) => {
-      fsMod.rmSync(p, { recursive: true, force: true })
-    }
-  })
-
-  await stubMessageBox(app)
+  await stubTrash(app)
 })
 
 test.afterEach(async () => {
-  try {
-    await closeAppDiscardingQuit(app)
-  } catch {
-    await app.close().catch(() => {})
-  }
+  await closeAppSafely(app)
 })
 
 test.afterAll(async () => {
@@ -88,7 +65,7 @@ test.afterAll(async () => {
 })
 
 async function openFolder(): Promise<void> {
-  await clickHamburgerItem(window, 'Open Folder…')
+  await openWorkspaceFolder(window)
 }
 
 async function openFile(name: string): Promise<void> {

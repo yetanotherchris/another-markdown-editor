@@ -1,8 +1,8 @@
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, clickHamburgerItem } from './launch'
+import { launchApp, closeAppSafely, closeAppDiscardingQuit, openFolder as openWorkspaceFolder, typeInEditor as typeSharedInEditor, pressShortcut as pressSharedShortcut } from './launch'
 
 /**
  * Spec 010 chrome suite (contracts/renderer.md §E2e): the hamburger menu, the
@@ -25,34 +25,16 @@ test.beforeAll(async () => {
   fs.writeFileSync(path.join(testFolder, LONG_NAME), '# Long')
 })
 
-async function launchApp(): Promise<{ app: ElectronApplication; window: Page }> {
-  const instance = await electron.launch({
-    args: electronLaunchArgs,
-    env: { ...process.env, AME_CONFIG_DIR: configDir }
-  })
-  const page = await instance.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await instance.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder as string] })
-  }, testFolder)
-  await stubMessageBox(instance)
-  return { app: instance, window: page }
-}
-
 test.beforeEach(async () => {
   // Isolated config dir per test so a persisted explorerVisible (or any other
   // setting) from a previous test/run cannot leak in (AME_CONFIG_DIR seam).
   configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-chrome-config-'))
-  ;({ app, window } = await launchApp())
+  ;({ app, window } = await launchApp(configDir, testFolder))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
 
 test.afterEach(async () => {
-  try {
-    await closeAppDiscardingQuit(app)
-  } catch {
-    await app.close().catch(() => {})
-  }
+  await closeAppSafely(app)
   fs.rmSync(configDir, { recursive: true, force: true })
 })
 
@@ -67,27 +49,14 @@ const editorWidth = () =>
   window.locator('.editor-panel').evaluate((el) => el.getBoundingClientRect().width)
 
 async function openFolder(): Promise<void> {
-  await clickHamburgerItem(window, 'Open Folder…')
-  await expect(window.getByRole('treeitem').first()).toBeVisible()
+  await openWorkspaceFolder(window)
   await expect.poll(sidebarWidth).toBeGreaterThan(50)
 }
 
-async function typeInEditor(text: string): Promise<void> {
-  await window.locator('[contenteditable="true"]').first().click()
-  await window.keyboard.type(text)
-}
-
-// Main-side accelerators live in `before-input-event` (spec 010), which
-// Playwright's CDP-synthesized keyboard events do NOT reach. Inject the key
-// through the webContents so the real shortcut pipeline runs (sendInputEvent
-// goes through before-input-event exactly like a physical key).
-async function pressShortcut(key: string, modifiers: Array<'control' | 'meta' | 'shift'> = []): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, { key, modifiers }) => {
-    const win = BrowserWindow.getAllWindows()[0]
-    win.webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers })
-    win.webContents.sendInputEvent({ type: 'keyUp', keyCode: key, modifiers })
-  }, { key, modifiers })
-}
+// Thin wrappers binding the module-scoped app/window to the shared helpers.
+const typeInEditor = (text: string) => typeSharedInEditor(window, text)
+const pressShortcut = (key: string, modifiers: Array<'control' | 'meta' | 'shift'> = []) =>
+  pressSharedShortcut(app, key, modifiers)
 
 test('US1 chrome buttons sit top-left and the active tab is the #EAEAEA pill', async () => {
   await openFolder()
@@ -177,7 +146,7 @@ test('US2 a persisted hidden choice is overridden by reveal-on-open across resta
   // Phase 2: restart with the same config. A folder open always reveals the
   // explorer (reveal-on-open overrides a persisted hidden choice, clarification
   // 2026-08-05), and that reveal is persisted (visible=true).
-  ;({ app, window } = await launchApp())
+  ;({ app, window } = await launchApp(configDir, testFolder))
   await openFolder()
   await expect.poll(sidebarWidth).toBeGreaterThan(50)
   await expect.poll(() => {
@@ -190,7 +159,7 @@ test('US2 a persisted hidden choice is overridden by reveal-on-open across resta
 
   // Phase 3: restart again; the last folder open persisted visible=true, so the
   // toggle's default is visible and a fresh open shows the explorer.
-  ;({ app, window } = await launchApp())
+  ;({ app, window } = await launchApp(configDir, testFolder))
   await openFolder()
   await expect.poll(sidebarWidth).toBeGreaterThan(50)
 })

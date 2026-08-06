@@ -1,8 +1,8 @@
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, clickHamburgerRecent, hamburgerRecentState, hamburgerRecentStructure } from './launch'
+import { launchApp, closeAppSafely, stubMessageBox, stubOpenDialog, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, clickHamburgerRecent, hamburgerRecentState, hamburgerRecentStructure, openFolder as openWorkspaceFolder, typeInEditor as typeSharedInEditor } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -31,33 +31,14 @@ test.beforeEach(async () => {
   // externalFile is a shared fixture that the US3 deleted-file test removes;
   // recreate it so any later test that opens it has a real target.
   fs.writeFileSync(externalFile, '# External')
-  app = await electron.launch({
-    args: electronLaunchArgs,
-    env: { ...process.env, AME_CONFIG_DIR: configDir }
-  })
-  window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [folder as string]
-    })
-  }, testFolder)
-
-  await stubMessageBox(app)
+  ;({ app, window } = await launchApp(configDir, testFolder))
 })
 
 test.afterEach(async () => {
-  // Track actual closure: waitForEvent with a timeout RESOLVES on timeout, so
-  // a stalled quit round-trip must not be treated as "closed" (which would leak
-  // a live Electron process into the next test). If the app did not close,
-  // force it closed explicitly.
-  try {
-    await closeAppDiscardingQuit(app)
-  } catch {
-    await app.close().catch(() => {})
-  }
+  // Track actual closure: closeAppSafely force-closes the app if the stubbed
+  // quit round-trip stalls, so a live Electron process never leaks into the
+  // next test.
+  await closeAppSafely(app)
   fs.rmSync(configDir, { recursive: true, force: true })
 })
 
@@ -98,23 +79,17 @@ function clickRecentItem(labelContains: string): Promise<void> {
 }
 
 async function openFolder(): Promise<void> {
-  await clickHamburgerItem(window, 'Open Folder…')
+  await openWorkspaceFolder(window)
 }
 
 /** Point the (shared) open dialog stub at a specific path before a menu action. */
 async function stubDialog(target: string): Promise<void> {
-  await app.evaluate(({ dialog }, p) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [p as string]
-    })
-  }, target)
+  await stubOpenDialog(app, target)
 }
 
 /** Focus the editor of the active tab and type text into it. */
 async function typeInEditor(text: string): Promise<void> {
-  await window.locator('[contenteditable="true"]').first().click()
-  await window.keyboard.type(text)
+  await typeSharedInEditor(window, text)
 }
 
 // ---------- US1: reopen recent files and folders ----------
@@ -219,12 +194,7 @@ test('US1 recent items survive an application restart', async () => {
 
   // Close the app, then relaunch with the same config dir.
   await app.close()
-  app = await electron.launch({
-    args: electronLaunchArgs,
-    env: { ...process.env, AME_CONFIG_DIR: configDir }
-  })
-  window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
+  ;({ app, window } = await launchApp(configDir))
 
   const items = await recentItemsState()
   expect(items.some((i) => i.label.includes('external.md'))).toBe(true)
@@ -693,12 +663,7 @@ test('US4 Clear Recent Items empties the history, untouched session, persists ac
 
   // US4 scenario 3: the cleared history survives a restart.
   await app.close()
-  app = await electron.launch({
-    args: electronLaunchArgs,
-    env: { ...process.env, AME_CONFIG_DIR: configDir }
-  })
-  window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
+  ;({ app, window } = await launchApp(configDir))
   expect(await recentItemsState()).toEqual([{ label: 'No Recent Items', enabled: false }])
 })
 

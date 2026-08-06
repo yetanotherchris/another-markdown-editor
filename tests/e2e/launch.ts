@@ -10,6 +10,7 @@ export const electronLaunchArgs: string[] = process.env.AME_E2E_HEADED
   ? ['out/main/index.js']
   : ['out/main/index.js', '--headless']
 
+import { _electron as electron, expect } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
 
 export interface HamburgerEntry {
@@ -203,4 +204,105 @@ export async function closeAppDiscardingQuit(app: ElectronApplication): Promise<
     BrowserWindow.getAllWindows()[0].close()
   })
   await app.waitForEvent('close', { timeout: 8000 })
+}
+
+// ---- Spec 017 US4: the shared e2e harness (contracts/renderer.md §Test layout).
+// Every spec's repeated launch/teardown/open/type/stub blocks delegate here so
+// the suite stays DRY and a scenario never re-implements setup. ----
+
+export interface LaunchResult {
+  app: ElectronApplication
+  window: Page
+}
+
+/**
+ * Launch the built app with an optional isolated `AME_CONFIG_DIR` config dir,
+ * stub the open-dialog to return `openFolderPath` when a native folder picker
+ * is requested, and install the deterministic message-box stub. The per-spec
+ * beforeEach calls this (replacing the near-identical local `launchApp()` and
+ * inline `electron.launch` copies).
+ */
+export async function launchApp(configDir?: string, openFolderPath?: string): Promise<LaunchResult> {
+  const instance = await electron.launch({
+    args: electronLaunchArgs,
+    env: configDir
+      ? { ...process.env, AME_CONFIG_DIR: configDir }
+      : undefined
+  })
+  const page = await instance.firstWindow()
+  await page.waitForLoadState('domcontentloaded')
+  if (openFolderPath) await stubOpenDialog(instance, openFolderPath)
+  await stubMessageBox(instance)
+  return { app: instance, window: page }
+}
+
+/** Stub the native open-folder/file picker to return `folder`. */
+export async function stubOpenDialog(app: ElectronApplication, folder: string): Promise<void> {
+  await app.evaluate(({ dialog }, folderPath) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folderPath as string] })
+  }, folder)
+}
+
+/**
+ * Deterministic trash stub: `shell.trashItem` is overridden in main so the
+ * trash-dependent flows (organize, source) do not depend on the OS trash or
+ * the `TRASH_UNAVAILABLE` fallback. Matches the local copy the specs used.
+ */
+export async function stubTrash(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ shell }) => {
+    const fs = process.getBuiltinModule('fs')
+    const path = process.getBuiltinModule('path')
+    shell.trashItem = async (p: string) => {
+      fs.rmSync(p, { recursive: true, force: true })
+    }
+    void path
+  })
+}
+
+/** afterEach teardown: close with "Discard and Quit", force-close on failure. */
+export async function closeAppSafely(app: ElectronApplication): Promise<void> {
+  try {
+    await closeAppDiscardingQuit(app)
+  } catch {
+    await app.close().catch(() => {})
+  }
+}
+
+/** Open a workspace folder through the hamburger's "Open Folder…". */
+export async function openFolder(window: Page): Promise<void> {
+  await openHamburger(window)
+  await window.getByRole('menuitem', { name: 'Open Folder…' }).click()
+  await window.getByRole('button', { name: 'Open menu' }).focus()
+  await expect(window.getByRole('treeitem').first()).toBeVisible()
+}
+
+/** Open a markdown file by name from the tree so the WYSIWYG editor mounts. */
+export async function openFile(window: Page, name: string): Promise<void> {
+  await openFolder(window)
+  await window.getByRole('treeitem').getByText(name).click()
+  await expect(window.locator('.ProseMirror:visible')).toBeVisible()
+}
+
+/** Type `text` into the visible contenteditable editor. */
+export async function typeInEditor(window: Page, text: string): Promise<void> {
+  await window.locator('[contenteditable="true"]').first().click()
+  await window.keyboard.type(text)
+}
+
+/**
+ * Send a keyboard shortcut through the main-side `before-input-event` pipeline
+ * (spec 010 accelerators). Playwright's CDP-synthesized keyboard events do not
+ * reach `before-input-event`, so the key is injected via `sendInputEvent`,
+ * which runs exactly like a physical key.
+ */
+export async function pressShortcut(
+  app: ElectronApplication,
+  key: string,
+  modifiers: Array<'control' | 'meta' | 'shift'> = []
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }, { key: k, modifiers: mods }) => {
+    const win = BrowserWindow.getAllWindows()[0]
+    win.webContents.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: mods })
+    win.webContents.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: mods })
+  }, { key, modifiers })
 }

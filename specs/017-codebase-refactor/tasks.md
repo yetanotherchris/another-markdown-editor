@@ -301,14 +301,14 @@ the mirrored path and uses shared helpers (US4 scenarios 1–3).
       lines 511–670), `documents.reroute.test.ts` (tab lifecycle + REROUTE_PATHS,
       lines 368–508 + 672–745). All use `helpers.ts`. Every covered rule remains
       covered (never delete coverage). Delete the original file.
-- [ ] T039 [P] [US4] Add `tests/renderer/treeMove.test.ts` and
+- [X] T039 [P] [US4] Add `tests/renderer/treeMove.test.ts` and
       `tests/renderer/treeRename.test.ts` for the T022 extractions.
-- [ ] T040 [US4] Expand `tests/e2e/launch.ts` into the shared e2e harness:
+- [X] T040 [US4] Expand `tests/e2e/launch.ts` into the shared e2e harness:
       `launchApp({ configDir })` (merging the chrome/settings local copies),
       `stubOpenDialog(folder)`, `stubTrash()`, `closeAppSafely(app)`,
       `openFolder(window)`, `openFile(window, name)`, `typeInEditor(window,
       text)`, `pressShortcut(window, combo)` (from chrome.spec.ts).
-- [ ] T041 [US4] Update every e2e spec to use the shared harness: replace the
+- [X] T041 [US4] Update every e2e spec to use the shared harness: replace the
       repeated launch block, afterEach teardown, `openFolder`/`openFile`/
       `typeInEditor` local copies, and the deterministic-trash stubs with the
       launch.ts helpers. No spec loses a scenario.

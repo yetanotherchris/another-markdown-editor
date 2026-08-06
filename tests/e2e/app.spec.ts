@@ -1,8 +1,8 @@
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test'
+import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, clickHamburgerItem } from './launch'
+import { launchApp, closeAppSafely, clickHamburgerItem } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -18,28 +18,11 @@ test.beforeAll(async () => {
 })
 
 test.beforeEach(async () => {
-  app = await electron.launch({
-    args: electronLaunchArgs
-  })
-  window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [folder as string]
-    })
-  }, testFolder)
-
-  await stubMessageBox(app)
+  ;({ app, window } = await launchApp(undefined, testFolder))
 })
 
 test.afterEach(async () => {
-  try {
-    await closeAppDiscardingQuit(app)
-  } catch {
-    await app.close().catch(() => {})
-  }
+  await closeAppSafely(app)
 })
 
 test.afterAll(async () => {
