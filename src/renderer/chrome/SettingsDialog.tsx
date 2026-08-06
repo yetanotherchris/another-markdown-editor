@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import './settings.css'
 
 export type EditorFont = 'sans-serif' | 'serif'
 

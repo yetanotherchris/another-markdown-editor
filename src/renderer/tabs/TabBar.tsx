@@ -1,5 +1,6 @@
 import { PlusIcon, PencilSquareIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { DocumentState } from '../state/documents'
+import './tabs.css'
 
 interface TabBarProps {
   documents: DocumentState[]

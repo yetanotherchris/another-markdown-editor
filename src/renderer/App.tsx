@@ -25,6 +25,8 @@ import SettingsDialog from './chrome/SettingsDialog'
 import type { EditorFont } from './chrome/SettingsDialog'
 import { isWorkspaceRelative } from './explorer/operations'
 import './App.css'
+import './chrome/chrome.css'
+import './editor/editor.css'
 
 const initialSession: EditingSession = {
   documents: [],
@@ -42,9 +44,8 @@ export default function App() {
   // Spec 010, US2 (FR-007): persisted explorer visibility drives the collapsed
   // state; handleSidebarResize keeps it in sync while the panel is mounted.
   const [explorerCollapsed, setExplorerCollapsed] = useState(false)
-  // Spec 012: whether the settings dialog is open (single instance).
+  // Spec 012: settings dialog open state (single instance); editor font.
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Spec 012, US2: editor font, applied as data-editor-font and persisted.
   const [editorFont, setEditorFont] = useState<EditorFont>(getSettings().editorFont)
   const sidebarPanelRef = usePanelRef()
   // Spec 010, US2 (FR-007): set once the initial restore has run, so resize
@@ -59,14 +60,13 @@ export default function App() {
   workspaceRef.current = workspace
   const activeDoc = getActiveDocument(session)
 
-  // The live-dirty decision is bound once here (pure domain rule + the pool
-  // accessor) so both the pool eviction and the session checks share it.
+  // The live-dirty decision is bound once here (pure rule + pool accessor) so
+  // both the pool eviction and the session checks share it.
   const getMarkdown = useCallback((id: string) => instancePool.getMarkdown(id), [])
   const isDirtyLive = useCallback(
     (doc: DocumentState) => domainIsDirtyLive(doc, getMarkdown),
     [getMarkdown]
   )
-
   const dialog = useDialogQueue(sessionRef)
   const pool = useEditorPool({ dispatch, sessionRef, isDirtyLive })
   const sessionApi = useDocumentSession({ dispatch, sessionRef, dialog, enforcePoolCap: pool.enforcePoolCap })

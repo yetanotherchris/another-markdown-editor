@@ -3,6 +3,7 @@ import { Bars3Icon, ChevronRightIcon } from '@heroicons/react/24/outline'
 import type { MenuCommand, RecentItem } from '../../shared/ipc-contract'
 import { hamburgerMenuStructure, recentMenuEntries } from './menuModel'
 import type { Platform, HamburgerItem } from './menuModel'
+import './chrome.css'
 
 /** The sandboxed renderer exposes a minimal `process` with `platform`. */
 function currentPlatform(): Platform {

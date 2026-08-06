@@ -1,0 +1,173 @@
+/* Spec 010 chrome: the header bar, the chrome icon buttons, and the
+ * hamburger dropdown + Recent Items submenu (co-located with the chrome
+ * components; split from App.css in the 017 stylesheet restructure). */
+
+/* Spec 010: the top header row holds the chrome buttons and the document tabs
+   in one horizontal space (clarification 2026-08-05):
+   `[hamburger] [explorer toggle] [tabs… +]`. */
+.header-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ame-border);
+  background: var(--ame-surface);
+  flex-shrink: 0;
+  /* The header forms its own stacking context (position + z-index) so the
+     hamburger dropdown — an absolutely-positioned descendant that hangs below
+     this row — always paints above the tab strip and the editor panel. No
+     overflow clip: the tab strip scrolls within its own container. */
+  position: relative;
+  z-index: 10;
+}
+
+/* Spec 010: the primary chrome controls (hamburger + explorer toggle) in the
+   rounded-corner modern grey look (FR-001, FR-005, FR-006). */
+.chrome-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Every chrome icon button (hamburger trigger, explorer toggle) is a square
+   ghost button; the visible focus ring and Enter/Space activation satisfy
+   FR-009. */
+.chrome-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ame-text-secondary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.chrome-icon-button:hover:not(:disabled) {
+  background: var(--ame-active-tab);
+}
+
+.chrome-icon-button:focus-visible {
+  outline: 2px solid var(--ame-accent);
+  outline-offset: 1px;
+}
+
+.chrome-icon-button:disabled {
+  color: var(--ame-muted-secondary);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.chrome-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* The hamburger dropdown anchor; the menu is positioned relative to it. */
+.hamburger {
+  position: relative;
+}
+
+.hamburger-menu,
+.hamburger-submenu {
+  position: absolute;
+  z-index: 100;
+  min-width: 240px;
+  padding: 6px;
+  background: var(--ame-bg);
+  border: 1px solid var(--ame-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+
+.hamburger-menu {
+  top: calc(100% + 6px);
+  left: 0;
+}
+
+/* The Recent Items parent item is the anchor for its nested submenu, which
+   opens to the right — the standard submenu affordance (FR-001, mirrors the
+   native `File > Recent Items`). */
+.submenu-anchor {
+  position: relative;
+}
+
+.hamburger-submenu {
+  top: -6px;
+  left: calc(100% + 4px);
+}
+
+.menu-item-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--ame-muted);
+}
+
+.menu-group-label {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ame-muted);
+  user-select: none;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ame-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--ame-surface-secondary);
+}
+
+.menu-item:focus-visible {
+  outline: 2px solid var(--ame-accent);
+  outline-offset: -2px;
+}
+
+.menu-item:disabled {
+  color: var(--ame-muted-secondary);
+  cursor: default;
+}
+
+.menu-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-item-accelerator {
+  flex-shrink: 0;
+  color: var(--ame-muted);
+  font-size: 12px;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 5px 8px;
+  background: var(--ame-border-secondary);
+  flex-shrink: 0;
+}
