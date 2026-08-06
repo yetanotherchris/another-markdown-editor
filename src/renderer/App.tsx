@@ -1,7 +1,7 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
-import { Panel, Group, Separator } from 'react-resizable-panels'
+import { Panel, Group, Separator, usePanelRef } from 'react-resizable-panels'
 import type { TreeApi } from 'react-arborist'
-import { Plus, FolderOpen } from 'lucide-react'
+import { Squares2X2Icon } from '@heroicons/react/24/outline'
 import type { MenuCommand, EntryKind, WorkspaceInfo } from '@shared/ipc-contract'
 import {
   EditingSession,
@@ -24,6 +24,7 @@ import EditorPanel from './editor/EditorPanel'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import StatusFooter from './status/StatusFooter'
+import HamburgerMenu from './chrome/HamburgerMenu'
 import {
   renameTargetPath,
   moveTargetPath,
@@ -55,6 +56,15 @@ export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(workspaceReducer, initialWorkspaceState)
   const [pendingEditId, setPendingEditId] = useState<string | null>(null)
   const [footerNote, setFooterNote] = useState<string | null>(null)
+  // Spec 010, US2: the persisted explorer visibility drives the initial
+  // collapsed state; handleSidebarResize keeps it in sync while the panel is
+  // mounted (FR-007).
+  const [explorerCollapsed, setExplorerCollapsed] = useState(false)
+  const sidebarPanelRef = usePanelRef()
+  // Spec 010, US2 (FR-007): set once the initial restore has run. Before that,
+  // resize events are the panel settling into its layout (or the restore
+  // collapsing it) and must not be persisted as the user's visibility choice.
+  const explorerRestoreDoneRef = useRef(false)
   const pendingCreateRef = useRef(new Set<string>())
   const createCounterRef = useRef(0)
   const treeApiRef = useRef<TreeApi<TreeNode> | null>(null)
@@ -796,8 +806,49 @@ export default function App() {
   }, [applyMove])
 
   const handleSidebarResize = useCallback((size: { asPercentage: number; inPixels: number }) => {
+    const collapsed = size.asPercentage <= 0
+    setExplorerCollapsed(collapsed)
+    // Never persist a collapsed (0) width. Writing 0 would change the Panel's
+    // `defaultSize` prop, which re-runs its registration effect and replaces
+    // the panel object — wiping the library's `expandToSize` so a toggle-expand
+    // snaps to minSize instead of the previous width (spec 010 US2 scenario 2,
+    // verified 2026-08-05). The collapsed visibility is persisted separately.
+    if (collapsed) {
+      if (explorerRestoreDoneRef.current) {
+        updateSettings({ explorerVisible: false })
+        window.api.updateSettings({ explorerVisible: false }).catch(() => { /* ignore */ })
+      }
+      return
+    }
     updateSettings({ sidebarWidth: size.asPercentage })
     window.api.updateSettings({ sidebarWidth: size.asPercentage }).catch(() => { /* ignore */ })
+    // A non-collapsed panel IS visible, so persist true unconditionally. Main's
+    // settings merge reads the CURRENT state from disk, so two updates inside
+    // the 500 ms debounce window clobber each other (the sidebarWidth-only
+    // write above would otherwise resurrect a stale persisted "hidden" choice —
+    // the exact race that broke the reveal-on-open restart e2e, review
+    // 2026-08-06). The launch-time restore was removed the same day; the mount
+    // guard above still suppresses the transient size-0 from persisting a fake
+    // collapse.
+    updateSettings({ explorerVisible: true })
+    window.api.updateSettings({ explorerVisible: true }).catch(() => { /* ignore */ })
+  }, [])
+
+  // Spec 010, US2: the explorer toggle collapses/expands the sidebar panel
+  // (FR-005). The panel only exists while a workspace is open; the button is
+  // disabled otherwise (spec edge case). The choice is persisted explicitly so
+  // it does not depend on a resize event firing (FR-007).
+  const handleToggleExplorer = useCallback(() => {
+    const panel = sidebarPanelRef.current
+    if (!panel) return
+    explorerRestoreDoneRef.current = true
+    // isCollapsed() is true when the panel IS collapsed: expand then, else
+    // collapse, and persist the resulting state.
+    const currentlyCollapsed = panel.isCollapsed()
+    if (currentlyCollapsed) panel.expand()
+    else panel.collapse()
+    updateSettings({ explorerVisible: !currentlyCollapsed })
+    window.api.updateSettings({ explorerVisible: !currentlyCollapsed }).catch(() => { /* ignore */ })
   }, [])
 
   // Spec 004, FR-010: a folder switch rebinds the workspace-relative paths of
@@ -809,6 +860,21 @@ export default function App() {
     ),
     [isDirtyLive]
   )
+
+  // Spec 010 (clarification 2026-08-05): opening a folder reveals the explorer
+  // even if it was previously hidden — an explicit open overrides the persisted
+  // hidden choice so the newly opened workspace is always browsable. Runs on
+  // every successful folder commit (both Open Folder and a recent-folder open
+  // route through commitFolderOpen). The restore flag is deliberately NOT set
+  // here (review 2026-08-06): the panel has not mounted yet, and arming it
+  // would defeat the mount guard that suppresses the transient size-0 resize.
+  // Persistence is explicit on this path, so nothing is lost.
+  const revealExplorer = useCallback(() => {
+    updateSettings({ explorerVisible: true })
+    window.api.updateSettings({ explorerVisible: true }).catch(() => { /* ignore */ })
+    const panel = sidebarPanelRef.current
+    if (panel && panel.isCollapsed()) panel.expand()
+  }, [])
 
   const commitFolderOpen = useCallback(async () => {
     const result = await window.api.commitFolderOpen()
@@ -824,7 +890,8 @@ export default function App() {
         entries: result.value.entries
       }
     })
-  }, [])
+    revealExplorer()
+  }, [revealExplorer])
 
   // Both entry points (File > Open Folder and a recent-folder open, FR-007)
   // route through the same prepare → (confirm) → commit flow. A second folder
@@ -905,71 +972,74 @@ export default function App() {
     }
   }, [commitFolderOpen, dirtyWorkspaceRelativeDocs, doClose, releaseDialogSurface, saveDocument])
 
-  const handleOpenFolder = useCallback(() => {
-    void runFolderOpenFlow()
-  }, [runFolderOpenFlow])
-
-  useEffect(() => {
-    const unsubMenu = window.api.onMenuCommand((command: MenuCommand) => {
-      const active = getActiveDocument(sessionRef.current)
-      if (typeof command === 'object') {
-        // Spec 004: File > Recent Items. Route through the exact same dispatch
-        // paths as File > Open File / Open Folder (FR-007). A failed open
-        // surfaces in-context and leaves the session untouched (FR-009).
-        if (command.type === 'open-recent') {
-          if (command.kind === 'file') {
-            window.api.openRecentFile(command.path).then((result) => {
-              if (result.ok) {
-                dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-                enforcePoolCap(sessionRef.current.activeId)
-              } else {
-                void showOperationError(result.message)
-              }
-            })
-          } else {
-            // Recent-folder open shares the prepare → (confirm) → commit flow
-            // with File > Open Folder (FR-007/FR-010).
-            void runFolderOpenFlow(command.path)
-          }
-        }
-        return
-      }
-      switch (command) {
-        case 'open-file': {
-          window.api.openFileDialog().then((result) => {
-            if (result.ok && result.value) {
+  // Spec 010: the single command bus for menu-driven actions — shared by the
+  // native-menu IPC listener, the renderer hamburger, and the keyboard
+  // shortcuts (which send the same `menu:command`). Every action the old File
+  // menu could send resolves here, so the hamburger exposes the same set
+  // (FR-001/FR-002).
+  const handleMenuCommand = useCallback((command: MenuCommand) => {
+    const active = getActiveDocument(sessionRef.current)
+    if (typeof command === 'object') {
+      // Spec 004: File > Recent Items. Route through the exact same dispatch
+      // paths as File > Open File / Open Folder (FR-007). A failed open
+      // surfaces in-context and leaves the session untouched (FR-009).
+      if (command.type === 'open-recent') {
+        if (command.kind === 'file') {
+          window.api.openRecentFile(command.path).then((result) => {
+            if (result.ok) {
               dispatch({ type: 'OPEN_EXISTING', payload: result.value })
               enforcePoolCap(sessionRef.current.activeId)
-            } else if (!result.ok) {
+            } else {
               void showOperationError(result.message)
             }
           })
-          break
+        } else {
+          // Recent-folder open shares the prepare → (confirm) → commit flow
+          // with File > Open Folder (FR-007/FR-010).
+          void runFolderOpenFlow(command.path)
         }
-        case 'open-folder': {
-          void runFolderOpenFlow()
-          break
-        }
-        case 'save': {
-          if (active) saveDocument(active)
-          break
-        }
-        case 'save-as': {
-          if (active) saveDocument(active, true)
-          break
-        }
-        case 'close-tab': {
-          if (active) handleCloseRequest(active.id)
-          break
-        }
-        case 'new-file': {
-          handleNew()
-          break
-        }
-        default:
-          break
       }
-    })
+      return
+    }
+    switch (command) {
+      case 'open-file': {
+        window.api.openFileDialog().then((result) => {
+          if (result.ok && result.value) {
+            dispatch({ type: 'OPEN_EXISTING', payload: result.value })
+            enforcePoolCap(sessionRef.current.activeId)
+          } else if (!result.ok) {
+            void showOperationError(result.message)
+          }
+        })
+        break
+      }
+      case 'open-folder': {
+        void runFolderOpenFlow()
+        break
+      }
+      case 'save': {
+        if (active) saveDocument(active)
+        break
+      }
+      case 'save-as': {
+        if (active) saveDocument(active, true)
+        break
+      }
+      case 'close-tab': {
+        if (active) handleCloseRequest(active.id)
+        break
+      }
+      case 'new-file': {
+        handleNew()
+        break
+      }
+      default:
+        break
+    }
+  }, [enforcePoolCap, handleCloseRequest, handleNew, runFolderOpenFlow, saveDocument, showOperationError])
+
+  useEffect(() => {
+    const unsubMenu = window.api.onMenuCommand(handleMenuCommand)
 
     const unsubDocument = window.api.onDocumentChanged((e) => {
       const doc = sessionRef.current.documents.find(d => d.path === e.path)
@@ -1012,7 +1082,7 @@ export default function App() {
       unsubRecentOk()
       unsubQuit()
     }
-  }, [enforcePoolCap, handleCloseRequest, handleExternalChange, handleNew, handleQuitRequest, runFolderOpenFlow, saveDocument])
+  }, [handleExternalChange, handleMenuCommand, handleQuitRequest])
 
   useEffect(() => {
     return () => {
@@ -1051,15 +1121,29 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <div className="toolbar">
-        <button onClick={handleNew} title="Create a new document">
-          <Plus size={14} aria-hidden="true" />
-          New
-        </button>
-        <button onClick={handleOpenFolder} title="Open a folder in the explorer">
-          <FolderOpen size={14} aria-hidden="true" />
-          Open Folder
-        </button>
+      {/* Spec 010 (clarification 2026-08-05): one header row holds the chrome
+          buttons and the tabs — `[hamburger] [toggle] [tabs… +]`. */}
+      <div className="header-bar">
+        <div className="chrome-bar">
+          <HamburgerMenu onCommand={handleMenuCommand} />
+          <button
+            type="button"
+            className="chrome-icon-button"
+            aria-label="Toggle file explorer"
+            title="Toggle file explorer"
+            onClick={handleToggleExplorer}
+            disabled={!hasWorkspace}
+          >
+            <Squares2X2Icon className="chrome-icon" aria-hidden="true" />
+          </button>
+        </div>
+        <TabBar
+          documents={session.documents}
+          activeId={session.activeId}
+          onActivate={handleActivate}
+          onClose={handleCloseRequest}
+          onNew={handleNew}
+        />
       </div>
       <div className="main-area">
         <Group orientation="horizontal" className="panel-group">
@@ -1070,12 +1154,12 @@ export default function App() {
                 minSize="15"
                 maxSize="50"
                 className="sidebar-panel"
+                collapsible
+                collapsedSize={0}
+                panelRef={sidebarPanelRef}
                 onResize={handleSidebarResize}
               >
                 <div className="sidebar">
-                  <div className="sidebar-header">
-                    <span className="workspace-title">{workspace.name}</span>
-                  </div>
                   <Tree
                     data={workspace.nodes}
                     selectedId={workspace.selectedId}
@@ -1093,16 +1177,13 @@ export default function App() {
                   />
                 </div>
               </Panel>
-              <Separator className="resize-handle" />
+              <Separator
+                className="resize-handle"
+                style={explorerCollapsed ? { visibility: 'hidden' } : undefined}
+              />
             </>
           )}
           <Panel className="editor-panel">
-            <TabBar
-              documents={session.documents}
-              activeId={session.activeId}
-              onActivate={handleActivate}
-              onClose={handleCloseRequest}
-            />
             <div className="editor-area">
               {session.documents.length === 0 ? (
                 <div className="empty-state">

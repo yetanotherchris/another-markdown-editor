@@ -21,7 +21,7 @@ A user opens the application and immediately sees the primary workspace controls
 **Acceptance Scenarios**:
 
 1. **Given** the application is open on a workspace, **When** the user looks at the top-left of the window, **Then** they see a hamburger menu icon and an adjacent file explorer icon.
-2. **Given** the user has opened the application, **When** they look at the tab bar, **Then** they see inactive tabs with truncated labels, an active tab rendered as a light gray pill (`#EAEAEA`) with an edit icon, filename label, and close button, and a "+" button immediately following the active tab for creating a new file.
+2. **Given** the user has opened the application, **When** they look at the tab bar, **Then** they see inactive tabs with truncated labels, an active tab rendered as a light gray pill (`#EAEAEA`) with an edit icon, filename label, and close button, and a "+" button at the end of the tab strip for creating a new file (clarification 2026-08-06).
 3. **Given** the user compares the application to the rounded corner, modern grey reference, **When** they inspect the colors, icons, and layout, **Then** the two appear visually consistent.
 
 ---
@@ -38,7 +38,7 @@ A user can show or hide the file explorer panel on the left using a single click
 
 1. **Given** the explorer panel is visible, **When** the user clicks the explorer toggle icon, **Then** the panel hides and the editor area expands to use the available width.
 2. **Given** the explorer panel is hidden, **When** the user clicks the explorer toggle icon again, **Then** the panel reappears with its previous width.
-3. **Given** the user has hidden the explorer and closed the application, **When** they reopen the application, **Then** the explorer remains hidden.
+3. **Given** the user has hidden the explorer, **When** they open a folder (Open Folder or a recent folder), **Then** the explorer is revealed regardless of the persisted hidden choice (clarification 2026-08-05). The explorer panel only mounts once a workspace is open, and a folder open is the only way a workspace arrives — so the persisted `explorerVisible` is always overridden and there is no launch-time restore of a hidden state to observe (clarification 2026-08-06).
 
 ---
 
@@ -88,17 +88,17 @@ A user can click the hamburger menu icon to open a dropdown containing the appli
 - **FR-001**: The application must display a hamburger menu icon in the primary toolbar that opens a dropdown menu containing all existing top-level menu actions (File, Edit, View, Help, and any other application-level menus).
 - **FR-002**: The hamburger menu must replace the existing native/application menu bar entirely; the previous menu bar is no longer shown.
 - **FR-003**: The tab bar must visually match the rounded corner, modern grey tabbed interface: inactive tabs display truncated text with ellipsis, the active tab is rendered as a light gray pill (`#EAEAEA`) with rounded corners containing an edit icon, the filename label, and a close button, and tabs exhibit distinct active/inactive states, hover states, and close affordance.
-- **FR-004**: The new-file action must be triggered by a "+" icon/button placed immediately after the active tab in the tab bar, replacing any existing "New File" text button.
+- **FR-004**: The new-file action must be triggered by a "+" icon/button placed at the end of the tab strip in the tab bar, replacing any existing "New File" text button. A fixed, always-reachable placement supersedes the earlier literal "immediately after the active tab" reading (clarification 2026-08-06).
 - **FR-005**: A file explorer toggle icon must be placed adjacent to the hamburger menu; clicking it toggles the visibility of the file explorer panel on the left.
 - **FR-006**: The main window UI color palette must match the following modern grey reference colors: primary background `#FFFFFF`; secondary/surface background `#F9F9FB`/`#F8F8FA`; active tab pill background `#EAEAEA`; primary text `#1A1A1A`/`#222222`; secondary/muted text `#666666`/`#707070`; borders and dividers `#E5E5E5`/`#ECECEC`; accent orange `#D96B27`; control/button background `#2D2D2D`.
-- **FR-007**: The layout state (explorer visible/hidden) must persist across application restarts.
+- **FR-007**: The layout state (explorer width, and the visible/hidden choice) must persist, but an explicit folder open always reveals the explorer (US2 scenario 3; clarifications 2026-08-05 and 2026-08-06). Because the explorer only mounts with a workspace and every folder open reveals it, the hidden choice is a within-session preference only.
 - **FR-008**: When the explorer is hidden, the editor area must expand to use the available width without overlapping or truncating the active document.
 - **FR-009**: The hamburger menu, explorer toggle, and + button must be reachable via keyboard interaction (e.g., focusable and activatable with Enter/Space).
 - **FR-010**: The WYSIWYG editor content area (the document editing surface) must retain its existing colors and not be restyled by this feature.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Layout State**: The persisted visibility state of the file explorer panel (visible/hidden). It represents the user's preferred workspace layout and is restored on application start.
+- **Layout State**: The persisted visibility state of the file explorer panel (visible/hidden) plus its width. It records the user's preferred layout, but an explicit folder open always reveals the explorer (clarifications 2026-08-05/06), so the hidden choice is only observable within a session.
 - **Primary Toolbar**: The top-left chrome containing the hamburger menu icon, file explorer toggle icon, and related controls. It is the main entry point for global workspace actions.
 - **Tab Bar**: The region containing document tabs and the new-file "+" button. It is the primary navigation surface for open documents.
 
@@ -110,13 +110,12 @@ A user can click the hamburger menu icon to open a dropdown containing the appli
 - **SC-002**: Users can toggle the explorer panel visibility in under 2 seconds.
 - **SC-003**: Users can create a new file from the + button in under 3 seconds.
 - **SC-004**: The application's visual appearance is consistent with the rounded corner, modern grey reference as judged by a side-by-side comparison.
-- **SC-005**: Layout state (explorer visibility) persists across 100% of clean application restarts.
+- **SC-005**: Layout state (explorer width) persists across clean application restarts; explorer visibility is persisted but always overridden by a folder open (clarifications 2026-08-05/06).
 - **SC-006**: 90% of users can locate a primary action inside the hamburger menu on their first attempt.
 
 ## Assumptions
 
-- The modern grey color palette has been provided by the user as exact values: primary background `#FFFFFF`; secondary/surface background `#F9F9FB`/`#F8F8FA`; active tab pill background `#EAEAEA`; primary text `#1A1A1A`/`#222222`; secondary/muted text `#666666`/`#707070`; borders and dividers `#E5E5E5`/`#ECECEC`; accent orange `#D96B27`; control/button background `#2D2D2D`.
-- The file explorer panel is positioned on the left side of the application window.
+- The modern grey color palette has been provided by the user as exact values: primary background `#FFFFFF`; secondary/surface background `#F9F9FB`/`#F8F8FA`; active tab pill background `#EAEAEA`; primary text `#1A1A1A`/`#222222`; secondary/muted text `#666666`/`#707070`; borders and dividers `#E5E5E5`/`#ECECEC`; accent orange `#D96B27`; control/button background `#2D2D2D`.- The file explorer panel is positioned on the left side of the application window.
 - The tab bar behavior (reordering, closing, scrolling) remains functionally unchanged; only visual styling is updated.
 - The + button creates a new untitled file in the current workspace.
 - The hamburger menu exposes all existing top-level actions; no new commands are introduced by this feature.
@@ -124,5 +123,35 @@ A user can click the hamburger menu icon to open a dropdown containing the appli
 - The WYSIWYG editor content area (the document editing surface) is out of scope for this feature and retains its existing colors.
 - The application will use the Heroicons open-source icon library for the new UI chrome icons: `Bars3` for the hamburger menu, `Squares2x2` for the explorer toggle, `Plus` for the new-file button, `XMark` for tab close, and `PencilSquare` (or `Pencil`) for the active tab edit indicator.
 - The active tab is rendered as a light gray pill (`#EAEAEA`) with rounded corners, containing an edit icon, the filename label, and a close button; inactive tab labels truncate with ellipsis when too long.
-- The "+" new-file button is placed immediately after the active tab in the tab bar.
+- The "+" new-file button is placed at the end of the tab strip (clarification 2026-08-06), where it stays reachable regardless of tab order.
 - The window uses a clean white canvas background and the top-right controls follow the standard Windows-style minimize/maximize/close layout.
+
+## Clarifications
+
+- **2026-08-05 — Tabs live in the header bar.** The tab bar is NOT a separate
+  strip below the chrome: the document tabs (pill-shaped, with the active tab as
+  the `#EAEAEA` pill) occupy the same top header row as the hamburger menu and
+  the explorer toggle — one unified header bar (`[hamburger] [explorer toggle]
+  [tabs… +]`). The sidebar and editor content sit below that header.
+- **2026-08-05 — Native menus are fully gone.** When this feature is complete no
+  OS-native File or View menu is visible on any platform; every action is
+  reachable only through the hamburger menu (reaffirms FR-002).
+- **2026-08-05 — Opening a folder reveals the explorer.** US2 scenario 3 is
+  amended: an explicit folder open (File > Open Folder or a recent folder)
+  always reveals the explorer, overriding a persisted `explorerVisible`
+  "hidden" choice. The persisted choice governs the toggle's default on a fresh
+  launch, but every folder open overrides it. This supersedes the earlier
+  behaviour where a hidden explorer stayed hidden across folder opens.
+- **2026-08-06 — The "+" is pinned at the end of the tab strip.** FR-004's
+  literal "immediately after the active tab" is superseded by a user decision:
+  the "+" renders after the last tab, pinned with `position: sticky; right: 0`,
+  so it stays reachable as the tabs scroll or reorder. US1 scenario 2 and the
+  matching assumption are amended; the code was left as-is.
+- **2026-08-06 — No launch-time explorer restore (re-scopes FR-007/SC-005).**
+  The explorer panel only mounts once a workspace is open, and a workspace only
+  arrives via an explicit folder open, which always reveals the explorer
+  (clarification 2026-08-05). A persisted `explorerVisible: false` can
+  therefore never be observed on launch — it is a within-session preference
+  only. US2 scenario 3, FR-007, and SC-005 are amended to remove the
+  unreachable "restored across restarts" clause; the dead restore effect was
+  removed from the code (review 2026-08-06).

@@ -10,7 +10,103 @@ export const electronLaunchArgs: string[] = process.env.AME_E2E_HEADED
   ? ['out/main/index.js']
   : ['out/main/index.js', '--headless']
 
-import type { ElectronApplication } from '@playwright/test'
+import type { ElectronApplication, Page } from '@playwright/test'
+
+export interface HamburgerEntry {
+  label: string
+  enabled: boolean
+}
+
+/** Open the hamburger and the Recent Items submenu, waiting for the list to
+ *  load (the submenu renders only after its IPC fetch resolves). Idempotent:
+ *  opening the submenu again (e.g. after a state read) must not re-toggle it. */
+async function openRecentSubmenu(window: Page) {
+  await openHamburger(window)
+  const parent = window.getByRole('menuitem', { name: 'Recent Items', exact: true })
+  if ((await parent.getAttribute('aria-expanded')) !== 'true') await parent.click()
+  const menu = window.getByRole('menu', { name: 'Recent Items' })
+  await menu.waitFor()
+  return menu
+}
+
+/**
+ * Spec 010 (contracts/renderer.md §E2e): shared chrome helpers for driving the
+ * renderer hamburger from Playwright. `window` is the renderer Page.
+ */
+
+/** Open the hamburger (idempotent: no-op if `aria-expanded` is already true).
+ *  Clicking the trigger toggles, so a second call must not close it. */
+export async function openHamburger(window: Page): Promise<void> {
+  const trigger = window.getByRole('button', { name: 'Open menu' })
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click()
+}
+
+/** Open the hamburger, click the menuitem whose accessible name is `label`, and
+ *  close the dropdown. Dispatches through the shared command bus. */
+export async function clickHamburgerItem(window: Page, label: string): Promise<void> {
+  await openHamburger(window)
+  await window.getByRole('menuitem', { name: label }).click()
+  await window.getByRole('button', { name: 'Open menu' }).focus()
+}
+
+/** Match a submenu label against a query the way the native menu helper did:
+ *  exact, either-as-substring, or the path basenames agree. A full-path query
+ *  must match a shortened label, and a tail query a full label. */
+function recentQueryMatches(label: string, query: string): boolean {
+  if (label === query) return true
+  if (label.includes(query) || query.includes(label)) return true
+  const tail = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p
+  const labelTail = tail(label)
+  const queryTail = tail(query)
+  return labelTail === queryTail
+}
+
+/** Open the hamburger → Recent Items submenu → click the entry matching
+ *  `label`. Matching is label/substring/basename-based so both tail queries
+ *  ('external.md') and full-path queries match shortened labels. */
+export async function clickHamburgerRecent(window: Page, label: string): Promise<void> {
+  const menu = await openRecentSubmenu(window)
+  const items = menu.getByRole('menuitem')
+  const count = await items.count()
+  for (let i = 0; i < count; i++) {
+    const text = ((await items.nth(i).textContent()) ?? '').trim()
+    if (recentQueryMatches(text, label)) {
+      await items.nth(i).click()
+      return
+    }
+  }
+  throw new Error(`No Recent Items entry matches ${JSON.stringify(label)}`)
+}
+
+/** The selectable recent entries in the hamburger's Recent Items submenu
+ *  (labels only, excluding the Clear Recent Items action). */
+export async function hamburgerRecentState(window: Page): Promise<HamburgerEntry[]> {
+  const menu = await openRecentSubmenu(window)
+  const items = menu.getByRole('menuitem')
+  const count = await items.count()
+  const result: HamburgerEntry[] = []
+  for (let i = 0; i < count; i++) {
+    const item = items.nth(i)
+    const label = (await item.textContent()) ?? ''
+    if (label === 'Clear Recent Items') continue
+    result.push({ label, enabled: await item.isEnabled() })
+  }
+  return result
+}
+
+/** The full Recent Items submenu as `{ label, enabled }[]`: entries, the
+ *  disabled placeholder, separators (empty label), and Clear Recent Items, in
+ *  DOM order (replaces the native `recentMenuStructure`). */
+export async function hamburgerRecentStructure(window: Page): Promise<HamburgerEntry[]> {
+  const menu = await openRecentSubmenu(window)
+  return menu.evaluate((el) =>
+    Array.from(el.querySelectorAll('[role="menuitem"], [role="separator"]')).map((node) =>
+      node.getAttribute('role') === 'separator'
+        ? { label: '', enabled: false }
+        : { label: (node.textContent ?? '').trim(), enabled: !(node as HTMLButtonElement).disabled }
+    )
+  )
+}
 
 /**
  * Stub `dialog.showMessageBox` in the main process so a test can drive a native

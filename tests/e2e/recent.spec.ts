@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, clickHamburgerRecent, hamburgerRecentState, hamburgerRecentStructure } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -65,59 +65,40 @@ test.afterAll(async () => {
   fs.rmSync(testFolder, { recursive: true, force: true })
 })
 
-// ---- native-menu helpers ----
+// ---- hamburger helpers (spec 010: the native menu is gone) ----
 
-async function clickFileMenu(labelStartsWith: string): Promise<void> {
-  await app.evaluate(({ Menu }, prefix) => {
-    const file = Menu.getApplicationMenu()?.items.find((i) => i.label === 'File')
-    const item = file?.submenu?.items.find((i) => i.label?.startsWith(prefix as string))
-    item?.click()
-  }, labelStartsWith)
+const FILE_MENU_LABELS = { 'Open File': 'Open File…', 'Open Folder': 'Open Folder…', 'Close Tab': 'Close Tab' } as const
+
+async function clickFileMenu(prefix: keyof typeof FILE_MENU_LABELS): Promise<void> {
+  await clickHamburgerItem(window, FILE_MENU_LABELS[prefix])
 }
 
-/** The selectable recent entries in File > Recent Items (labels only; the
- *  separator and the Clear Recent Items action are excluded). */
-async function recentItemsState(): Promise<{ label: string; enabled: boolean }[]> {
-  return app.evaluate(({ Menu }) => {
-    const file = Menu.getApplicationMenu()?.items.find((i) => i.label === 'File')
-    const recent = file?.submenu?.items.find((i) => i.label === 'Recent Items')
-    return (recent?.submenu?.items ?? [])
-      .filter((i) => i.label && i.label !== 'Clear Recent Items')
-      .map((i) => ({ label: i.label, enabled: i.enabled }))
-  })
+/** The selectable recent entries in the hamburger's Recent Items submenu
+ *  (labels only; the separator and the Clear Recent Items action are
+ *  excluded). */
+function recentItemsState(): Promise<{ label: string; enabled: boolean }[]> {
+  return hamburgerRecentState(window)
 }
 
-/** The full Recent Items submenu, including separators and the Clear action
- *  (separator labels are an empty string in Electron). */
-async function recentMenuStructure(): Promise<{ label: string | undefined; enabled: boolean }[]> {
-  return app.evaluate(({ Menu }) => {
-    const file = Menu.getApplicationMenu()?.items.find((i) => i.label === 'File')
-    const recent = file?.submenu?.items.find((i) => i.label === 'Recent Items')
-    return (recent?.submenu?.items ?? []).map((i) => ({ label: i.label, enabled: i.enabled }))
-  })
+/** The full Recent Items submenu, including separators (empty label) and the
+ *  Clear action. */
+function recentMenuStructure(): Promise<{ label: string; enabled: boolean }[]> {
+  return hamburgerRecentStructure(window)
 }
 
 /** Click a Recent Items action by its exact label (e.g. Clear Recent Items). */
-async function clickMenuAction(label: string): Promise<void> {
-  await app.evaluate(({ Menu }, name) => {
-    const file = Menu.getApplicationMenu()?.items.find((i) => i.label === 'File')
-    const recent = file?.submenu?.items.find((i) => i.label === 'Recent Items')
-    const item = recent?.submenu?.items.find((i) => i.label === name as string)
-    item?.click()
-  }, label)
+function clickMenuAction(label: string): Promise<void> {
+  return clickHamburgerRecent(window, label)
 }
 
-async function clickRecentItem(labelContains: string): Promise<void> {
-  await app.evaluate(({ Menu }, needle) => {
-    const file = Menu.getApplicationMenu()?.items.find((i) => i.label === 'File')
-    const recent = file?.submenu?.items.find((i) => i.label === 'Recent Items')
-    const item = recent?.submenu?.items.find((i) => i.label?.includes(needle as string))
-    item?.click()
-  }, labelContains)
+/** Click a recent entry whose shortened label contains `labelContains` (name
+ *  matching is substring-based, so full paths and tails both match). */
+function clickRecentItem(labelContains: string): Promise<void> {
+  return clickHamburgerRecent(window, labelContains)
 }
 
 async function openFolder(): Promise<void> {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
 }
 
 /** Point the (shared) open dialog stub at a specific path before a menu action. */

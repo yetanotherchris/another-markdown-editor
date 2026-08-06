@@ -2,7 +2,8 @@ import type { Settings } from '../../shared/ipc-contract'
 
 const defaults: Settings = {
   sidebarWidth: 30,
-  themeOverride: null
+  themeOverride: null,
+  explorerVisible: true
 }
 
 let cached: Settings = { ...defaults }

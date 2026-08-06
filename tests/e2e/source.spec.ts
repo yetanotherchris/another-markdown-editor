@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, clickHamburgerItem } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -59,7 +59,7 @@ test.afterAll(async () => {
 })
 
 async function openFolder(): Promise<void> {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
 }
 
 async function openFile(name: string): Promise<void> {
@@ -259,7 +259,7 @@ test('a no-edit view-source round trip does not mark a normalising file as chang
   await window.getByRole('button', { name: 'Close link.md' }).click()
   // The native prompt must not have fired.
   await expect.poll(() => messageBoxCallCount(app)).toBe(0)
-  await expect(window.getByRole('button', { name: 'Open Folder' })).toBeVisible()
+  await expect(window.getByRole('button', { name: 'Open menu' })).toBeVisible()
 })
 
 test('saving a pristine normalising file from the formatted view keeps its bytes', async () => {

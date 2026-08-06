@@ -29,6 +29,27 @@ describe('documents reducer', () => {
       expect(s2.documents).toHaveLength(2)
       expect(s2.activeId).toBe(s2.documents[1].id)
     })
+
+    it('numbers untitled documents sequentially 1, 2, 3…', () => {
+      const s1 = documentsReducer(createSession(), { type: 'OPEN_NEW' })
+      const s2 = documentsReducer(s1, { type: 'OPEN_NEW' })
+      const s3 = documentsReducer(s2, { type: 'OPEN_NEW' })
+      expect(s1.documents.map(d => d.title)).toEqual(['Untitled-1'])
+      expect(s2.documents.map(d => d.title)).toEqual(['Untitled-1', 'Untitled-2'])
+      expect(s3.documents.map(d => d.title)).toEqual(['Untitled-1', 'Untitled-2', 'Untitled-3'])
+    })
+
+    it('is pure: a double-invoked OPEN_NEW (React StrictMode) burns no numbers', () => {
+      // StrictMode calls the reducer twice with the same state and keeps one
+      // result. A counter side-effect inside createEmpty would produce
+      // Untitled-2, Untitled-4, Untitled-6 — the reducer must be pure.
+      const state = createSession()
+      const ignored = documentsReducer(state, { type: 'OPEN_NEW' })
+      const kept = documentsReducer(state, { type: 'OPEN_NEW' })
+      expect(kept.documents).toHaveLength(1)
+      expect(kept.documents[0].title).toBe('Untitled-1')
+      expect(ignored.documents[0].title).toBe('Untitled-1')
+    })
   })
 
   describe('OPEN_EXISTING', () => {

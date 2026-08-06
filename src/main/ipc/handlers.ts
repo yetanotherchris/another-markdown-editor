@@ -8,17 +8,16 @@ import { atomicWrite } from '../fs/atomicWrite'
 import { mkdir, createFile, moveEntry, trashEntry } from '../fs/mutate'
 import { loadSettings, saveSettings } from '../settings'
 import { WorkspaceState } from '../workspace'
-import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem } from '../recentItems'
+import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem, normalizeRecentItems } from '../recentItems'
 import { recentItemsConfigPath } from '../recentItemsPath'
 import { reportRecentItemsWarning, notifyRecentItemsOk } from '../recentItemsWarning'
 import { scrubAbsolutePaths } from '../scrubPaths'
-import { refreshApplicationMenu } from '../menu'
 import { showNativeConfirmation } from '../dialogs'
 import { validateNativeDialogRequest } from './dialogValidation'
 import type {
   Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, TrashReceipt, Settings, EntryKind, ErrorCode,
-  WatchEvent, EntryInfo, RecentKind, NativeDialogDecision
+  WatchEvent, EntryInfo, RecentKind, RecentItem, NativeDialogDecision
 } from '../../shared/ipc-contract'
 
 let workspaceState: WorkspaceState | null = null
@@ -167,7 +166,6 @@ export function setupHandlers(window: BrowserWindow): void {
     } catch (e: unknown) {
       reportRecentItemsWarning(e, 'save')
     }
-    refreshApplicationMenu()
   }
 
   function removeRecent(path_: string, kind: RecentKind): void {
@@ -179,7 +177,6 @@ export function setupHandlers(window: BrowserWindow): void {
     } catch (e: unknown) {
       reportRecentItemsWarning(e, 'save')
     }
-    refreshApplicationMenu()
   }
 
   /** Realpath-canonical form of an absolute path for recording (FR-006: raw
@@ -607,7 +604,7 @@ export function setupHandlers(window: BrowserWindow): void {
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 30, themeOverride: null })
+      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true })
     }
   })
 
@@ -622,7 +619,8 @@ export function setupHandlers(window: BrowserWindow): void {
         sidebarWidth: typeof p.sidebarWidth === 'number' ? p.sidebarWidth : current.sidebarWidth,
         themeOverride: p.themeOverride === 'light' || p.themeOverride === 'dark' || p.themeOverride === null
           ? p.themeOverride as 'light' | 'dark' | null
-          : current.themeOverride
+          : current.themeOverride,
+        explorerVisible: typeof p.explorerVisible === 'boolean' ? p.explorerVisible : current.explorerVisible
       }
       saveSettings(updated)
       return ok(updated)
@@ -640,6 +638,60 @@ export function setupHandlers(window: BrowserWindow): void {
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, workspaceRoot))
     }
+  })
+
+  // ---- spec-010 hamburger menu IPC (renderer can no longer reach the native
+  // menu, so the actions that lived there move behind named operations) ----
+
+  ipcMain.handle('recent:list', (): Result<RecentItem[]> => {
+    const configPath = recentItemsConfigPath()
+    try {
+      // Strict read: a genuinely MISSING config (first run, or a cleared
+      // history that never re-wrote) is an empty history; an unreadable or
+      // broken config must surface as an error so the hamburger keeps offering
+      // Clear Recent Items (FR-011) instead of claiming the history is empty.
+      // Windows reports a file-as-parent as ENOENT, so probe the parent
+      // directory's type BEFORE reading the file to tell the two apart.
+      const dirStat = fs.statSync(path.dirname(configPath))
+      if (!dirStat.isDirectory()) throw new Error('config parent is not a directory')
+      return ok(normalizeRecentItems(JSON.parse(fs.readFileSync(configPath, 'utf-8'))))
+    } catch (e: unknown) {
+      if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return ok([])
+      return err('IO', 'Recent Items could not be loaded')
+    }
+  })
+
+  // FR-011: clearing is best-effort like record/remove — on a persistence
+  // failure the empty list cannot be saved, the failure is reported quietly,
+  // and nothing else changes.
+  ipcMain.handle('recent:clear', (): Result<null> => {
+    try {
+      saveRecentItems(recentItemsConfigPath(), [])
+      notifyRecentItemsOk()
+    } catch (e: unknown) {
+      reportRecentItemsWarning(e, 'clear')
+    }
+    return ok(null)
+  })
+
+  // Request a quit through the normal window-close flow (research R4): the
+  // close handler sends `app:quitRequested`, the renderer flushes and prompts
+  // for unsaved changes, then calls confirmQuit. Never call app.quit() here.
+  // Crucially this must NOT arm `allowClose`: the close handler has to
+  // intercept first (review 2026-08-06) so a dirty document is never discarded
+  // silently — `quit:respond` (the renderer's confirmation) re-enters
+  // `tryCloseWindow()`, which is the only path allowed to set `allowClose`.
+  ipcMain.handle('app:requestQuit', (): Result<null> => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0) {
+      windows[0].close()
+    }
+    return ok(null)
+  })
+
+  ipcMain.handle('devtools:toggle', (): Result<null> => {
+    window.webContents.toggleDevTools()
+    return ok(null)
   })
 
   ipcMain.handle('quit:respond', (_e, args: unknown) => {

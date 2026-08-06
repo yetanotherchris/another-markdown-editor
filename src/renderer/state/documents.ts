@@ -66,15 +66,17 @@ export interface EditingSession {
   untitledCounter: number
 }
 
-let untitledCounter = 0
-
-export function createEmpty(): DocumentState {
-  untitledCounter++
-  const id = `untitled-${untitledCounter}`
+/** Create a new untitled document. Pure: the caller (the OPEN_NEW reducer
+ *  case) supplies the sequence number from `EditingSession.untitledCounter`.
+ *  Never increment a module-level counter here — the reducer must stay pure
+ *  (React StrictMode double-invokes reducers in dev; a side effect would burn
+ *  a number per invocation and produce Untitled-2, -4, -6). */
+export function createEmpty(counter: number): DocumentState {
+  const id = `untitled-${counter}`
   return {
     id,
     path: null,
-    title: `Untitled-${untitledCounter}`,
+    title: `Untitled-${counter}`,
     baseline: '',
     editorBaseline: '',
     content: '',
@@ -145,9 +147,11 @@ export interface DocumentsAction {
 export function documentsReducer(state: EditingSession, action: DocumentsAction): EditingSession {
   switch (action.type) {
     case 'OPEN_NEW': {
-      const doc = createEmpty()
+      const counter = state.untitledCounter + 1
+      const doc = createEmpty(counter)
       return {
         ...state,
+        untitledCounter: counter,
         documents: [...state.documents, doc],
         activeId: doc.id
       }

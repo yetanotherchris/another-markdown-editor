@@ -242,6 +242,10 @@ AGENTS.md                         This file
 - Code review results are reported in the PR as a comment.
 - PR title format: `feat(phase-N): <description>` with the AI usage line at
   the end of the description.
+- **Do not manually wrap PR body text.** GitHub renders the body verbatim, so
+  line-wrapping the markdown by hand creates ragged, hard-to-diff text. Write
+  the description as normal flowing paragraphs with a single newline between
+  blocks (blank line = new paragraph); do not break lines at ~80 characters.
 - Once merged, the next phase branch is created from the updated `main`.
 - The retired `001-markdown-editor` branch was the original feature branch;
   it was merged into `main` (PR #8) and deleted. Do not recreate it or branch

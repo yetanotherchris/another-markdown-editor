@@ -3,7 +3,7 @@ import type {
   DesktopApi, Result, WorkspaceInfo, DirEntry, OpenedFile,
   WriteReceipt, EntryKind, TrashReceipt, Settings,
   WatchEvent, DocumentChangeEvent, MenuCommand, EntryInfo, RecentItemsWarning,
-  NativeDialogRequest, NativeDialogDecision
+  NativeDialogRequest, NativeDialogDecision, RecentItem
 } from '../shared/ipc-contract'
 
 const api: DesktopApi = {
@@ -65,7 +65,12 @@ const api: DesktopApi = {
   },
 
   showConfirmation: (request: NativeDialogRequest) =>
-    ipcRenderer.invoke('dialog:show', request) as Promise<Result<NativeDialogDecision>>
+    ipcRenderer.invoke('dialog:show', request) as Promise<Result<NativeDialogDecision>>,
+
+  getRecentItems: () => ipcRenderer.invoke('recent:list') as Promise<Result<RecentItem[]>>,
+  clearRecentItems: () => ipcRenderer.invoke('recent:clear') as Promise<Result<null>>,
+  requestQuit: () => ipcRenderer.invoke('app:requestQuit') as Promise<Result<null>>,
+  toggleDevTools: () => ipcRenderer.invoke('devtools:toggle') as Promise<Result<null>>
 }
 
 contextBridge.exposeInMainWorld('api', api)

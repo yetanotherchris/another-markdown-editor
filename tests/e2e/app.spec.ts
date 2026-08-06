@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, clickHamburgerItem } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -47,13 +47,16 @@ test.afterAll(async () => {
 })
 
 test('launches and shows the editor shell', async () => {
-  await expect(window.getByRole('button', { name: 'New' })).toBeVisible()
-  await expect(window.getByRole('button', { name: 'Open Folder' })).toBeVisible()
+  // Spec 010 chrome: the hamburger, the explorer toggle, and the "+" new-file
+  // button live in the header row (the old text toolbar buttons are gone).
+  await expect(window.getByRole('button', { name: 'Open menu' })).toBeVisible()
+  await expect(window.getByRole('button', { name: 'Toggle file explorer' })).toBeVisible()
+  await expect(window.getByRole('button', { name: 'New file' })).toBeVisible()
   await expect(window.getByText(/Open a file or create a new document/)).toBeVisible()
 })
 
 test('opens a folder and lists only markdown files and folders', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
 
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
   await expect(window.getByRole('treeitem').getByText('beta.md')).toBeVisible()
@@ -62,7 +65,7 @@ test('opens a folder and lists only markdown files and folders', async () => {
 })
 
 test('opens a file from the tree into the editor', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   await window.getByRole('treeitem').getByText('alpha.md').click()
 
   await expect(window.locator('.document-title')).toContainText('alpha.md')
@@ -70,7 +73,7 @@ test('opens a file from the tree into the editor', async () => {
 })
 
 test('expands and collapses a folder in the tree', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
 
   const subRow = window.getByRole('treeitem').filter({ hasText: 'sub' })
   await expect(subRow.getByRole('button', { name: 'Expand' })).toBeVisible()
@@ -83,7 +86,7 @@ test('expands and collapses a folder in the tree', async () => {
 })
 
 test('keeps documents open when switching tree selection', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
 
   await window.getByRole('treeitem').getByText('alpha.md').click()
   await expect(window.locator('.document-title')).toContainText('alpha.md')
@@ -96,7 +99,7 @@ test('keeps documents open when switching tree selection', async () => {
 })
 
 test('editor shows the persistent menu bar instead of the floating toolbar', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   await window.getByRole('treeitem').getByText('alpha.md').click()
 
   // The classic theme stylesheet ships the Crepe menu bar (headings +

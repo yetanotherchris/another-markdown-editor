@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions } from './launch'
+import { electronLaunchArgs, stubMessageBox, closeAppDiscardingQuit, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, openHamburger } from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -56,7 +56,7 @@ test.afterAll(async () => {
 })
 
 async function openFolderAndFile(fileName: string): Promise<void> {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   await window.getByRole('treeitem').getByText(fileName).click()
 }
 
@@ -256,6 +256,30 @@ test('quitting with Save All writes every dirty document and closes the app', as
   expect(fs.readFileSync(path.join(testFolder, 'beta.md'), 'utf-8')).toContain('BETA')
 })
 
+test('hamburger Quit with a dirty document prompts, and cancel keeps the app open', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' EXTRA')
+
+  await stubMessageBox(app, 'Cancel')
+  await clickHamburgerItem(window, 'Quit')
+
+  await expect.poll(() => messageBoxCallCount(app)).toBeGreaterThanOrEqual(1)
+  await expect(window.locator('.document-title')).toContainText('alpha.md')
+})
+
+test('hamburger Quit with Discard and Quit closes the application', async () => {
+  await openFolderAndFile('alpha.md')
+  await typeInEditor(' EXTRA')
+
+  const closed = app.waitForEvent('close')
+  await stubMessageBox(app, 'Discard and Quit')
+  // Click Quit directly (not via clickHamburgerItem, whose post-click focus
+  // step cannot run once the app closes).
+  await openHamburger(window)
+  await window.getByRole('menuitem', { name: 'Quit' }).click()
+  await closed
+})
+
 test('external change to a clean document auto-reloads it', async () => {
   await openFolderAndFile('alpha.md')
   await expect(window.locator('.ProseMirror')).toContainText('Hello world.')
@@ -340,7 +364,7 @@ test('external deletion of an open document: OK keeps it in memory', async () =>
 })
 
 test('switching to the oldest tab at the instance cap keeps its editor alive', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   // Fill the pool to the 8-instance cap.
   for (let i = 1; i <= 8; i++) {
     await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
@@ -354,7 +378,7 @@ test('switching to the oldest tab at the instance cap keeps its editor alive', a
 })
 
 test('reopening an evicted document from the tree brings its editor back', async () => {
-  await window.getByRole('button', { name: 'Open Folder' }).click()
+  await clickHamburgerItem(window, 'Open Folder…')
   // Open nine files so the oldest (f01) is evicted by the LRU cap.
   for (let i = 1; i <= 9; i++) {
     await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
