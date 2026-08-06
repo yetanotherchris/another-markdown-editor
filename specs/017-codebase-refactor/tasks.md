@@ -391,11 +391,11 @@ the same change (FR-013/FR-014).
 **Independent Test**: read `docs/domain-policies.md`; each referenced location
 exists (US6 scenario 1); no stale path references remain (US6 scenario 2).
 
-- [ ] T051 [US6] Verify `docs/domain-policies.md` (T009) references resolve to
+- [X] T051 [US6] Verify `docs/domain-policies.md` (T009) references resolve to
       real code in the refactored tree; correct any location that changed during
       implementation. Ensure each invariant is identified by the same name it had
       before the refactor (US6 scenario 3).
-- [ ] T052 [US6] Grep `src/`, `tests/`, `docs/`, `AGENTS.md` for stale
+- [X] T052 [US6] Grep `src/`, `tests/`, `docs/`, `AGENTS.md` for stale
       references to pre-refactor locations (`handlers.ts`, `App.tsx`-as-god
       comments, `src/renderer/App` orchestrator wording, `ipc/handlers` paths)
       and update them (e.g. the HamburgerMenu.tsx comment pointing at

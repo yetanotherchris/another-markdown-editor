@@ -12,7 +12,7 @@ function currentPlatform(): Platform {
 }
 
 interface HamburgerMenuProps {
-  /** The shared renderer command bus (handleMenuCommand in App.tsx). */
+  /** The shared renderer command bus (handleMenuCommand from useMenuCommands). */
   onCommand: (command: MenuCommand) => void
   /** Spec 012 FR-001: open the settings dialog from the "main menu" (the
    *  hamburger replaced the native menu in spec 010). */
