@@ -6,7 +6,8 @@ import { Folder, FolderOpen, FileText, ChevronRight, ChevronDown } from 'lucide-
 import type { TreeNode } from '../state/workspace'
 import { findNodeById, parentPathOf } from '../state/workspace'
 import { useElementSize } from '../hooks/useElementSize'
-import { moveTargetPath, wouldMoveIntoOwnDescendant } from './operations'
+import { treeMoveTarget, treeWouldMoveIntoOwnDescendant } from './treeMove'
+import { treeRenameLabel } from './treeRename'
 import type { EntryKind } from '../../shared/ipc-contract'
 import './Tree.css'
 
@@ -72,11 +73,7 @@ function RenameInput({ node }: { node: NodeApi<TreeNode> }) {
   }
 
   // The placeholder flow names a brand-new entry; a real row is being renamed.
-  const isPlaceholder = node.data.name.startsWith('new-file-') ||
-    node.data.name.startsWith('new-folder-')
-  const label = isPlaceholder
-    ? `Name new ${node.data.kind === 'directory' ? 'folder' : 'file'}`
-    : `Rename ${node.data.name}`
+  const label = treeRenameLabel(node.data)
 
   return (
     <input
@@ -351,9 +348,8 @@ export default function Tree({
       ? args.parentNode.data.id
       : ''
     for (const id of args.dragIds) {
-      const target = moveTargetPath(id, targetParentId)
+      const target = treeMoveTarget(id, targetParentId)
       if (!target) continue
-      if (wouldMoveIntoOwnDescendant(id, targetParentId)) continue
       onMove(id, targetParentId)
     }
   }, [onMove])
@@ -401,7 +397,7 @@ export default function Tree({
     // destination; everything else must be a directory.
     if (!parentNode.isRoot && parentNode.data.kind !== 'directory') return true
     return dragNodes.some(dn =>
-      parentNode.isRoot ? false : wouldMoveIntoOwnDescendant(dn.id, parentNode.data.id)
+      parentNode.isRoot ? false : treeWouldMoveIntoOwnDescendant(dn.id, parentNode.data.id)
     )
   }, [])
 
