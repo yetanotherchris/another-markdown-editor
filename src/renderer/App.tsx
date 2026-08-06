@@ -25,6 +25,8 @@ import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import StatusFooter from './status/StatusFooter'
 import HamburgerMenu from './chrome/HamburgerMenu'
+import SettingsDialog from './chrome/SettingsDialog'
+import type { EditorFont } from './chrome/SettingsDialog'
 import {
   renameTargetPath,
   moveTargetPath,
@@ -60,6 +62,12 @@ export default function App() {
   // collapsed state; handleSidebarResize keeps it in sync while the panel is
   // mounted (FR-007).
   const [explorerCollapsed, setExplorerCollapsed] = useState(false)
+  // Spec 012: whether the settings dialog is open. Single instance — opening
+  // while open is a no-op (spec edge case), so only a boolean is needed.
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  // Spec 012, US2: the editor font, applied as `data-editor-font` on the app
+  // container and persisted via updateSettings (FR-005/FR-006).
+  const [editorFont, setEditorFont] = useState<EditorFont>(getSettings().editorFont)
   const sidebarPanelRef = usePanelRef()
   // Spec 010, US2 (FR-007): set once the initial restore has run. Before that,
   // resize events are the panel settling into its layout (or the restore
@@ -131,7 +139,18 @@ export default function App() {
   showOperationErrorRef.current = showOperationError
 
   useEffect(() => {
-    loadSettingsFromMain()
+    void loadSettingsFromMain().then(() => {
+      // Spec 012: apply the persisted editor font once main's settings resolve.
+      setEditorFont(getSettings().editorFont)
+    })
+  }, [])
+
+  // Spec 012, US2: apply immediately and persist. The renderer cache and main's
+  // store are both updated so the choice survives restarts (FR-006).
+  const handleEditorFontChange = useCallback((font: EditorFont) => {
+    setEditorFont(font)
+    updateSettings({ editorFont: font })
+    window.api.updateSettings({ editorFont: font }).catch(() => { /* ignore */ })
   }, [])
 
   const handleContentChange = useCallback((id: string, content: string) => {
@@ -1120,12 +1139,12 @@ export default function App() {
   const hasWorkspace = workspace.name !== null
 
   return (
-    <div className="app-container">
+    <div className="app-container" data-editor-font={editorFont}>
       {/* Spec 010 (clarification 2026-08-05): one header row holds the chrome
           buttons and the tabs — `[hamburger] [toggle] [tabs… +]`. */}
       <div className="header-bar">
         <div className="chrome-bar">
-          <HamburgerMenu onCommand={handleMenuCommand} />
+          <HamburgerMenu onCommand={handleMenuCommand} onOpenSettings={() => setSettingsOpen(true)} />
           <button
             type="button"
             className="chrome-icon-button"
@@ -1213,6 +1232,14 @@ export default function App() {
         workspaceRoot={workspace.root}
         note={footerNote}
       />
+
+      {settingsOpen && (
+        <SettingsDialog
+          editorFont={editorFont}
+          onEditorFontChange={handleEditorFontChange}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   )
 }

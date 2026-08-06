@@ -3,7 +3,8 @@ import type { Settings } from '../../shared/ipc-contract'
 const defaults: Settings = {
   sidebarWidth: 30,
   themeOverride: null,
-  explorerVisible: true
+  explorerVisible: true,
+  editorFont: 'sans-serif'
 }
 
 let cached: Settings = { ...defaults }

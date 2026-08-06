@@ -166,9 +166,10 @@ test('US2 a persisted hidden choice is overridden by reveal-on-open across resta
   await window.getByRole('button', { name: 'Toggle file explorer' }).click()
   await expect.poll(sidebarWidth).toBeLessThan(3)
   await expect.poll(() => {
-    const settingsPath = path.join(configDir, 'settings.json')
-    if (!fs.existsSync(settingsPath)) return undefined
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf-8')).explorerVisible
+    // Spec 012: settings share the MRU config.json under the `.settings` key.
+    const configPath = path.join(configDir, 'config.json')
+    if (!fs.existsSync(configPath)) return undefined
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.explorerVisible
   }).toBe(false)
 
   await closeAppDiscardingQuit(app)
@@ -180,9 +181,9 @@ test('US2 a persisted hidden choice is overridden by reveal-on-open across resta
   await openFolder()
   await expect.poll(sidebarWidth).toBeGreaterThan(50)
   await expect.poll(() => {
-    const settingsPath = path.join(configDir, 'settings.json')
-    if (!fs.existsSync(settingsPath)) return undefined
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf-8')).explorerVisible
+    const configPath = path.join(configDir, 'config.json')
+    if (!fs.existsSync(configPath)) return undefined
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.explorerVisible
   }).toBe(true)
 
   await closeAppDiscardingQuit(app)

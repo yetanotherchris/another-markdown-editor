@@ -111,9 +111,20 @@ export function loadRecentItems(filePath: string): RecentItem[] {
  * systems. The parent directory is created on demand; a failure to create it
  * or to write the temp propagates to the caller, which must treat the
  * persistence failure as non-fatal (FR-011).
+ *
+ * Spec 012 FR-002: settings share this file (`{ recentItems?, settings? }`).
+ * A save is a read-modify-write that preserves the `.settings` section, so
+ * recording a recent item never clobbers the settings dialog's data.
  */
 export function saveRecentItems(filePath: string, items: RecentItem[]): void {
+  let existing: Record<string, unknown> = {}
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    if (parsed && typeof parsed === 'object') existing = parsed as Record<string, unknown>
+  } catch {
+    // Missing or corrupt config — start from a fresh object.
+  }
   const dir = path.dirname(filePath)
   fs.mkdirSync(dir, { recursive: true })
-  atomicWrite(filePath, JSON.stringify({ recentItems: items }, null, 2), 0o600)
+  atomicWrite(filePath, JSON.stringify({ ...existing, recentItems: items }, null, 2), 0o600)
 }

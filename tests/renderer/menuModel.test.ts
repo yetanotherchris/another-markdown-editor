@@ -13,7 +13,7 @@ function item(path: string, kind: RecentKind): RecentItem {
 }
 
 describe('hamburgerMenuStructure (spec 010)', () => {
-  it('orders File actions, the Recent Items submenu parent, Save/Close, devtools, Quit with separators', () => {
+  it('orders File actions, the Recent Items submenu parent, Save/Close, devtools, Settings, Quit with separators', () => {
     const items = hamburgerMenuStructure('win32')
     expect(items.map((i) => (i.kind === 'separator' || i.kind === 'recent-items') ? i.kind : i.label)).toEqual([
       'New File', 'Open File…', 'Open Folder…',
@@ -21,6 +21,8 @@ describe('hamburgerMenuStructure (spec 010)', () => {
       'Save', 'Save As…', 'Close Tab',
       'separator',
       'Toggle Developer Tools',
+      'separator',
+      'Settings…',
       'separator',
       'Quit'
     ])
@@ -37,6 +39,17 @@ describe('hamburgerMenuStructure (spec 010)', () => {
     expect(commands.map((c) => c.command)).toEqual([
       'new-file', 'open-file', 'open-folder', 'save', 'save-as', 'close-tab'
     ])
+  })
+
+  it('places Settings… after Toggle Developer Tools and before Quit (spec 012 FR-001)', () => {
+    const items = hamburgerMenuStructure('win32')
+    const labels = items.map((i) => (i.kind === 'separator' || i.kind === 'recent-items') ? i.kind : i.label)
+    const devtoolsIndex = labels.indexOf('Toggle Developer Tools')
+    const settingsIndex = labels.indexOf('Settings…')
+    const quitIndex = labels.indexOf('Quit')
+    expect(settingsIndex).toBeGreaterThan(devtoolsIndex)
+    expect(settingsIndex).toBeLessThan(quitIndex)
+    expect(items[settingsIndex]).toEqual({ kind: 'action', label: 'Settings…', action: 'settings' })
   })
 
   it('uses Ctrl+ on Windows/Linux and ⌘ on macOS', () => {

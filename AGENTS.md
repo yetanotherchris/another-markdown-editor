@@ -241,6 +241,12 @@ AGENTS.md                         This file
 - After the PR is created, **before merging**, launch code review subagents to
   review the changes for correctness, security, and spec compliance.
 - Code review results are reported in the PR as a comment.
+- **Archive the spec as part of the implementation PR.** When a spec's feature
+  is fully implemented and its PR is opened, move the spec directory from
+  `specs/<n>-<name>/` to `specs/archive/<n>-<name>/` in the same change (use
+  `git mv`), set the spec's `**Status**` to `Archived`, and update its row in
+  the Current implementation status table below. Do not leave implemented specs
+  in the active `specs/` directory.
 - PR title format: `feat(phase-N): <description>` with the AI usage line at
   the end of the description.
 - **Do not manually wrap PR body text.** GitHub renders the body verbatim, so
@@ -267,7 +273,7 @@ AGENTS.md                         This file
 | 009-release-binary-naming | Archived | Complete |
 | 010-modern-grey-ui | Archived | Complete |
 | 011-window-state-persistence | Spec only | Not yet planned |
-| 012-settings-dialog | Spec only | Not yet planned |
+| 012-settings-dialog | Archived | Complete |
 | 013-theme-setting | Spec only | Not yet planned |
 | 014-view-source-icon | Spec only | Not yet planned |
 | 015-explorer-reveal-location | Spec only | Not yet planned |

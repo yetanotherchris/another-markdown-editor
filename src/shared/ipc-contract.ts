@@ -117,6 +117,9 @@ export interface Settings {
    *  Defaults to true — a fresh install shows the explorer; once the user
    *  toggles it, the choice persists across restarts. */
   explorerVisible: boolean
+  /** The editor font-family choice (spec 012 FR-003/FR-004). Defaults to
+   *  'sans-serif'. A closed union — validated in main, never arbitrary text. */
+  editorFont: 'sans-serif' | 'serif'
 }
 
 export interface DesktopApi {

@@ -13,6 +13,9 @@ function currentPlatform(): Platform {
 interface HamburgerMenuProps {
   /** The shared renderer command bus (handleMenuCommand in App.tsx). */
   onCommand: (command: MenuCommand) => void
+  /** Spec 012 FR-001: open the settings dialog from the "main menu" (the
+   *  hamburger replaced the native menu in spec 010). */
+  onOpenSettings: () => void
 }
 
 /**
@@ -21,7 +24,7 @@ interface HamburgerMenuProps {
  * `Menu.popup()`. Real `<button role="menuitem">` rows for keyboard access
  * (FR-009); closes on outside click and Escape (US4 scenario 2).
  */
-export default function HamburgerMenu({ onCommand }: HamburgerMenuProps) {
+export default function HamburgerMenu({ onCommand, onOpenSettings }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false)
   const [recentItems, setRecentItems] = useState<RecentItem[]>([])
   // True once the most recent getRecentItems() resolved. The submenu renders
@@ -136,16 +139,18 @@ export default function HamburgerMenu({ onCommand }: HamburgerMenuProps) {
     close()
   }, [close, onCommand])
 
-  const handleAction = useCallback((action: 'clear-recent' | 'toggle-devtools' | 'quit') => {
+  const handleAction = useCallback((action: 'clear-recent' | 'toggle-devtools' | 'settings' | 'quit') => {
     if (action === 'clear-recent') {
       void window.api.clearRecentItems().then(() => loadRecent())
     } else if (action === 'toggle-devtools') {
       void window.api.toggleDevTools()
+    } else if (action === 'settings') {
+      onOpenSettings()
     } else {
       void window.api.requestQuit()
     }
     close()
-  }, [close, loadRecent])
+  }, [close, loadRecent, onOpenSettings])
 
   const recentEntries = recentMenuEntries(recentItems)
 

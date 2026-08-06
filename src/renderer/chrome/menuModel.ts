@@ -14,7 +14,7 @@ export type HamburgerItem =
   | { kind: 'command'; label: string; command: MenuCommand; accelerator?: string }
   | { kind: 'recent-items' }
   | { kind: 'separator' }
-  | { kind: 'action'; label: string; action: 'clear-recent' | 'toggle-devtools' | 'quit' }
+  | { kind: 'action'; label: string; action: 'clear-recent' | 'toggle-devtools' | 'settings' | 'quit' }
 
 /** Character budget for a Recent Items label, matching menu.ts. */
 export const RECENT_LABEL_MAX = 60
@@ -58,6 +58,8 @@ export function hamburgerMenuStructure(platform: Platform): HamburgerItem[] {
     { kind: 'command', label: 'Close Tab', command: 'close-tab', accelerator: formatAccelerator('close-tab', platform) },
     { kind: 'separator' },
     { kind: 'action', label: 'Toggle Developer Tools', action: 'toggle-devtools' },
+    { kind: 'separator' },
+    { kind: 'action', label: 'Settings…', action: 'settings' },
     { kind: 'separator' },
     { kind: 'action', label: 'Quit', action: 'quit' }
   ]
