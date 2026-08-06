@@ -25,14 +25,6 @@ export const ctx = {
   allowClose: false
 }
 
-export function getWorkspaceState(): WorkspaceState | null {
-  return ctx.workspaceState
-}
-
-export function getWorkspaceRoot(): string | null {
-  return ctx.workspaceRoot
-}
-
 export function ok<T>(value: T): Result<T> {
   return { ok: true, value }
 }

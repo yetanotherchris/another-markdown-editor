@@ -30,6 +30,27 @@ export interface ResolveResult {
   relative: string
 }
 
+/** Validate one path segment's filename rules (reserved names, trailing dot/space). */
+function validateSegment(segment: string): void {
+  if (isReservedName(segment)) {
+    throw Object.assign(new Error('Invalid filename: reserved name'), { code: 'OUTSIDE_WORKSPACE' })
+  }
+  if (hasTrailingDotOrSpace(segment)) {
+    throw Object.assign(new Error('Invalid filename: trailing dot or space'), { code: 'OUTSIDE_WORKSPACE' })
+  }
+}
+
+/** The relative path is contained when it is non-empty, not `..`, not absolute. */
+function assertContained(relative: string, candidate: string): void {
+  const segments = relative.split(path.sep)
+  if (!relative && candidate !== '.' && candidate !== './') {
+    throw Object.assign(new Error('Path escapes workspace'), { code: 'OUTSIDE_WORKSPACE' })
+  }
+  if (segments[0] === '..' || path.isAbsolute(relative)) {
+    throw Object.assign(new Error('Path escapes workspace'), { code: 'OUTSIDE_WORKSPACE' })
+  }
+}
+
 export function resolveWithinRoot(root: string, candidate: string): ResolveResult {
   if (typeof candidate !== 'string' || candidate.length === 0) {
     throw Object.assign(new Error('Invalid path: must be a non-empty string'), { code: 'OUTSIDE_WORKSPACE' })
@@ -49,12 +70,7 @@ export function resolveWithinRoot(root: string, candidate: string): ResolveResul
 
   for (const segment of candidate.split(/[/\\]/)) {
     if (segment.length === 0 || segment === '.' || segment === '..') continue
-    if (isReservedName(segment)) {
-      throw Object.assign(new Error('Invalid filename: reserved name'), { code: 'OUTSIDE_WORKSPACE' })
-    }
-    if (hasTrailingDotOrSpace(segment)) {
-      throw Object.assign(new Error('Invalid filename: trailing dot or space'), { code: 'OUTSIDE_WORKSPACE' })
-    }
+    validateSegment(segment)
   }
 
   const rootReal = fs.realpathSync(root)
@@ -79,14 +95,7 @@ export function resolveWithinRoot(root: string, candidate: string): ResolveResul
   }
 
   const relative = path.relative(rootReal, realTarget)
-
-  const segments = relative.split(path.sep)
-  if (!relative && candidate !== '.' && candidate !== './') {
-    throw Object.assign(new Error('Path escapes workspace'), { code: 'OUTSIDE_WORKSPACE' })
-  }
-  if (segments[0] === '..' || path.isAbsolute(relative)) {
-    throw Object.assign(new Error('Path escapes workspace'), { code: 'OUTSIDE_WORKSPACE' })
-  }
+  assertContained(relative, candidate)
 
   const normalized = relative.split(path.sep).join('/')
 

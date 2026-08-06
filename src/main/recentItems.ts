@@ -55,6 +55,23 @@ export function removeRecentItem(items: RecentItem[], path_: string, kind: Recen
   return items.filter((existing) => dedupeKey(existing.path, existing.kind) !== key)
 }
 
+/** Validate one loaded entry, returning a RecentItem or null when malformed. */
+function parseEntry(entry: unknown): RecentItem | null {
+  if (!entry || typeof entry !== 'object') return null
+  const e = entry as Record<string, unknown>
+  if (typeof e.path !== 'string' || e.path.length === 0) return null
+  if (!path.isAbsolute(e.path)) return null
+  if (e.kind !== 'file' && e.kind !== 'folder') return null
+  if (typeof e.name !== 'string' || e.name.length === 0) return null
+  if (typeof e.lastOpenedAt !== 'number' || !Number.isFinite(e.lastOpenedAt)) return null
+  return {
+    path: e.path,
+    kind: e.kind as RecentKind,
+    name: e.name,
+    lastOpenedAt: e.lastOpenedAt
+  }
+}
+
 /** Recover a list from arbitrary loaded JSON, dropping anything malformed. */
 export function normalizeRecentItems(raw: unknown): RecentItem[] {
   if (!raw || typeof raw !== 'object') return []
@@ -62,19 +79,8 @@ export function normalizeRecentItems(raw: unknown): RecentItem[] {
   if (!Array.isArray(arr)) return []
   const valid: RecentItem[] = []
   for (const entry of arr) {
-    if (!entry || typeof entry !== 'object') continue
-    const e = entry as Record<string, unknown>
-    if (typeof e.path !== 'string' || e.path.length === 0) continue
-    if (!path.isAbsolute(e.path)) continue
-    if (e.kind !== 'file' && e.kind !== 'folder') continue
-    if (typeof e.name !== 'string' || e.name.length === 0) continue
-    if (typeof e.lastOpenedAt !== 'number' || !Number.isFinite(e.lastOpenedAt)) continue
-    valid.push({
-      path: e.path,
-      kind: e.kind as RecentKind,
-      name: e.name,
-      lastOpenedAt: e.lastOpenedAt
-    })
+    const parsed = parseEntry(entry)
+    if (parsed) valid.push(parsed)
   }
   // Most-recent-first; dedupe by (path, kind) keeping the most recent copy
   // (a hand-edited config may hold duplicates); cap per type (FR-012) while

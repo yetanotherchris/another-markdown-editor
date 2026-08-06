@@ -92,9 +92,7 @@ export function useWorkspaceTree(opts: {
       // must NOT wipe the children — arborist fires this for auto-opens too,
       // which would erase the node being edited right after creation.
       return
-    }
-
-    dispatchWorkspace({ type: 'EXPAND_START', payload: { id } })
+    }    dispatchWorkspace({ type: 'EXPAND_START', payload: { id } })
     const result = await window.api.readDir(id)
     if (result.ok) {
       dispatchWorkspace({ type: 'EXPAND_SUCCESS', payload: { id, entries: result.value } })
@@ -165,8 +163,7 @@ export function useWorkspaceTree(opts: {
     }
 
     // createCounterRef resets on app restart, so a leftover placeholder from a
-    // previous session can make the first name collide (CONFLICT). Retry with
-    // the next number instead of failing the operation.
+    // previous session can make the first name collide (CONFLICT); retry.
     let result: Awaited<ReturnType<typeof window.api.createEntry>> | null = null
     for (let attempt = 0; attempt < 5; attempt++) {
       createCounterRef.current++

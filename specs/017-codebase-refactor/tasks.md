@@ -339,19 +339,19 @@ regression (FR-012/FR-017/FR-018, SC-006/SC-009/SC-010).
 **Independent Test**: `npm run check` reports zero violations; the synthetic
 fixture test proves each rule fires.
 
-- [ ] T045 [US5] Run `npm run check` on the refactored codebase. Fix any size or
+- [X] T045 [US5] Run `npm run check` on the refactored codebase. Fix any size or
       complexity violations it reports (a module/function over a limit that is
       genuinely cohesive may exceed it ONLY with a recorded justification in
       plan.md's decision log — US5 scenario 4). Verify `App.tsx` ≤ 300 and every
       source module ≤ 500 lines (SC-001/SC-002).
-- [ ] T046 [US8] Fix any circular-import cycles `npm run check` reports
+- [X] T046 [US8] Fix any circular-import cycles `npm run check` reports
       (pre-existing cycles are resolved as part of the refactor — FR-018 edge
       case). Verify zero cycles (SC-009).
-- [ ] T047 [US8] Fix any unused imports/types/exports reported (FR-017) — e.g.
+- [X] T047 [US8] Fix any unused imports/types/exports reported (FR-017) — e.g.
       the `getWorkspaceState`/`getWorkspaceRoot` handlers.ts exports that are
       unused outside handlers.ts are dropped from `context.ts`'s public surface.
       Verify zero unused (SC-010). Confirm `npm run check` is fully green.
-- [ ] T048 [US5] Confirm `tests/main/check-maintainability.test.ts` passes and
+- [X] T048 [US5] Confirm `tests/main/check-maintainability.test.ts` passes and
       `npm run check` exits 0 on the real tree (SC-006).
 
 **Checkpoint**: `npm run check` green; no cycles; no unused exports; the

@@ -36,16 +36,11 @@ export interface DocumentState {
   path: string | null
   title: string
   baseline: string
-  /** The editor's serialization of the content it last parsed, captured right
-   *  after a (re)mount (CAPTURE_BASELINE) and after a save. Unlike `baseline`
-   *  it is NOT the on-disk bytes: Crepe normalizes markdown, so for a pristine
-   *  file the editor baseline differs from the raw text (autolinks, loose
-   *  pipes, entities). It is the reference for the live-dirty check
-   *  (isDirtyLive): the editor has uncommitted drift only when its current
-   *  serialization differs from this baseline, never merely because it
-   *  normalized a pristine document. It is also the reference UPDATE_CONTENT
-   *  uses to compute the reducer dirty flag for formatted documents (an
-   *  edit → undo back to the original content is not dirty). */
+  /** The editor's serialization of the content it last parsed, captured after a
+   *  (re)mount and after a save. Unlike `baseline` it is NOT the on-disk bytes
+   *  (Crepe normalizes markdown). It is the reference for the live-dirty check
+   *  and for UPDATE_CONTENT's dirty flag — an edit undone back to the original
+   *  content is not dirty (raw-bytes policy, spec 002). */
   editorBaseline: string
   content: string
   dirty: boolean
@@ -227,18 +222,11 @@ export function handleUpdateContent(state: EditingSession, payload: { id: string
         ? {
             ...d,
             content,
-            // A formatted document's content slot holds the editor's
-            // serialization, which always appends a single trailing newline
-            // and normalizes EOLs. Comparing it byte-for-byte against the
-            // raw on-disk baseline would mark an untouched document dirty
-            // (e.g. edit → undo back to the original). Compare against the
-            // editor's OWN baseline serialization instead — it already
-            // absorbed every normalization (trailing newline, CRLF→LF,
-            // re-escaped entities), so only real drift is dirty.
-            // markdownSame is the belt-and-suspenders covering the windows
-            // where editorBaseline is still the raw bytes (pre-CAPTURE_BASELINE,
-            // post-raw-bytes SAVE_SUCCESS). Source-view content is raw text,
-            // so the exact byte comparison stays correct there.
+            // A formatted document's dirty flag compares against the editor's
+            // OWN baseline serialization (which absorbed every normalization),
+            // not the raw disk bytes — so edit → undo back to the original
+            // clears dirty. Source-view content is raw text, so the exact byte
+            // comparison stays correct there (raw-bytes policy, spec 002).
             dirty:
               d.view === 'source'
                 ? content !== d.baseline

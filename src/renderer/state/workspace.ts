@@ -149,6 +149,40 @@ function insertEntry(state: WorkspaceState, parentPath: string, entry: DirEntry)
   }
 }
 
+/** Build a tree node for a watched path (name derived from the path tail). */
+function watchedNode(path: string, isDirectory: boolean): TreeNode {
+  return {
+    id: path,
+    name: path.split('/').pop() || path,
+    kind: isDirectory ? 'directory' : 'file',
+    children: isDirectory ? [] : null,
+    loadState: isDirectory ? 'unloaded' : 'loaded'
+  }
+}
+
+/** Insert a newly-added watched node at the top level, deduped. */
+function addTopLevel(state: WorkspaceState, path: string, isDirectory: boolean): WorkspaceState {
+  if (findNodeById(state.nodes, path)) return state
+  return {
+    ...state,
+    nodes: insertSorted(state.nodes, watchedNode(path, isDirectory))
+  }
+}
+
+/** Insert a newly-added watched node under a loaded parent, deduped. */
+function addNested(state: WorkspaceState, parent: string, path: string, isDirectory: boolean): WorkspaceState {
+  const found = findParentAndIndex(state.nodes, parent)
+  if (!found || !found.parent || found.parent.loadState !== 'loaded') return state
+  if (findNodeById(found.parent.children ?? [], path)) return state
+  return {
+    ...state,
+    nodes: updateNode(state.nodes, parent, n => ({
+      ...n,
+      children: insertSorted(n.children ?? [], watchedNode(path, isDirectory))
+    }))
+  }
+}
+
 function applyWatchEvent(state: WorkspaceState, event: WatchEvent): WorkspaceState {
   const { path, kind, isDirectory } = event
 
@@ -162,42 +196,9 @@ function applyWatchEvent(state: WorkspaceState, event: WatchEvent): WorkspaceSta
 
   if (kind === 'added') {
     const parent = parentPathOf(path)
-    if (parent === '') {
-      // Top-level add
-      if (findNodeById(state.nodes, path)) return state
-      const newNode: TreeNode = {
-        id: path,
-        name: path.split('/').pop() || path,
-        kind: isDirectory ? 'directory' : 'file',
-        children: isDirectory ? [] : null,
-        loadState: isDirectory ? 'unloaded' : 'loaded'
-      }
-      return {
-        ...state,
-        nodes: insertSorted(state.nodes, newNode)
-      }
-    }
-
-    const found = findParentAndIndex(state.nodes, parent)
-    if (!found || !found.parent || found.parent.loadState !== 'loaded') return state
-
-    if (findNodeById(found.parent.children ?? [], path)) return state
-
-    const newNode: TreeNode = {
-      id: path,
-      name: path.split('/').pop() || path,
-      kind: isDirectory ? 'directory' : 'file',
-      children: isDirectory ? [] : null,
-      loadState: isDirectory ? 'unloaded' : 'loaded'
-    }
-
-    return {
-      ...state,
-      nodes: updateNode(state.nodes, parent, n => ({
-        ...n,
-        children: insertSorted(n.children ?? [], newNode)
-      }))
-    }
+    return parent === ''
+      ? addTopLevel(state, path, isDirectory)
+      : addNested(state, parent, path, isDirectory)
   }
 
   // kind === 'changed'
@@ -339,12 +340,4 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     default:
       return state
   }
-}
-
-export function isDirectoryNode(node: TreeNode): boolean {
-  return node.kind === 'directory'
-}
-
-export function isLoaded(node: TreeNode): boolean {
-  return node.loadState === 'loaded'
 }

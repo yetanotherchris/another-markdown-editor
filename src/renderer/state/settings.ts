@@ -13,10 +13,6 @@ export function getSettings(): Settings {
   return cached
 }
 
-export function setSettings(settings: Settings): void {
-  cached = { ...settings }
-}
-
 export function updateSettings(patch: Partial<Settings>): void {
   cached = { ...cached, ...patch }
 }
