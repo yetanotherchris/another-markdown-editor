@@ -290,10 +290,10 @@ unit-level assertions duplicated in e2e (FR-009/FR-010).
 **Independent Test**: for each named production module, its test file exists at
 the mirrored path and uses shared helpers (US4 scenarios 1–3).
 
-- [ ] T037 [US4] Create `tests/renderer/helpers.ts`: `createSession()`,
+- [X] T037 [US4] Create `tests/renderer/helpers.ts`: `createSession()`,
       `openTwoFiles()`, fixture factories — centralising the setup duplicated in
       documents.test.ts (US4 scenario 3).
-- [ ] T038 [US4] Split `tests/renderer/documents.test.ts` (747 lines) by concern
+- [X] T038 [US4] Split `tests/renderer/documents.test.ts` (747 lines) by concern
       into `documents.open-save-close.test.ts` (OPEN_NEW/OPEN_EXISTING/
       SAVE_SUCCESS/SAVE_FAILED/CLOSE/ACTIVATE, current lines 15–325),
       `documents.dirty.test.ts` (UPDATE_CONTENT/CAPTURE_BASELINE/hasDirtyDocuments,
@@ -367,14 +367,14 @@ SC-008).
 **Independent Test**: US7 acceptance scenarios; `npm run check` stylesheet rule
 green.
 
-- [ ] T049 [US7] Split `src/renderer/App.css` (732 lines) by area along its
+- [X] T049 [US7] Split `src/renderer/App.css` (732 lines) by area along its
       contiguous blocks: `chrome/chrome.css` (header/chrome/hamburger, lines
       72–240), `tabs/tabs.css` (297–419), `editor/editor.css` (421–536),
       `status/status.css` (547–618), `chrome/settings.css` (620–732). `App.css`
       keeps the reset/tokens/shell/panels (1–70, 242–295) and the editor-font
       override block (21–47). Each owning component imports its own stylesheet;
       selectors are untouched (mechanical move).
-- [ ] T050 [US7] Verify no stylesheet exceeds 400 lines and `npm run check`
+- [X] T050 [US7] Verify no stylesheet exceeds 400 lines and `npm run check`
       reports no `size-css` violations (SC-008). Grep the e2e specs for any
       selector that moved (none should — selectors are unchanged).
 
