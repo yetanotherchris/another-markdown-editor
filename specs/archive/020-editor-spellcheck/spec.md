@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-06
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Enable spellcheck in the WYSIWYG editor so that misspelled words are highlighted and can be corrected via right-click context menu."
 
@@ -112,6 +112,10 @@ A user who does not want spellcheck (or finds it distracting) can disable it thr
 - **SC-003**: Selecting a correction from the context menu replaces the word and dismisses the menu within 200 milliseconds.
 - **SC-004**: 95% of users can identify and correct a misspelled word within 5 seconds of it being highlighted.
 - **SC-005**: No perceptible typing latency degradation when spellcheck is active compared to when it is disabled.
+
+## Clarifications
+
+- **2026-08-07** — Re-enable behaviour (US4 S2): the platform's native spellchecker removes existing highlights the moment spellcheck is disabled, and re-enables for **new or edited** content. Words already rendered on screen are NOT re-highlighted immediately when spellcheck is turned back on; they are re-highlighted as the user edits them. This native behaviour is accepted (user decision 2026-08-07); forcing an immediate re-check would require remounting the editor and discarding undo history, which violates Principle IV (Calm, Predictable Editing).
 
 ## Assumptions
 
