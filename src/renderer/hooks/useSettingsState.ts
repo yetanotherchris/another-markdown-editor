@@ -25,12 +25,15 @@ export function useSettingsState(): {
   setSettingsOpen: (open: boolean) => void
   editorTheme: EditorThemeName
   handleEditorThemeChange: (theme: EditorThemeName) => void
+  spellcheckEnabled: boolean
+  handleSpellcheckChange: (enabled: boolean) => void
   themeChoice: ThemeChoice
   handleThemeChange: (choice: ThemeChoice) => void
   themeMode: 'light' | 'dark'
 } {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editorTheme, setEditorTheme] = useState<EditorThemeName>(getSettings().editorTheme)
+  const [spellcheckEnabled, setSpellcheckEnabled] = useState<boolean>(getSettings().spellcheckEnabled)
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() =>
     themeChoiceFromOverride(getSettings().themeOverride)
   )
@@ -57,9 +60,20 @@ export function useSettingsState(): {
     window.api.updateSettings({ themeOverride: override }).catch(() => { /* ignore */ })
   }, [])
 
+  // Spec 020 FR-006/US4: apply the spellcheck choice immediately and persist.
+  // The session-side switch flows through the IPC (applied in main's
+  // settings:update handler); the DOM attribute switch flows through
+  // `spellcheckEnabled` → the editor components' spellcheck props.
+  const handleSpellcheckChange = useCallback((enabled: boolean) => {
+    setSpellcheckEnabled(enabled)
+    updateSettings({ spellcheckEnabled: enabled })
+    window.api.updateSettings({ spellcheckEnabled: enabled }).catch(() => { /* ignore */ })
+  }, [])
+
   return {
     settingsOpen, setSettingsOpen,
     editorTheme, handleEditorThemeChange,
+    spellcheckEnabled, handleSpellcheckChange,
     themeChoice, handleThemeChange, themeMode
   }
 }

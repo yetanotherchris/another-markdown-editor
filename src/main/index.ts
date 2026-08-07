@@ -5,8 +5,19 @@ import { createApplicationMenu } from './menu'
 import { registerShortcuts } from './shortcuts'
 import { loadSettings, flushSettings } from './settings'
 import { applyThemeOverride } from './theme'
+import { applySpellcheckSetting } from './spellcheck'
+import { registerSpellcheckContextMenu } from './contextMenu'
 import { resolveLaunchBounds, trackWindowState, flushWindowState } from './windowState'
 import { reconcileExplorerClosedWithoutWorkspace } from './workspaceExplorerState'
+
+// Spec 020 test seam (research R6): `AME_USER_DATA_DIR` relocates the Chromium
+// profile — the home of the native spellcheck dictionary — so the e2e suite can
+// isolate its profile per test and never pollute the developer's real
+// dictionary. Must run before the app is ready (the session is created during
+// window setup). Production never sets it.
+if (process.env.AME_USER_DATA_DIR) {
+  app.setPath('userData', process.env.AME_USER_DATA_DIR)
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -46,6 +57,9 @@ function createWindow(): void {
     Menu.setApplicationMenu(null)
   }
   registerShortcuts(mainWindow)
+  // Spec 020 FR-002/FR-004: the native right-click correction menu for the
+  // editor area (spelling suggestions + add-to-dictionary).
+  registerSpellcheckContextMenu(mainWindow)
   registerIpcHandlers(mainWindow)
 
   if (process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL) {
@@ -71,6 +85,9 @@ app.whenReady().then(() => {
   // first paint is themed separately — main.tsx preloads the settings before
   // rendering (research R1: themeSource does not propagate to the renderer).
   applyThemeOverride(loadSettings().themeOverride)
+  // Spec 020 FR-006/FR-009: apply the persisted spellcheck choice BEFORE the
+  // window loads, so the first paint already honours it.
+  applySpellcheckSetting(loadSettings().spellcheckEnabled)
   createWindow()
 })
 

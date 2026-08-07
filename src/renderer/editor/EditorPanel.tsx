@@ -10,6 +10,8 @@ import './editor.css'
 interface EditorPanelProps {
   document: DocumentState
   isActive: boolean
+  /** Spec 020: whether the native spellchecker is enabled (US4 toggle). */
+  spellcheckEnabled: boolean
   onContentChange: (id: string, content: string) => void
   onBaselineCapture: (id: string, baseline: string) => void
   onCursorState: (id: string, cursorOffset: number, scrollTop: number) => void
@@ -20,6 +22,7 @@ interface EditorPanelProps {
 export default function EditorPanel({
   document,
   isActive,
+  spellcheckEnabled,
   onContentChange,
   onBaselineCapture,
   onCursorState,
@@ -71,6 +74,7 @@ export default function EditorPanel({
       onChange={(content) => onContentChange(document.id, content)}
       onReturnToFormatted={() => onReturnToFormatted(document.id)}
       isActive={isActive}
+      spellcheckEnabled={spellcheckEnabled}
     />
   )
 
@@ -84,6 +88,7 @@ export default function EditorPanel({
         defaultValue={document.content}
         active={isActive && !inSource}
         locked={inSource}
+        spellcheckEnabled={spellcheckEnabled}
         restoreCursor={{ cursorOffset: document.cursorOffset, scrollTop: document.scrollTop }}
         onMarkdownUpdated={handleMarkdownUpdated}
         onReady={handleReady}

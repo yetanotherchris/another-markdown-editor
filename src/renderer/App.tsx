@@ -50,6 +50,7 @@ export default function App() {
   const {
     settingsOpen, setSettingsOpen,
     editorTheme, handleEditorThemeChange,
+    spellcheckEnabled, handleSpellcheckChange,
     themeChoice, handleThemeChange, themeMode
   } = useSettingsState()
   const sidebarPanelRef = usePanelRef()
@@ -260,6 +261,7 @@ export default function App() {
                     key={doc.id}
                     document={doc}
                     isActive={doc.id === session.activeId}
+                    spellcheckEnabled={spellcheckEnabled}
                     onContentChange={sessionApi.handleContentChange}
                     onBaselineCapture={sessionApi.handleBaselineCapture}
                     onCursorState={sessionApi.handleCursorState}
@@ -285,6 +287,8 @@ export default function App() {
           onThemeChange={handleThemeChange}
           editorTheme={editorTheme}
           onEditorThemeSave={handleEditorThemeChange}
+          spellcheckEnabled={spellcheckEnabled}
+          onSpellcheckChange={handleSpellcheckChange}
           onClose={() => setSettingsOpen(false)}
         />
       )}

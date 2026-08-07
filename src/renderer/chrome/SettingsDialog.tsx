@@ -23,6 +23,10 @@ interface SettingsDialogProps {
   theme: ThemeChoice
   /** Spec 013: the apply-immediately model — a selection persists at once. */
   onThemeChange: (theme: ThemeChoice) => void
+  /** Spec 020 FR-006/US4: whether native spellcheck is on. Applied immediately
+   *  on change (S1: markers vanish the moment the box is unchecked). */
+  spellcheckEnabled: boolean
+  onSpellcheckChange: (enabled: boolean) => void
   onClose: () => void
 }
 
@@ -36,7 +40,7 @@ interface SettingsDialogProps {
  * applied when the user presses **Save** (FR-003/US1 S4). Never touches the
  * document session (FR-008/FR-014).
  */
-export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, onThemeChange, onClose }: SettingsDialogProps) {
+export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, onThemeChange, spellcheckEnabled, onSpellcheckChange, onClose }: SettingsDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   // Spec 016: the staged editor-theme selection, seeded from the last committed
   // value. Not applied on click — only the Save button commits it (US1 S4).
@@ -147,6 +151,18 @@ export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, 
                 <span>{option.label}</span>
               </label>
             ))}
+          </fieldset>
+          <fieldset className="settings-fieldset">
+            <legend className="settings-legend">Spellcheck</legend>
+            <label className="settings-radio">
+              <input
+                type="checkbox"
+                name="spellcheck"
+                checked={spellcheckEnabled}
+                onChange={(e) => onSpellcheckChange(e.target.checked)}
+              />
+              <span>Check spelling while typing</span>
+            </label>
           </fieldset>
         </div>
         <div className="settings-dialog-footer">

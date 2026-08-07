@@ -132,6 +132,10 @@ export interface Settings {
   /** The selected editor theme (spec 016 FR-001/FR-002). Defaults to
    *  'rustic'. A closed union — validated in main, never arbitrary text. */
   editorTheme: EditorThemeName
+  /** Spec 020 FR-006/FR-009: whether the native spellchecker is enabled.
+   *  Defaults to true. A closed type — validated in main as a boolean, never
+   *  arbitrary text. Persisted via the same settings store as the rest. */
+  spellcheckEnabled: boolean
 }
 
 export interface DesktopApi {

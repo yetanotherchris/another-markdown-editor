@@ -21,6 +21,10 @@ interface CrepeHostProps {
    *  otherwise clobber raw source edits) and the covered editor is made
    *  inert so it leaves the keyboard and accessibility tree (FR-009). */
   locked: boolean
+  /** Spec 020 FR-006/US4: whether the native spellchecker is enabled. Reflected
+   *  onto the contenteditable (`view.dom.spellcheck`) so Chromium draws (or
+   *  stops drawing) the squiggly underline for this element (research R5). */
+  spellcheckEnabled: boolean
   restoreCursor?: CursorState
   onMarkdownUpdated: (markdown: string) => void
   onReady: (editor: Crepe) => void
@@ -39,6 +43,7 @@ export default function CrepeHost({
   defaultValue,
   active,
   locked,
+  spellcheckEnabled,
   restoreCursor,
   onMarkdownUpdated,
   onReady,
@@ -154,6 +159,9 @@ export default function CrepeHost({
       const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx))
       viewRef.current = view
       scrollElementRef.current = view.dom.closest('.editor-host') ?? view.dom.parentElement
+      // Spec 020 FR-007: reflect the spellcheck setting onto the contenteditable
+      // now that it exists (later changes go through the effect below).
+      view.dom.spellcheck = spellcheckEnabled
       onReady(crepe)
       // Spec 002, US5 (FR-016/017): Backspace at the start of an empty task
       // item removes it. Bound on `view.dom` in the CAPTURE phase so this runs
@@ -204,6 +212,13 @@ export default function CrepeHost({
     // cover-locked elements without remounting the editor.
     applyInert()
   }, [locked])
+
+  // Spec 020 US4 S1: a setting change reflects onto the contenteditable
+  // immediately — Chromium draws (or drops) the squiggles on the next check.
+  useEffect(() => {
+    const view = viewRef.current
+    if (view) view.dom.spellcheck = spellcheckEnabled
+  }, [spellcheckEnabled])
 
   useEffect(() => {
     const view = viewRef.current

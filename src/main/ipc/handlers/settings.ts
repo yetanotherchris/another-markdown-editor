@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { loadSettings, updateSettings } from '../../settings'
 import { applyThemeOverride } from '../../theme'
+import { applySpellcheckSetting } from '../../spellcheck'
 import type { Result, Settings } from '../../../shared/ipc-contract'
 import { ctx, ok, err, sanitizeError } from './context'
 
@@ -13,7 +14,7 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic' })
+      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true })
     }
   })
 
@@ -30,6 +31,10 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
       // override resolves onto nativeTheme so the renderer re-renders now,
       // without waiting for the debounced disk write.
       applyThemeOverride(updated.themeOverride)
+      // Spec 020 FR-006/US4 S1: a spellcheck toggle applies immediately — the
+      // session spellchecker flips now, so markers vanish/return without
+      // waiting for the debounced disk write.
+      applySpellcheckSetting(updated.spellcheckEnabled)
       return ok(updated)
     } catch (e: unknown) {
       return err('IO', sanitizeError(e, null))

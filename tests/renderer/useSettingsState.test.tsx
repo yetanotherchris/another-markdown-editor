@@ -17,10 +17,10 @@ import type { ThemeChoice } from '../../src/renderer/hooks/useEffectiveTheme'
 // Minimal stub of the two DesktopApi calls the hook makes. The preload surface
 // types `window.api` globally (src/renderer/types.d.ts); tests replace it.
 function stubApi(): void {
-  const calls: { editorTheme?: EditorThemeName }[] = []
-  ;(globalThis as unknown as { __apiCalls: { editorTheme?: EditorThemeName }[] }).__apiCalls = calls
+  const calls: Array<{ editorTheme?: EditorThemeName; spellcheckEnabled?: boolean }> = []
+  ;(globalThis as unknown as { __apiCalls: Array<{ editorTheme?: EditorThemeName; spellcheckEnabled?: boolean }> }).__apiCalls = calls
   window.api = {
-    updateSettings: (patch: { editorTheme?: EditorThemeName }) => {
+    updateSettings: (patch: { editorTheme?: EditorThemeName; spellcheckEnabled?: boolean }) => {
       calls.push(patch)
       return Promise.resolve({ ok: true, value: getSettings() as never })
     }
@@ -81,6 +81,29 @@ describe('useSettingsState (spec 016)', () => {
     expect(getSettings().editorTheme).toBe('scholarly')
     const calls = (globalThis as unknown as { __apiCalls: { editorTheme?: EditorThemeName }[] }).__apiCalls
     expect(calls).toEqual([{ editorTheme: 'scholarly' }])
+  })
+
+  it('exposes the persisted spellcheckEnabled as the committed value', () => {
+    updateSettings({ spellcheckEnabled: false })
+    const { read } = renderHook()
+    expect(read().spellcheckEnabled).toBe(false)
+  })
+
+  it('handleSpellcheckChange updates local state, the cache, and the IPC', () => {
+    const { read } = renderHook()
+    act(() => {
+      read().handleSpellcheckChange(false)
+    })
+    expect(read().spellcheckEnabled).toBe(false)
+    expect(getSettings().spellcheckEnabled).toBe(false)
+    const calls = (globalThis as unknown as { __apiCalls: { spellcheckEnabled?: boolean }[] }).__apiCalls
+    expect(calls).toEqual([{ spellcheckEnabled: false }])
+  })
+
+  it('seeds the spellcheck default from a fresh cache', () => {
+    updateSettings({ spellcheckEnabled: true })
+    const { read } = renderHook()
+    expect(read().spellcheckEnabled).toBe(true)
   })
 
   it('still exposes the app-theme choice plumbing (spec 013)', () => {

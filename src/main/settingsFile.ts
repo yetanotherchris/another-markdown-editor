@@ -24,7 +24,8 @@ export const DEFAULTS: Settings = {
   themeOverride: null,
   explorerVisible: true,
   editorFont: 'sans-serif',
-  editorTheme: 'rustic'
+  editorTheme: 'rustic',
+  spellcheckEnabled: true
 }
 
 /** Read the whole shared config file, tolerantly: `{}` when missing or invalid.
@@ -58,7 +59,9 @@ function validateSettings(raw: unknown): Settings {
     explorerVisible: typeof parsed.explorerVisible === 'boolean' ? parsed.explorerVisible : DEFAULTS.explorerVisible,
     editorFont: (parsed.editorFont === 'sans-serif' || parsed.editorFont === 'serif')
       ? parsed.editorFont : DEFAULTS.editorFont,
-    editorTheme: isEditorThemeName(parsed.editorTheme) ? parsed.editorTheme : DEFAULTS.editorTheme
+    editorTheme: isEditorThemeName(parsed.editorTheme) ? parsed.editorTheme : DEFAULTS.editorTheme,
+    spellcheckEnabled: typeof parsed.spellcheckEnabled === 'boolean'
+      ? parsed.spellcheckEnabled : DEFAULTS.spellcheckEnabled
   }
 }
 
@@ -80,7 +83,9 @@ export function mergeSettingsPatch(current: Settings, patch: Partial<Settings>):
     editorFont: patch.editorFont === 'sans-serif' || patch.editorFont === 'serif'
       ? patch.editorFont as 'sans-serif' | 'serif'
       : current.editorFont,
-    editorTheme: isEditorThemeName(patch.editorTheme) ? patch.editorTheme : current.editorTheme
+    editorTheme: isEditorThemeName(patch.editorTheme) ? patch.editorTheme : current.editorTheme,
+    spellcheckEnabled: typeof patch.spellcheckEnabled === 'boolean'
+      ? patch.spellcheckEnabled : current.spellcheckEnabled
   }
 }
 
@@ -110,7 +115,7 @@ export function migrateLegacySettingsFile(configPath: string, legacyPath: string
   // legacy file with, say, only `themeOverride` should still be imported rather
   // than dropped whole. validateSettings recovers every field individually.
   if (!legacy || typeof legacy !== 'object') return null
-  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont', 'editorTheme']
+  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont', 'editorTheme', 'spellcheckEnabled']
   if (!known.some((k) => k in legacy)) return null
   const migrated = validateSettings(legacy)
   try {

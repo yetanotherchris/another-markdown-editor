@@ -221,13 +221,18 @@ export interface LaunchResult {
  * is requested, and install the deterministic message-box stub. The per-spec
  * beforeEach calls this (replacing the near-identical local `launchApp()` and
  * inline `electron.launch` copies).
+ *
+ * `userDataDir`, when given, relocates the Chromium profile via the
+ * `AME_USER_DATA_DIR` seam (spec 020 research R6) so the native spellcheck
+ * dictionary never leaks into — or out of — a test.
  */
-export async function launchApp(configDir?: string, openFolderPath?: string): Promise<LaunchResult> {
+export async function launchApp(configDir?: string, openFolderPath?: string, userDataDir?: string): Promise<LaunchResult> {
+  const env: Record<string, string> = { ...process.env } as Record<string, string>
+  if (configDir) env.AME_CONFIG_DIR = configDir
+  if (userDataDir) env.AME_USER_DATA_DIR = userDataDir
   const instance = await electron.launch({
     args: electronLaunchArgs,
-    env: configDir
-      ? { ...process.env, AME_CONFIG_DIR: configDir }
-      : undefined
+    env
   })
   const page = await instance.firstWindow()
   await page.waitForLoadState('domcontentloaded')
