@@ -84,7 +84,7 @@
 }
 
 .editor-host .milkdown .ProseMirror pre,
-.editor-host .milkdown .ProseMirror .milkdown-codeblock {
+.editor-host .milkdown .ProseMirror .milkdown-code-block {
   margin: 0 0 16px;
 }
 
