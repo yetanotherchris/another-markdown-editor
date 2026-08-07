@@ -219,8 +219,12 @@ test('US2 right-clicking a correctly spelled word shows no spelling menu', async
   await setEditorText(window, 'correct')
   await rightClickWord(window, 'correct')
   await window.waitForTimeout(500)
+  // The context-menu event fired (editable area) but reported no flagged word.
   const ctx = await lastCtx(app)
-  expect(ctx?.misspelledWord || '').toBe('')
+  expect(ctx).not.toBeNull()
+  expect(ctx?.misspelledWord).toBe('')
+  // The app built no spelling menu for a correctly spelled word.
+  expect(await lastMenuLabels(app)).toBeNull()
 })
 
 // ---------- US3: add to dictionary ----------

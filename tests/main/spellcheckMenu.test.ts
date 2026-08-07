@@ -45,4 +45,15 @@ describe('spellcheckMenuActions (spec 020)', () => {
     const actions = spellcheckMenuActions({ misspelledWord: 'teh', dictionarySuggestions: ['the'] })
     expect(actions[actions.length - 1].label).toBe('Add "teh" to Dictionary')
   })
+
+  it('ignores empty and duplicate suggestions (defensive)', () => {
+    const actions = spellcheckMenuActions({
+      misspelledWord: 'wurd',
+      dictionarySuggestions: ['', 'right', 'right', 'rite', '']
+    })
+    const suggestions = actions
+      .filter((a) => a.kind === 'suggestion')
+      .map((a) => a.suggestion)
+    expect(suggestions).toEqual(['right', 'rite'])
+  })
 })

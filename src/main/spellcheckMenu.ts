@@ -40,7 +40,11 @@ export function spellcheckMenuActions(params: {
   const { misspelledWord, dictionarySuggestions } = params
   if (!misspelledWord) return []
 
-  const actions: SpellcheckMenuAction[] = dictionarySuggestions
+  // Defensive: Chromium never reports empty/duplicate suggestions, but a stray
+  // empty string would otherwise build a no-op `replaceMisspelling('')` item.
+  const suggestions = [...new Set(dictionarySuggestions)].filter((s) => s.length > 0)
+
+  const actions: SpellcheckMenuAction[] = suggestions
     .slice(0, MAX_SUGGESTIONS)
     .map((suggestion) => ({
       kind: 'suggestion' as const,

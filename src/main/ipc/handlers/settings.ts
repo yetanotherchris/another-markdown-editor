@@ -25,7 +25,7 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
       }
       // Merge in MAIN against the authoritative in-memory settings (not a stale
       // disk read), so two updates inside the 500 ms debounce window do not
-      // clobber each other (review #27). Only the five known fields are read.
+      // clobber each other (review #27). Only the known fields are read.
       const updated = updateSettings(patch as Partial<Settings>)
       // Spec 013: a theme change applies immediately (FR-008) — the merged
       // override resolves onto nativeTheme so the renderer re-renders now,
