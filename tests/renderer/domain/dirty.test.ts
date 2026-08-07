@@ -16,6 +16,7 @@ function makeDoc(patch: Partial<DocumentState> = {}): DocumentState {
     baseline: '# Hi',
     editorBaseline: '# Hi\n',
     content: '# Hi\n',
+    frontmatter: '',
     dirty: false,
     diskBytes: null,
     editorState: 'live',

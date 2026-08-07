@@ -13,6 +13,7 @@ function makeDoc(id: string, dirty: boolean): DocumentState {
     baseline: '',
     editorBaseline: '',
     content: '',
+    frontmatter: '',
     dirty,
     diskBytes: null,
     editorState: 'live',

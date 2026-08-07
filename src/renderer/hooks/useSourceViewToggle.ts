@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import type { DocumentsAction, EditingSession } from '../state/documents'
 import { editorMatchesContent } from '../state/documents'
+import { joinFrontmatter } from '../domain/frontmatter'
 import type { DocumentSessionApi } from './useDocumentSession'
 
 export interface SourceViewToggleApi {
@@ -43,7 +44,9 @@ export function useSourceViewToggle(opts: {
   // undo/scroll/cursor survive (research.md R3, no-edit round trip). When the
   // source text changed (or the editor was evicted so nothing is live), the
   // new text must become the editor's content — REFRESH_FROM_SOURCE bumps
-  // contentVersion so CrepeHost remounts with the source bytes.
+  // contentVersion so CrepeHost remounts with the source bytes. Spec 021: the
+  // source textarea holds the FULL file, so the remount payload is the
+  // recombined text and the reducer re-splits any frontmatter edits (R3).
   const handleReturnToFormatted = useCallback(
     (id: string) => {
       const doc = sessionRef.current.documents.find(d => d.id === id)
@@ -53,8 +56,13 @@ export function useSourceViewToggle(opts: {
       // only the editor's single appended trailing newline is "unchanged", so a
       // blank line typed at EOF in source is not silently dropped, while a
       // pristine file that Crepe merely normalized still skips the remount.
+      // The comparison is against the BODY (`content`) — frontmatter changes
+      // alone leave the body untouched, so they do not force a remount.
       if (live === null || !editorMatchesContent(live, doc.content)) {
-        dispatch({ type: 'REFRESH_FROM_SOURCE', payload: { id, content: doc.content } })
+        dispatch({
+          type: 'REFRESH_FROM_SOURCE',
+          payload: { id, content: joinFrontmatter(doc.frontmatter, doc.content) }
+        })
       }
       dispatch({ type: 'SET_VIEW', payload: { id, view: 'formatted' } })
     },

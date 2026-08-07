@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import type { Crepe } from '@milkdown/crepe'
 import type { DocumentState } from '../state/documents'
 import { instancePool } from './instancePool'
+import { joinFrontmatter } from '../domain/frontmatter'
 import CrepeHost, { type CursorState } from './CrepeHost'
 import SourceView from './SourceView'
 import './editor.css'
@@ -62,9 +63,11 @@ export default function EditorPanel({
     return <div className="editor-host evicted" />
   }
 
-  const sourceView = document.view === 'source' && (
+  const inSource = document.view === 'source'
+
+  const sourceView = inSource && (
     <SourceView
-      value={document.content}
+      value={joinFrontmatter(document.frontmatter, document.content)}
       onChange={(content) => onContentChange(document.id, content)}
       onReturnToFormatted={() => onReturnToFormatted(document.id)}
       isActive={isActive}
@@ -79,8 +82,8 @@ export default function EditorPanel({
       <CrepeHost
         key={`${document.id}-v${document.contentVersion}`}
         defaultValue={document.content}
-        active={isActive && !sourceView}
-        locked={document.view === 'source'}
+        active={isActive && !inSource}
+        locked={inSource}
         restoreCursor={{ cursorOffset: document.cursorOffset, scrollTop: document.scrollTop }}
         onMarkdownUpdated={handleMarkdownUpdated}
         onReady={handleReady}

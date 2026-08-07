@@ -18,6 +18,7 @@ function makeDoc(patch: Partial<DocumentState> & { id: string; path: string | nu
     baseline: '',
     editorBaseline: '',
     content: '',
+    frontmatter: '',
     dirty: false,
     diskBytes: null,
     editorState: 'live',

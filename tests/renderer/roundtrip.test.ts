@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { documentsReducer, openFile } from '../../src/renderer/state/documents'
+import { splitFrontmatter } from '../../src/renderer/domain/frontmatter'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -15,6 +16,7 @@ describe('roundtrip characterization', () => {
   for (const fixture of fixtures) {
     it(`loads fixture: ${fixture}`, () => {
       const content = fs.readFileSync(path.join(FIXTURES_DIR, fixture), 'utf-8')
+      const { frontmatter, body } = splitFrontmatter(content)
 
       const doc = openFile({
         path: fixture,
@@ -24,7 +26,10 @@ describe('roundtrip characterization', () => {
         size: Buffer.byteLength(content)
       })
 
-      expect(doc.content).toBe(content)
+      // Spec 021: content is the body; frontmatter is stored separately;
+      // baseline keeps the raw full-file bytes read from disk.
+      expect(doc.content).toBe(body)
+      expect(doc.frontmatter).toBe(frontmatter)
       expect(doc.baseline).toBe(content)
       expect(doc.dirty).toBe(false)
       expect(doc.path).toBe(fixture)
@@ -32,6 +37,7 @@ describe('roundtrip characterization', () => {
 
     it(`raw content/baseline untouched by editor normalization: ${fixture}`, () => {
       const content = fs.readFileSync(path.join(FIXTURES_DIR, fixture), 'utf-8')
+      const { frontmatter, body } = splitFrontmatter(content)
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
@@ -52,13 +58,14 @@ describe('roundtrip characterization', () => {
       // the separate editorBaseline field, so the disk bytes remain
       // authoritative and a file without a trailing newline never gains one,
       // even though the editor normalized it in-memory.
-      const normalized = `${content.replace(/\r\n/g, '\n')}\n`
+      const normalized = `${body.replace(/\r\n/g, '\n')}\n`
       const s2 = documentsReducer(s1, {
         type: 'CAPTURE_BASELINE',
         payload: { id: docId, baseline: normalized }
       })
 
-      expect(s2.documents[0].content).toBe(content)
+      expect(s2.documents[0].content).toBe(body)
+      expect(s2.documents[0].frontmatter).toBe(frontmatter)
       expect(s2.documents[0].baseline).toBe(content)
       expect(s2.documents[0].dirty).toBe(false)
       expect(s2.documents[0].editorBaseline).toBe(normalized)

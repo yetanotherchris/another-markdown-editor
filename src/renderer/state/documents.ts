@@ -1,4 +1,5 @@
 import { isWithinOrEqual } from './workspace'
+import { splitFrontmatter, joinFrontmatter } from '../domain/frontmatter'
 
 /**
  * Trailing-newline / EOL-tolerant equality for comparing text that came from
@@ -43,6 +44,11 @@ export interface DocumentState {
    *  content is not dirty (raw-bytes policy, spec 002). */
   editorBaseline: string
   content: string
+  /** The raw frontmatter block at the top of the file, including its `---`
+   *  delimiters, or `''` when the file has none (spec 021 FR-004). Stored
+   *  separately from `content` (the body) so the visual editor never sees it
+   *  while the source view and save path can recombine it verbatim. */
+  frontmatter: string
   dirty: boolean
   diskBytes: string | null
   editorState: 'live' | 'evicted'
@@ -75,6 +81,7 @@ export function createEmpty(counter: number): DocumentState {
     baseline: '',
     editorBaseline: '',
     content: '',
+    frontmatter: '',
     dirty: false,
     diskBytes: null,
     editorState: 'live',
@@ -97,13 +104,19 @@ export function openFile(opened: {
 }): DocumentState {
   const path = opened.path
   const id = path || `file-${Date.now()}`
+  // Spec 021: split the raw file bytes into the frontmatter block and the body
+  // at the load boundary (research R3). `content`/`editorBaseline` hold the
+  // body; `baseline` keeps the raw full-file bytes read from disk so the
+  // source-view byte check and the no-edit round trip stay exact.
+  const { frontmatter, body } = splitFrontmatter(opened.content)
   return {
     id,
     path,
     title: opened.name,
     baseline: opened.content,
-    editorBaseline: opened.content,
-    content: opened.content,
+    editorBaseline: body,
+    content: body,
+    frontmatter,
     dirty: false,
     diskBytes: null,
     editorState: 'live',
@@ -219,20 +232,32 @@ export function handleUpdateContent(state: EditingSession, payload: { id: string
     ...state,
     documents: state.documents.map(d =>
       d.id === id
-        ? {
-            ...d,
-            content,
-            // A formatted document's dirty flag compares against the editor's
-            // OWN baseline serialization (which absorbed every normalization),
-            // not the raw disk bytes — so edit → undo back to the original
-            // clears dirty. Source-view content is raw text, so the exact byte
-            // comparison stays correct there (raw-bytes policy, spec 002).
-            dirty:
-              d.view === 'source'
-                ? content !== d.baseline
-                : !markdownSame(content, d.editorBaseline),
-            lastActiveAt: Date.now()
-          }
+        ? d.view === 'source'
+          ? // Spec 021 FR-007: the source textarea holds the FULL file, so every
+            // edit re-extracts the frontmatter and stores the body separately.
+            // Dirty compares the full recombined text against the raw on-disk
+            // bytes in `baseline` (raw-bytes policy, spec 002).
+            (() => {
+              const { frontmatter, body } = splitFrontmatter(content)
+              return {
+                ...d,
+                frontmatter,
+                content: body,
+                dirty: joinFrontmatter(frontmatter, body) !== d.baseline,
+                lastActiveAt: Date.now()
+              }
+            })()
+          : {
+              ...d,
+              content,
+              // A formatted document's dirty flag compares against the editor's
+              // OWN baseline serialization (which absorbed every normalization),
+              // not the raw disk bytes — so edit → undo back to the original
+              // clears dirty. Source-view content is raw text, so the exact byte
+              // comparison stays correct there (raw-bytes policy, spec 002).
+              dirty: !markdownSame(content, d.editorBaseline),
+              lastActiveAt: Date.now()
+            }
         : d
     )
   }
@@ -257,6 +282,18 @@ export function handleCaptureBaseline(state: EditingSession, payload: { id: stri
 
 export function handleSaveSuccess(state: EditingSession, payload: { id: string; path: string; content: string }): EditingSession {
   const { id, path, content } = payload
+  // Spec 021: the written full text was built by `joinFrontmatter` from the
+  // stored parts, so the store's partition is already correct and must NOT be
+  // re-derived from the written bytes — a `---` block the user pasted into the
+  // visual editor is body content and must stay body (spec edge case). The
+  // frontmatter is the written text's prefix; the written body is the suffix.
+  // `baseline` keeps the full written bytes for the source-view byte check and
+  // the no-edit round trip (research R3); `dirty` compares the pre-update full
+  // text against the written text (the original `d.content !== content` guard,
+  // level-corrected for the split model — a keystroke during the async write
+  // leaves the document dirty).
+  const frontmatter = state.documents.find(d => d.id === id)?.frontmatter ?? ''
+  const body = content.startsWith(frontmatter) ? content.slice(frontmatter.length) : content
   return {
     ...state,
     documents: state.documents.map(d =>
@@ -266,8 +303,8 @@ export function handleSaveSuccess(state: EditingSession, payload: { id: string; 
             path: path || d.path,
             title: path ? path.split('/').pop() || d.title : d.title,
             baseline: content,
-            editorBaseline: content,
-            dirty: d.content !== content,
+            editorBaseline: body,
+            dirty: joinFrontmatter(d.frontmatter, d.content) !== content,
             externalState: 'clean'
           }
         : d
@@ -326,15 +363,19 @@ export function handleCaptureEditorState(state: EditingSession, payload: { id: s
 
 export function handleReload(state: EditingSession, payload: { id: string; content: string }): EditingSession {
   const { id, content } = payload
+  // Spec 021: re-split the re-read full file (frontmatter + body) so content
+  // stays the body and the frontmatter field tracks the disk bytes (R3).
+  const { frontmatter, body } = splitFrontmatter(content)
   return {
     ...state,
     documents: state.documents.map(d =>
       d.id === id
         ? {
             ...d,
-            content,
+            frontmatter,
+            content: body,
             baseline: content,
-            editorBaseline: content,
+            editorBaseline: body,
             dirty: false,
             externalState: 'clean',
             cursorOffset: 0,
@@ -409,15 +450,19 @@ export function handleRefreshFromSource(state: EditingSession, payload: { id: st
   // differs from the live editor. The new text takes the content slot and
   // bumps contentVersion so the CrepeHost remounts with the source bytes;
   // baseline/dirty are untouched so the document stays unsaved.
+  // Spec 021: the payload is the full recombined text, re-split so any
+  // frontmatter edits made in source survive the remount (research R3).
   const { id, content } = payload
+  const { frontmatter, body } = splitFrontmatter(content)
   return {
     ...state,
     documents: state.documents.map(d =>
       d.id === id
         ? {
             ...d,
-            content,
-            editorBaseline: content,
+            frontmatter,
+            content: body,
+            editorBaseline: body,
             cursorOffset: 0,
             scrollTop: 0,
             contentVersion: d.contentVersion + 1
