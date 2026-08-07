@@ -73,4 +73,23 @@ describe('findMisspellings', () => {
     // "don't"/"it's" are valid contractions; "cant" is a real word too
     expect(miss).toEqual([])
   })
+
+  it('does not flag hyphenated compounds or spaced dashes (hyphens split tokens)', () => {
+    const text = 'A well-known state-of-the-art design, half - full and bad-knwon words.'
+    const miss = findMisspellings(text, gb, new Set())
+    // The correctly-spelled compound parts are not flagged; only "knwon" is.
+    expect(miss.map((m) => m.word)).toEqual(['knwon'])
+  })
+
+  it('does not flag ordinal suffixes (4th, 22nd)', () => {
+    const text = 'The 4th floor, 22nd place and 1st prize.'
+    expect(findMisspellings(text, gb, new Set())).toEqual([])
+  })
+
+  it('skips inline-code content when given a plain-text extraction', () => {
+    // The plugin removes inline-code text nodes before checking; findMisspellings
+    // itself just checks whatever text it is given.
+    const miss = findMisspellings('const teh = 1;', gb, new Set())
+    expect(miss.map((m) => m.word)).toEqual(['const', 'teh'])
+  })
 })

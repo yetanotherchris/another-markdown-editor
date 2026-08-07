@@ -20,7 +20,7 @@ import { useSettingsState } from './hooks/useSettingsState'
 import EditorPanel from './editor/EditorPanel'
 import SpellingMenu from './editor/SpellingMenu'
 import type { SpellingMenuState } from './editor/spellcheckPlugin'
-import { updateSpellcheckRuntime } from './editor/spellcheckRuntime'
+import { updateSpellcheckRuntime, spellcheckRuntime } from './editor/spellcheckRuntime'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import StatusFooter from './status/StatusFooter'
@@ -68,7 +68,13 @@ export default function App() {
   useEffect(() => {
     let alive = true
     window.api.getSpellcheckWords().then((res) => {
-      if (res.ok && alive) updateSpellcheckRuntime({ customWords: new Set(res.value) })
+      if (res.ok && alive) {
+        // Merge, don't replace: a word added in-session before this resolves
+        // must survive in the runtime set.
+        const merged = new Set(spellcheckRuntime.customWords)
+        res.value.forEach((word) => merged.add(word))
+        updateSpellcheckRuntime({ customWords: merged })
+      }
     }).catch(() => { /* non-critical */ })
     return () => { alive = false }
   }, [])

@@ -41,12 +41,23 @@ function isSkippedNode(node: PMNode): boolean {
   return name === 'code_block' || name === 'fence' || name === 'math'
 }
 
+/** Inline code is a MARK in Milkdown's commonmark preset — the schema names it
+ *  `inlineCode` (with an older `n` id) — so a text node inside `` `code` ``
+ *  carries it and must be skipped too. */
+const INLINE_CODE_MARKS = new Set(['inlineCode', 'n'])
+
+function isInlineCodeText(node: PMNode): boolean {
+  return node.isText && node.marks.some((mark) => INLINE_CODE_MARKS.has(mark.type.name))
+}
+
 /** Every spellcheckable text segment with its absolute doc offsets. */
 function collectTextSegments(doc: PMNode): Array<{ from: number; to: number; text: string }> {
   const segments: Array<{ from: number; to: number; text: string }> = []
   doc.descendants((node, pos) => {
     if (node.isText) {
-      segments.push({ from: pos, to: pos + node.nodeSize, text: node.text ?? '' })
+      if (!isInlineCodeText(node)) {
+        segments.push({ from: pos, to: pos + node.nodeSize, text: node.text ?? '' })
+      }
       return false
     }
     return !isSkippedNode(node)
@@ -72,9 +83,8 @@ export function computeSpellcheckDecorations(view: EditorView): DecorationSet {
   return DecorationSet.create(view.state.doc, decorations)
 }
 
-/** Dispatch a fresh decoration set onto the view (idempotent, no doc change). */
+/** Dispatch a fresh decoration set onto the view (no doc change). */
 function applyDecorations(view: EditorView): void {
-  if (view.state.doc === undefined) return
   const decos = computeSpellcheckDecorations(view)
   view.dispatch(view.state.tr.setMeta(spellcheckKey, { decos }))
 }
