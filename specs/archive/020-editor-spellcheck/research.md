@@ -224,7 +224,7 @@ effective (the en-US dictionary is always present). This is the "bigger change"
 the spec previously deferred; it supersedes the native as-you-type scope.
 
 **Verified against the built app**: on open, existing misspellings are flagged;
-typing flags new ones (debounced 250 ms); toggling off clears all underlines
+typing flags new ones (debounced ~120 ms); toggling off clears all underlines
 immediately and on restores them (a whole-document re-pass, unlike the native
 engine); switching en-GB ↔ en-US immediately re-flags the British/American
 words respectively; the correction menu replaces words and add-to-dictionary
@@ -234,13 +234,16 @@ persists across restarts.
 native spellchecker (language applied via the session), where it works well;
 only the WYSIWYG editor is JS-checked.
 
-## R-Process — no process or isolation change
+## R-Process — two named IPC channels for the custom dictionary
 
-**Decision**: No new IPC channels, no preload methods, no `contextBridge`
-change. The renderer's only new interface is the `spellcheckEnabled` field on
-the existing `Settings` type. The correction and dictionary flows never enter
-the renderer.
+**Decision**: The WYSIWYG spellchecker is fully renderer-owned (JS engine + DOM
+menu), so the correction flow never crosses the boundary. The ONLY new IPC is a
+fixed pair of named operations for the persisted custom dictionary:
+`spellcheck:getWords` and `spellcheck:addWord` (no generic `invoke` escape
+hatch, no path arguments — `addWord` validates a closed word charset in main).
+The renderer's settings surface grows by `spellcheckEnabled` and
+`spellcheckLanguage` on the existing `Settings` type.
 
-**Rationale**: Principle I is preserved by construction — the native spellcheck
-surface exists entirely in main and Chromium. Keeping the renderer out of the
-correction path is both simpler and safer (nothing new crosses the boundary).
+**Rationale**: Principle I is preserved — nothing beyond two named dictionary
+operations enters the renderer, and the renderer still has no Node/fs access
+(the dictionaries are bundled assets).

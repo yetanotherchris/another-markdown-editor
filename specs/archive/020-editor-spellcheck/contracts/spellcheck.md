@@ -38,7 +38,7 @@ export function computeSpellcheckDecorations(view: EditorView): DecorationSet
 
 - Marks every misspelled range with an `ame-spelling-error` inline decoration;
   code blocks and math are skipped. Re-checks the whole document on mount and
-  (debounced 250 ms) after each edit and every runtime change.
+  (debounced ~120 ms) after each edit and every runtime change.
 - Right-clicking a marked word opens `SpellingMenuState` (word, up to 5 nspell
   suggestions, `apply(replacement)` → `insertText` transaction, `addToDictionary` →
   custom-words + `spellcheck:addWord`).

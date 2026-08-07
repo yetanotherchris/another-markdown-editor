@@ -75,7 +75,7 @@ platform's default language (spec assumption).
 design below).** The WYSIWYG editor is spellchecked by `nspell` in the renderer
 with the en-GB/en-US dictionaries bundled as assets. A ProseMirror plugin
 (`spellcheckPlugin.ts`) marks misspelled ranges with `ame-spelling-error`
-decorations, re-checking the whole document on open and (debounced 250 ms) after
+decorations, re-checking the whole document on open and (debounced ~120 ms) after
 each edit; the shared runtime (`spellcheckRuntime.ts`) holds enabled/language/
 custom-words and notifies editors to re-run on any change. Right-clicking a
 marked word opens the app's own DOM correction menu (`SpellingMenu.tsx`); the
@@ -193,6 +193,6 @@ spellcheck code remains solely for the source view.
 ## Complexity tracking
 
 No constitution violations. The WYSIWYG now runs a full-document check in the
-renderer; it is debounced (250 ms after typing stops) and the dictionaries are
+renderer; it is debounced (~120 ms after typing stops) and the dictionaries are
 bundled assets, so nothing runs on the keystroke path and the app stays
 offline/deterministic.
