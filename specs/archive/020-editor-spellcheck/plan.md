@@ -6,32 +6,35 @@
 
 ## Summary
 
-The WYSIWYG editor gets the platform's native spellchecker. Misspelled words
-are underlined automatically as the user types (FR-001); right-clicking a
-flagged word shows a native context menu with correction suggestions that
-replace the word in place (FR-002/FR-003); a "Add … to Dictionary" item teaches
-the persistent custom dictionary so the word is never flagged again
-(FR-004/FR-005); and a Settings toggle turns the whole feature on and off,
-persisting across restarts with a default of on (FR-006/FR-009). The source view
-participates through the same native engine (FR-007). No rendering of menus or
-squiggles is implemented by the app — Chromium and Electron provide them.
+The WYSIWYG editor gets a **JS whole-document spellchecker** (2026-08-07): a
+renderer-side `nspell` engine with bundled en-GB/en-US Hunspell dictionaries
+checks the entire document on open and re-checks (debounced) as the user types.
+Misspelled words get a wavy-red underline (`ame-spelling-error` decoration,
+FR-001/FR-007); right-clicking one opens the app's own correction menu with
+suggestions that replace the word in place (FR-002/FR-003); an "Add to
+dictionary" item teaches a persistent personal dictionary so the word is never
+flagged again (FR-004/FR-005); and a Settings toggle + language selector turn
+the feature on/off and pick the dictionary, persisting across restarts with a
+default of on (FR-006/FR-009).
 
-This is a main-process feature with a thin renderer bridge. All spellcheck
-logic lives in `src/main` (enable/disable, context menu, replace, dictionary);
-the renderer only persists the setting and reflects it onto the two editable
-elements. No new IPC channel or preload method is added (research R-Process).
+The source view keeps the platform's native spellchecker (a plain textarea
+where it works well), with its language driven by the same setting. The
+WYSIWYG is fully JS — offline, deterministic, and able to flag existing errors
+on open, which the native engine could not (research R9 supersedes R1–R4 for
+the WYSIWYG).
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5.8, strict: true, across main, preload and renderer.
 
-**Primary Dependencies**: Electron 43 (unchanged) — `session.setSpellCheckerEnabled`,
-`webContents.replaceMisspelling`, `session.addWordToSpellCheckerDictionary`,
-the `webContents` `context-menu` event, and `Menu`. No new runtime dependencies.
+**Primary Dependencies**: `nspell` (Hunspell core in JS) + the en-GB/en-US
+Hunspell dictionaries from the `dictionaries` project (MIT), bundled as assets.
+Electron's session spellchecker is retained for the source view only.
 
 **Storage**: unchanged — settings in `appData/ame/config.json` (new
-`spellcheckEnabled` boolean); the personal dictionary is Chromium's own
-(`<userData>/Shared Dictionary`), persisted natively.
+`spellcheckEnabled` boolean, `spellcheckLanguage`); the personal dictionary is
+a `spellcheckDictionary` array in the same config file, read/written by main
+and loaded into the renderer's checker via two new IPC channels.
 
 **Testing**: Vitest 4 (node project for `tests/main`, jsdom for
 `tests/renderer`); Playwright via `npm run test:e2e` (build + launch), with a
@@ -68,38 +71,37 @@ platform's default language (spec assumption).
 
 ## Phase 1 Design decisions
 
-**Native spellcheck end to end.** Highlighting, suggestions, replace, and the
-personal dictionary all come from Electron/Chromium (R1). The main process
-enables the spellchecker at startup and on setting changes (`spellcheck.ts`),
-and owns the right-click correction menu (`contextMenu.ts` + the pure
-`spellcheckMenu.ts`). The renderer never performs spelling analysis.
+**JS whole-document engine (Phase 8, 2026-08-07, supersedes the native WYSIWYG
+design below).** The WYSIWYG editor is spellchecked by `nspell` in the renderer
+with the en-GB/en-US dictionaries bundled as assets. A ProseMirror plugin
+(`spellcheckPlugin.ts`) marks misspelled ranges with `ame-spelling-error`
+decorations, re-checking the whole document on open and (debounced 250 ms) after
+each edit; the shared runtime (`spellcheckRuntime.ts`) holds enabled/language/
+custom-words and notifies editors to re-run on any change. Right-clicking a
+marked word opens the app's own DOM correction menu (`SpellingMenu.tsx`); the
+custom dictionary persists via two new named IPC channels
+(`spellcheck:getWords`/`spellcheck:addWord`) into a `spellcheckDictionary`
+array in the shared config. The source view keeps the native spellchecker.
+(Native-engine decisions R1–R4 remain true for the source view only.)
 
-**Settings: one new persisted boolean.** `Settings.spellcheckEnabled` defaults
-to `true` (FR-006). It flows through the existing validated store
-(`settingsFile.ts` DEFAULTS/validate/merge/migrate + `state/settings.ts`),
-the existing `settings:get`/`settings:update` channels, and a new immediate-apply
-checkbox in the Settings dialog (US4 — markers vanish instantly on change,
-S1). The `settings:update` handler applies the new value to the session before
-returning, exactly like `applyThemeOverride` (spec 013 precedent).
+**Settings: one new persisted boolean + language.** `Settings.spellcheckEnabled`
+defaults to `true` (FR-006); `spellcheckLanguage` (`en-GB`/`en-US`/`null`)
+selects the bundled dictionary. Both flow through the existing validated store
+(`settingsFile.ts`), the existing settings channels, and immediate-apply
+controls in the Settings dialog (US4 S1). The `settings:update` handler keeps
+the session spellchecker in sync for the source view.
 
-**Editor wiring.** `useSettingsState` exposes `spellcheckEnabled` +
-`handleSpellcheckChange`. `App` passes it to `SettingsDialog` and `EditorPanel`;
-`EditorPanel` passes it to `CrepeHost` (sets `view.dom.spellcheck`, R5) and
-`SourceView` (textarea `spellCheck`, replacing the hard-coded `false`, R5).
-
-**Correction menu.** On `context-menu`, if `params.misspelledWord` is set, build
-a native menu: up to 5 suggestion items (click → `webContents.replaceMisspelling`)
-then a separator and "Add "<word>" to Dictionary" (click →
-`session.defaultSession.addWordToSpellCheckerDictionary`). Otherwise show no
-menu (FR-008: nothing is suppressed; the app simply has no other edit menu).
-Verified: `replaceMisspelling` works inside ProseMirror and the textarea (R2).
+**Editor wiring.** `useSettingsState` exposes the spellcheck settings; `App`
+syncs them into the shared runtime, loads the custom dictionary on startup,
+renders the correction menu, and passes `onSpellingMenu` through `EditorPanel`
+to `CrepeHost`, which registers the spellcheck plugin and disables the native
+spellcheck attribute on the contenteditable (to avoid double underlines).
 
 **Test isolation.** `src/main/index.ts` applies `app.setPath('userData', …)`
 from `AME_USER_DATA_DIR` at module load (R6), so the e2e suite uses an isolated
-Chromium profile per test. The spellcheck e2e spec installs capture hooks via
-`electronApp.evaluate` — a second `context-menu` listener and a
-`Menu.buildFromTemplate` wrapper — to observe the real native flow and invoke
-menu clicks deterministically (R6, R7).
+Chromium profile per test. The JS-engine e2e drives the real DOM directly
+(`.ame-spelling-error` marks + the `[data-testid="spelling-menu"]`), so no
+main-process capture hooks are needed.
 
 ## Project Structure
 
@@ -121,41 +123,48 @@ specs/020-editor-spellcheck/
 
 ```text
 src/shared/
-└── ipc-contract.ts            # Settings.spellcheckEnabled: boolean (default true)
+└── ipc-contract.ts            # spellcheckEnabled + spellcheckLanguage + spellcheck IPC methods
 
 src/main/
-├── spellcheck.ts              # NEW: applySpellcheckSetting(enabled)
-├── spellcheckMenu.ts          # NEW: pure spellcheckMenuActions(params)
-├── contextMenu.ts             # NEW: registerSpellcheckContextMenu(window)
-├── settingsFile.ts            # + spellcheckEnabled in DEFAULTS/validate/merge/migrate
+├── spellcheck.ts              # applySpellcheckSetting(enabled, language) — session (source view)
+├── contextMenu.ts             # native correction menu for the source view textarea
+├── spellcheckDictionary.ts    # NEW: custom-dictionary store in the shared config
+├── ipc/handlers/spellcheck.ts # NEW: spellcheck:getWords / spellcheck:addWord
+├── settingsFile.ts            # + spellcheckEnabled/spellcheckLanguage in DEFAULTS/validate/merge/migrate
 ├── ipc/handlers/settings.ts   # apply the setting on every settings:update
 └── index.ts                   # AME_USER_DATA_DIR seam + startup apply + register handler
 
 src/renderer/
-├── state/settings.ts          # + spellcheckEnabled default
-├── hooks/useSettingsState.ts  # + spellcheckEnabled + handleSpellcheckChange
-├── chrome/SettingsDialog.tsx  # + "Check spelling while typing" checkbox
-├── chrome/settings.css        # checkbox rows (reuse .settings-radio pattern)
-├── App.tsx                    # wire the new state through to dialog + editor
-├── editor/EditorPanel.tsx     # + spellcheckEnabled prop → CrepeHost / SourceView
-├── editor/CrepeHost.tsx       # + spellcheckEnabled → view.dom.spellcheck
-└── editor/SourceView.tsx      # + spellcheckEnabled → textarea spellCheck
+├── assets/dictionaries/       # NEW: en-gb/en-us .aff/.dic (nspell, `?raw` imported)
+├── domain/spellcheck.ts       # NEW: pure nspell wrapper — tokenizer + findMisspellings
+├── editor/spellcheckRuntime.ts# NEW: shared runtime (enabled/language/custom words) + change listeners
+├── editor/spellcheckPlugin.ts # NEW: ProseMirror plugin — decorations + correction menu
+├── editor/SpellingMenu.tsx    # NEW: the DOM correction menu
+├── state/settings.ts          # + spellcheckEnabled/spellcheckLanguage defaults
+├── hooks/useSettingsState.ts  # + spellcheck settings + handlers
+├── chrome/SettingsDialog.tsx  # + "Check spelling while typing" checkbox + language select
+├── chrome/settings.css        # checkbox + select rows
+├── App.tsx                    # runtime sync, custom-dictionary load, correction menu
+├── editor/EditorPanel.tsx     # + onSpellingMenu → CrepeHost; spellcheckEnabled → SourceView
+├── editor/CrepeHost.tsx       # registers the spellcheck plugin; disables native markers
+└── editor/SourceView.tsx      # textarea spellCheck (native, source view)
 
 tests/
 ├── main/
-│   ├── spellcheckMenu.test.ts # NEW: pure action-builder unit tests
-│   └── settings.test.ts       # + spellcheckEnabled load/merge/migrate cases
+│   ├── spellcheckDictionary.test.ts  # NEW: store unit tests
+│   └── settings.test.ts       # + spellcheckEnabled/spellcheckLanguage load/merge/migrate cases
 ├── renderer/
+│   ├── spellcheck.test.ts     # NEW: findMisspellings unit tests (both dictionaries)
 │   └── useSettingsState.test.tsx  # + spellcheck handler cases
 └── e2e/
     ├── launch.ts              # launchApp(..., userDataDir) via AME_USER_DATA_DIR
-    └── spellcheck.spec.ts     # NEW: US1–US4 acceptance scenarios
+    └── spellcheck.spec.ts     # NEW: whole-document + corrections + dictionary + toggle + language
 ```
 
-**Structure decision**: the spellcheck surface mirrors the app's existing
-main/settings split (settings.ts Electron-coupled, settingsFile.ts pure) and
-the renderer menuModel pattern. The pure action-builder lives beside the main
-modules it feeds and is unit-tested without Electron.
+**Structure decision**: the JS spellchecker is renderer-owned (pure domain
+module + ProseMirror plugin + DOM menu), with only the persisted custom
+dictionary crossing to main through two named IPC channels. The main native
+spellcheck code remains solely for the source view.
 
 ## Phase status
 
@@ -166,19 +175,24 @@ modules it feeds and is unit-tested without Electron.
 - Phase 5: US3 — add to dictionary (persistent, native)
 - Phase 6: US4 — settings toggle (immediate apply + persistence)
 - Phase 7: Polish — lint, typecheck, unit + e2e, spec archive, PR
+- Phase 8 (2026-08-07): JS whole-document engine — replaces the native WYSIWYG
+  spellchecker with nspell + bundled dictionaries, the decoration plugin, the
+  custom correction menu, and the persisted custom dictionary (research R9);
+  the source view keeps native spellchecking.
 
 ## Deferred / later features
 
 - Additional spellcheck languages beyond English (UK/US) — the mechanism
-  (`session.setSpellCheckerLanguages`) is in place; extending the closed union
-  is a one-line change (2026-08-07)
-- A dedicated "learned words" management UI (native OS dictionary is opaque)
+  (bundled dictionary + closed union) is in place; extending it is a
+  copy-the-assets + one-line change (2026-08-07)
+- A dedicated "learned words" management UI (currently the custom dictionary
+  only grows via the correction menu)
 - A non-spelling right-click edit menu (Cut/Copy/Paste) — out of scope; the app
-  currently has no context menu, and FR-008 only forbids *suppressing* one
+  currently has no such menu
 
 ## Complexity tracking
 
-No constitution violations. The one deliberate trade is the accepted native
-re-enable limitation (R4, spec clarification 2026-08-07) — the simpler
-alternative (remount the editor to force an immediate re-check) was rejected
-because it resets undo history and scroll, contradicting Principle IV.
+No constitution violations. The WYSIWYG now runs a full-document check in the
+renderer; it is debounced (250 ms after typing stops) and the dictionaries are
+bundled assets, so nothing runs on the keystroke path and the app stays
+offline/deterministic.

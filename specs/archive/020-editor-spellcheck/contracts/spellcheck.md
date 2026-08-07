@@ -4,109 +4,87 @@
 
 ## Scope
 
-The IPC surface is **unchanged** except for one new boolean on the existing
-`Settings` type. No new channels, no preload additions, no `OpenedFile`/
-`writeFile` changes (research R-Process).
+The IPC surface gains two named channels for the persisted custom dictionary
+(`spellcheck:getWords`, `spellcheck:addWord`); the settings field set grows by
+`spellcheckLanguage`. The WYSIWYG spellchecker is a JS engine in the renderer
+(research R9); the native session spellchecker is retained for the source view
+only.
+
+## Pure renderer contract — `src/renderer/domain/spellcheck.ts`
+
+```ts
+import type NSpell from 'nspell'
+import type { SpellcheckLanguage } from '../../shared/ipc-contract'
+
+export interface Misspelling { start: number; end: number; word: string }
+
+export function resolveLanguage(language: SpellcheckLanguage | null): SpellcheckLanguage
+export function getChecker(language: SpellcheckLanguage | null): NSpell
+export function findMisspellings(text: string, checker: NSpell, customWords: ReadonlySet<string>): Misspelling[]
+```
+
+- Words are letters (any script), apostrophes and hyphens; pure numbers and
+  punctuation never match.
+- `customWords` holds lowercased user words; matches are skipped.
+- `resolveLanguage(null)` picks en-US only when the platform language is
+  en-US, otherwise en-GB.
+
+## Spellcheck plugin contract — `src/renderer/editor/spellcheckPlugin.ts`
+
+```ts
+export function spellcheckPlugin(onMenu: (menu: SpellingMenuState | null) => void): Plugin
+export function computeSpellcheckDecorations(view: EditorView): DecorationSet
+```
+
+- Marks every misspelled range with an `ame-spelling-error` inline decoration;
+  code blocks and math are skipped. Re-checks the whole document on mount and
+  (debounced 250 ms) after each edit and every runtime change.
+- Right-clicking a marked word opens `SpellingMenuState` (word, up to 5 nspell
+  suggestions, `apply(replacement)` → `insertText` transaction, `addToDictionary` →
+  custom-words + `spellcheck:addWord`).
 
 ## Settings contract — `src/shared/ipc-contract.ts`
 
 ```ts
 export type SpellcheckLanguage = 'en-GB' | 'en-US'
-
 export interface Settings {
-  // …existing fields…
-  /** Spec 020 FR-006/FR-009: whether the native spellchecker is enabled.
-   *  Defaults to true. Persisted via the existing settings store. */
+  // …
   spellcheckEnabled: boolean
-  /** Spec 020 (2026-08-07): the explicit spellchecker language, or `null`
-   *  for the platform/system default. A closed union. */
   spellcheckLanguage: SpellcheckLanguage | null
 }
 ```
 
-`settingsFile.ts` validation/merge/migration contract (spec 012 precedent):
-- Default `true` (FR-006).
-- A non-boolean value loads/merges as the current default (`true`) — never
-  arbitrary text.
-- `spellcheckLanguage` defaults to `null` (system default); only `en-GB`,
-  `en-US`, or `null` load/merge — never arbitrary text.
-- Legacy migration: a pre-020 config without the fields inherits the defaults
-  (`true`, `null`).
+`settingsFile.ts` validation/merge/migration contract: `spellcheckEnabled`
+defaults `true` (boolean-only); `spellcheckLanguage` defaults `null` and only
+accepts `en-GB`, `en-US`, or `null`. Legacy configs inherit both defaults.
 
-## Pure main contract — `src/main/spellcheckMenu.ts`
+## Custom dictionary IPC (main)
 
-```ts
-export interface SpellcheckMenuAction {
-  kind: 'suggestion' | 'add-to-dictionary'
-  /** The menu label: the suggestion text, or `Add "<word>" to Dictionary`. */
-  label: string
-  /** The flagged word (from context-menu params). */
-  word: string
-  /** Present only when kind === 'suggestion': the correction to apply. */
-  suggestion?: string
-}
+- `spellcheck:getWords` → `Result<string[]>`: the stored lowercased words.
+- `spellcheck:addWord { word }` → `Result<string[]>`: validates the word
+  (letters/apostrophes/hyphens, 1–64 chars), adds it, persists atomically to
+  the shared config, returns the updated list.
 
-/** Build the correction-menu actions for a context-menu event. Empty when no
- *  word is flagged (no menu is shown — FR-008 is about not *suppressing*). */
-export function spellcheckMenuActions(params: {
-  misspelledWord: string
-  dictionarySuggestions: string[]
-}): SpellcheckMenuAction[]
-```
+## Source view (unchanged native surface)
 
-Behaviour contract:
-- `params.misspelledWord` empty → `[]` (no menu).
-- Otherwise: up to **5** `suggestion` actions (one per dictionary suggestion, in
-  suggestion order), followed by one `add-to-dictionary` action. An empty
-  suggestion list still yields the add-to-dictionary action.
-
-## Main wiring contract — `src/main/spellcheck.ts`, `src/main/contextMenu.ts`
-
-```ts
-export function applySpellcheckSetting(enabled: boolean): void
-// session.defaultSession.setSpellCheckerEnabled(enabled) — the whole toggle.
-
-export function registerSpellcheckContextMenu(window: BrowserWindow): void
-```
-
-- `registerSpellcheckContextMenu` listens on `window.webContents` for
-  `context-menu`; for non-empty `spellcheckMenuActions(params)` it builds a
-  native `Menu` and pops it up (FR-002/FR-008). No menu is built or shown
-  otherwise.
-- A `suggestion` item's click calls
-  `window.webContents.replaceMisspelling(suggestion)` (FR-003). Verified to work
-  in the ProseMirror editor and the source textarea (research R2).
-- The `add-to-dictionary` item's click calls
-  `session.defaultSession.addWordToSpellCheckerDictionary(word)` (FR-004).
-  Persists natively across restarts (FR-005, research R3).
-
-## Renderer contract
-
-- `useSettingsState` exposes `spellcheckEnabled: boolean` and
-  `handleSpellcheckChange(enabled: boolean)`, which persists through
-  `updateSettings` + `window.api.updateSettings` (FR-009).
-- `SettingsDialog` renders a "Spellcheck" group with a checkbox, applied
-  immediately on change (US4 S1: markers vanish the moment the setting flips).
-- `CrepeHost` sets `view.dom.spellcheck = spellcheckEnabled` at mount and on
-  change; `SourceView` passes `spellCheck={spellcheckEnabled}` to its textarea
-  (FR-007, research R5).
+`applySpellcheckSetting(enabled, language)` keeps the session spellchecker and
+its language in sync for the source-view textarea; the native `context-menu`
+handler still offers suggestions there.
 
 ## Acceptance contract
 
 The acceptance scenarios in `spec.md` US1–US4 are verified in
-`tests/e2e/spellcheck.spec.ts` against the built app with the real native
-spellchecker and an isolated Chromium profile (`AME_USER_DATA_DIR`):
+`tests/e2e/spellcheck.spec.ts` against the built app, driving the real DOM
+(`.ame-spelling-error` marks and the `[data-testid="spelling-menu"]`) with an
+isolated config + Chromium profile:
 
-- US1 — a misspelled word is flagged (context-menu params carry
-  `misspelledWord`) and the `.ProseMirror` element has spellcheck enabled.
-- US2 — the app's context-menu template lists the dictionary suggestions; invoking
-  a suggestion's click handler replaces the word in the editor.
-- US3 — "Add … to Dictionary" teaches the word; it is no longer flagged in the
-  same session and survives an app restart.
-- US4 — the settings checkbox flips `session.isSpellCheckerEnabled()` and the
-  editor attributes immediately, persists in `config.json`, and a relaunch
-  honours the persisted value.
+- US1 — existing misspellings are flagged on open (whole-document) and a word
+  typed into the editor is flagged as you type.
+- US2 — right-clicking a marked word shows the correction menu; invoking a
+  suggestion replaces the word; a correctly spelled word shows no menu.
+- US3 — "Add to dictionary" unmarks the word immediately, persists in the
+  config, and survives an app restart.
+- US4 — the settings checkbox clears/restores every underline immediately;
+  the language setting switches the en-GB ↔ en-US dictionaries and re-flags the
+  British/American words accordingly.
 
-The native re-enable limitation (already-rendered words are not re-flagged until
-edited) is accepted and recorded in `spec.md` (clarification 2026-08-07);
-US4 S2 is asserted on *new* typed words only.

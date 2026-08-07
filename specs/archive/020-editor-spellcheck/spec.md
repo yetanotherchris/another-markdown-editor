@@ -94,8 +94,8 @@ A user who does not want spellcheck (or finds it distracting) can disable it thr
 - **FR-004**: The system MUST allow the user to add a word to their personal dictionary so it is no longer flagged as misspelled.
 - **FR-005**: The system MUST persist the personal dictionary across application restarts.
 - **FR-006**: The system MUST provide a setting to enable or disable spellcheck, defaulting to enabled.
-- **FR-007**: The system MUST allow the platform's native spellchecker to operate in both the WYSIWYG editor and the source view.
-- **FR-008**: The system MUST NOT suppress the platform's native right-click context menu in the editor area; spelling suggestions must be accessible when right-clicking a misspelled word.
+- **FR-007**: The system MUST spellcheck the WYSIWYG editor against the document's full content — misspellings already present when a file is opened are flagged, and new ones are flagged as they are typed (whole-document checking, 2026-08-07).
+- **FR-008**: The system MUST provide a correction menu when the user right-clicks a misspelled word in the WYSIWYG editor (the app's own menu, built from the checker's suggestions) and MUST NOT be blocked by any platform right-click handling in the editor area.
 - **FR-009**: The spellcheck setting MUST persist across application restarts.
 - **FR-010**: The system MUST NOT introduce perceptible typing latency from spellcheck processing (consistent with Principle IV, Calm Predictable Editing).
 
@@ -115,13 +115,14 @@ A user who does not want spellcheck (or finds it distracting) can disable it thr
 
 ## Clarifications
 
-- **2026-08-07** — Re-enable behaviour (US4 S2): the platform's native spellchecker removes existing highlights the moment spellcheck is disabled, and re-enables for **new or edited** content. Words already rendered on screen are NOT re-highlighted immediately when spellcheck is turned back on; they are re-highlighted as the user edits them. This native behaviour is accepted (user decision 2026-08-07); forcing an immediate re-check would require remounting the editor and discarding undo history, which violates Principle IV (Calm, Predictable Editing).
-- **2026-08-07** — Spellcheck language is now selectable (was "platform default only"): the Settings dialog offers System default / English (UK) / English (US), persisted as `spellcheckLanguage` (`null` = system default). This addresses a British-English writer whose OS default dictionary is en-US flagging correct British spellings (e.g. "behaviour") as errors. The mechanism (`session.setSpellCheckerLanguages`) is identical for any additional languages added later.
+- **2026-08-07** — Whole-document checking replaces the earlier native-engine scope (user decision): the WYSIWYG editor is checked by a **JS spellchecker in the renderer** (`nspell` + bundled en-GB/en-US Hunspell dictionaries checked in under `src/renderer/assets/dictionaries/`). The whole document is checked on open and re-checked (debounced 250 ms) after each edit; misspelled ranges get the `ame-spelling-error` wavy-red underline decoration. The earlier limitation — that the platform native spellchecker only scans typed/edited text — no longer applies to the WYSIWYG editor; the earlier "check as you type / native" clarifications are superseded by this one.
+- **2026-08-07** — Re-enable behaviour (US4 S2): because the WYSIWYG checker is the app's own, disabling spellcheck clears every underline immediately and re-enabling re-runs the whole-document pass — there is no deferred re-marking. (The source view still uses the platform native spellchecker, where the native re-enable behaviour applies.)
+- **2026-08-07** — Spellcheck language is selectable: the Settings dialog offers System default / English (UK) / English (US), persisted as `spellcheckLanguage` (`null` = system default, resolved from the platform language). The WYSIWYG checker loads the matching bundled dictionary; the source view's native spellchecker gets the same language via the session. Additional languages can be added by extending the closed union + bundling a dictionary.
 
 ## Assumptions
 
-- The built-in spellchecker uses the platform's native spellchecking engine, which is available by default in the desktop shell and requires no additional dependencies.
-- Spellcheck dictionaries for the user's primary language are available or can be downloaded automatically by the platform.
-- The right-click context menu for spelling corrections will use the platform's native context menu for the editor area.
-- Spellcheck language selection defaults to the platform's default language; the user can explicitly choose System default / English (UK) / English (US) in Settings (2026-08-07). Additional languages can be added by extending the closed union later.
-- The source view enables native spellcheck. Markdown syntax characters (e.g., `#`, `**`, `[]`) may occasionally be flagged by the platform spellchecker; this is accepted as a minor trade-off of using native behaviour everywhere.
+- The WYSIWYG spellchecker is a JS engine (`nspell`) running in the renderer, with the en-GB and en-US Hunspell dictionaries bundled as assets (no network, no download, works offline). Dictionary files are from the open-source `dictionaries` project (MIT).
+- The source view keeps the platform's native spellchecker (it is a plain textarea where native checking works well); its language is set from the same `spellcheckLanguage` setting via the session.
+- The WYSIWYG correction menu is the app's own DOM menu (suggestions come from the checker), not a platform native menu.
+- Markdown code blocks and math are not spellchecked (spec edge case).
+- Spellcheck language selection defaults to the platform's default language; the user can explicitly choose System default / English (UK) / English (US) in Settings. Additional languages can be added by extending the closed union and bundling a dictionary.

@@ -203,6 +203,37 @@ dictionary is the documented no-op case). Ordering gotcha: calling
 RE-ENABLES the spellchecker, so the enable flag must be written last (found and
 fixed during the e2e run).
 
+## R9 — The JS whole-document spellchecker (replaces the native WYSIWYG engine, 2026-08-07)
+
+**Decision**: The WYSIWYG editor's spellchecking is now a JS engine in the
+renderer: `nspell` (Hunspell core in plain JS) with the en-GB and en-US
+dictionaries from the `dictionaries` project (MIT) checked in under
+`src/renderer/assets/dictionaries/` and imported as Vite `?raw` assets. A
+ProseMirror plugin (`spellcheckPlugin.ts`) walks the document, checks every
+word (skipping code blocks/math), and applies `ame-spelling-error` inline
+decorations (wavy-red underline). The right-click correction menu is the app's
+own DOM menu (`SpellingMenu.tsx`); the custom dictionary persists in the shared
+config via `spellcheck:getWords`/`spellcheck:addWord` IPC.
+
+**Rationale**: The user requires true whole-document checking — misspellings
+already in a file must be flagged when it opens, which the platform native
+spellchecker cannot do (R2/R4: Chromium only scans text modified through user
+input). A JS engine bundled into the app also makes spellchecking offline and
+deterministic (no dictionary downloads), and makes the language setting fully
+effective (the en-US dictionary is always present). This is the "bigger change"
+the spec previously deferred; it supersedes the native as-you-type scope.
+
+**Verified against the built app**: on open, existing misspellings are flagged;
+typing flags new ones (debounced 250 ms); toggling off clears all underlines
+immediately and on restores them (a whole-document re-pass, unlike the native
+engine); switching en-GB ↔ en-US immediately re-flags the British/American
+words respectively; the correction menu replaces words and add-to-dictionary
+persists across restarts.
+
+**Source view stays native**: the plain-textarea source view keeps Chromium's
+native spellchecker (language applied via the session), where it works well;
+only the WYSIWYG editor is JS-checked.
+
 ## R-Process — no process or isolation change
 
 **Decision**: No new IPC channels, no preload methods, no `contextBridge`

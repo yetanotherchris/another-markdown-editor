@@ -140,6 +140,24 @@ scenario depends on
 
 ---
 
+## Phase 8: JS whole-document engine (2026-08-07, supersedes the native WYSIWYG engine)
+
+**Purpose**: Replace the native WYSIWYG spellchecker with a JS engine (`nspell`
++ bundled en-GB/en-US dictionaries) so the whole document is checked on open and
+re-checked as you type. Research R9.
+
+- [X] T025 [P] Add `nspell` + `@types/nspell` dependencies; copy the en-gb/en-us `.aff`/`.dic` files from the `dictionaries` project into src/renderer/assets/dictionaries/ (MIT, bundled as `?raw` assets)
+- [X] T026 [P] Create src/renderer/domain/spellcheck.ts — pure `findMisspellings(text, checker, customWords)` tokenizer/checker + `resolveLanguage` + `getChecker` (unit-tested)
+- [X] T027 [P] Create the custom-dictionary store src/main/spellcheckDictionary.ts (a `spellcheckDictionary` array in the shared config) + src/main/ipc/handlers/spellcheck.ts (`spellcheck:getWords`/`spellcheck:addWord`) + preload methods + contract types
+- [X] T028 Create src/renderer/editor/spellcheckRuntime.ts (shared enabled/language/custom-words state + change listeners) and src/renderer/editor/spellcheckPlugin.ts (whole-document decoration plugin + right-click correction menu)
+- [X] T029 [P] Create src/renderer/editor/SpellingMenu.tsx (the DOM correction menu) + the `ame-spelling-error` and menu CSS in editor.css
+- [X] T030 Wire the plugin into src/renderer/editor/CrepeHost.tsx (disable the native spellcheck attribute; register the plugin), thread `onSpellingMenu` through EditorPanel, and sync the runtime + render the menu from src/renderer/App.tsx
+- [X] T031 [P] Write tests/renderer/spellcheck.test.ts (findMisspellings across both dictionaries, custom words, tokenization) and tests/main/spellcheckDictionary.test.ts (store load/add/dedupe/sibling-preservation)
+- [X] T032 [P] Rewrite tests/e2e/spellcheck.spec.ts for the JS engine: whole-document on open, as-you-type, correction menu replace, no menu on correct words, add-to-dictionary + restart persistence, toggle clear/restore, en-GB↔en-US language switch
+- [X] T033 [P] Update spec.md/plan.md/research.md/data-model.md/contracts for the JS engine (FR-007/FR-008, assumptions, R9)
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

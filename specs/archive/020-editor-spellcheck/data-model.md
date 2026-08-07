@@ -19,10 +19,10 @@ The user-maintained collection of words the spellchecker treats as valid.
 
 | Aspect | Value |
 |--------|-------|
-| Where it lives | The Chromium profile of the app: `<userData>/Shared Dictionary` (LevelDB). On Windows/macOS also the OS custom dictionary. |
-| Owner | Chromium + Electron (`session.addWordToSpellCheckerDictionary`); the app never reads or writes dictionary files (research R3). |
-| Lifecycle | Created lazily by Chromium; words added by the user persist across restarts natively (FR-005). |
-| Scope | Shared across all open documents and all views, in-session and across sessions (US3 S2/S3). |
+| Where it lives | A `spellcheckDictionary: string[]` top-level key in `appData/ame/config.json` (2026-08-07 — was the native Chromium Shared Dictionary for the old native engine). |
+| Owner | Main process (`src/main/spellcheckDictionary.ts`), read/written atomically via `spellcheck:getWords`/`spellcheck:addWord` IPC; loaded into the renderer's JS checker at startup (research R9). |
+| Lifecycle | Created lazily; words added by the user persist across restarts (FR-005) and are shared across all open documents. |
+| Format | Lowercased, deduped, non-empty strings. |
 
 ## Settings transitions
 
@@ -36,12 +36,13 @@ The user-maintained collection of words the spellchecker treats as valid.
 
 | Element | Mechanism |
 |---------|-----------|
-| WYSIWYG contenteditable (`.ProseMirror`) | `view.dom.spellcheck = spellcheckEnabled`, set at editor mount and on every setting change (R5). |
-| Source-view `<textarea>` | React `spellCheck={spellcheckEnabled}` prop (replaces the current hard-coded `false`, R5). |
+| WYSIWYG contenteditable (`.ProseMirror`) | The JS spellcheck plugin applies `ame-spelling-error` inline decorations over misspelled ranges (wavy-red underline). Native markers are disabled on this element (research R9). |
+| Source-view `<textarea>` | React `spellCheck` prop reflecting the setting — native spellchecking (language from the session). |
 
-## Native state owned by Chromium (not modelled by the app)
+## Renderer spellcheck runtime (2026-08-07, JS engine)
 
-- The active spelling marker for the word under a right-click (consumed by
-  `webContents.replaceMisspelling`, R2).
-- Whether the spellchecker is enabled (`session.defaultSession.isSpellCheckerEnabled()`).
-- The configured spellcheck language (platform default, spec assumption).
+`src/renderer/editor/spellcheckRuntime.ts` holds the editor-independent state
+the plugin reads: `enabled`, `language` (persisted setting, `null` = system
+default resolved from the platform), `customWords` (Set, from the config), the
+compiled `nspell` checker for the effective language, and a `version` bump +
+listener notification on every change so all editors re-run their pass.
