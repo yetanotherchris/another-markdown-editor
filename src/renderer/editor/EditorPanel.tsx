@@ -4,12 +4,18 @@ import type { DocumentState } from '../state/documents'
 import { instancePool } from './instancePool'
 import { joinFrontmatter } from '../domain/frontmatter'
 import CrepeHost, { type CursorState } from './CrepeHost'
+import type { SpellingMenuState } from './spellcheckPlugin'
 import SourceView from './SourceView'
 import './editor.css'
 
 interface EditorPanelProps {
   document: DocumentState
   isActive: boolean
+  /** Spec 020: whether native spellcheck is enabled — applies to the source
+   *  view textarea only (the WYSIWYG uses the JS spellchecker). */
+  spellcheckEnabled: boolean
+  /** Spec 020 (JS spellchecker): the WYSIWYG correction menu, or null. */
+  onSpellingMenu: (menu: SpellingMenuState | null) => void
   onContentChange: (id: string, content: string) => void
   onBaselineCapture: (id: string, baseline: string) => void
   onCursorState: (id: string, cursorOffset: number, scrollTop: number) => void
@@ -20,6 +26,8 @@ interface EditorPanelProps {
 export default function EditorPanel({
   document,
   isActive,
+  spellcheckEnabled,
+  onSpellingMenu,
   onContentChange,
   onBaselineCapture,
   onCursorState,
@@ -71,6 +79,7 @@ export default function EditorPanel({
       onChange={(content) => onContentChange(document.id, content)}
       onReturnToFormatted={() => onReturnToFormatted(document.id)}
       isActive={isActive}
+      spellcheckEnabled={spellcheckEnabled}
     />
   )
 
@@ -84,6 +93,7 @@ export default function EditorPanel({
         defaultValue={document.content}
         active={isActive && !inSource}
         locked={inSource}
+        onSpellingMenu={onSpellingMenu}
         restoreCursor={{ cursorOffset: document.cursorOffset, scrollTop: document.scrollTop }}
         onMarkdownUpdated={handleMarkdownUpdated}
         onReady={handleReady}

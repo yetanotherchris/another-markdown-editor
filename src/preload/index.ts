@@ -70,7 +70,9 @@ const api: DesktopApi = {
   getRecentItems: () => ipcRenderer.invoke('recent:list') as Promise<Result<RecentItem[]>>,
   clearRecentItems: () => ipcRenderer.invoke('recent:clear') as Promise<Result<null>>,
   requestQuit: () => ipcRenderer.invoke('app:requestQuit') as Promise<Result<null>>,
-  toggleDevTools: () => ipcRenderer.invoke('devtools:toggle') as Promise<Result<null>>
+  toggleDevTools: () => ipcRenderer.invoke('devtools:toggle') as Promise<Result<null>>,
+  getSpellcheckWords: () => ipcRenderer.invoke('spellcheck:getWords') as Promise<Result<string[]>>,
+  addSpellcheckWord: (word: string) => ipcRenderer.invoke('spellcheck:addWord', { word }) as Promise<Result<string[]>>
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -7,6 +7,9 @@ interface SourceViewProps {
   onReturnToFormatted: () => void
   /** Focus the textarea only when this tab is actually visible (FR-021). */
   isActive: boolean
+  /** Spec 020 FR-007: whether the native spellchecker is enabled. Reflected
+   *  onto the textarea so Chromium draws the squiggly underline here too. */
+  spellcheckEnabled: boolean
 }
 
 /**
@@ -15,7 +18,7 @@ interface SourceViewProps {
  * saving behave identically (FR-013). A compact top toolbar mirroring the Crepe
  * top bar's height hosts the labeled return control (FR-008).
  */
-export default function SourceView({ value, onChange, onReturnToFormatted, isActive }: SourceViewProps) {
+export default function SourceView({ value, onChange, onReturnToFormatted, isActive, spellcheckEnabled }: SourceViewProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleChange = useCallback(
@@ -50,7 +53,7 @@ export default function SourceView({ value, onChange, onReturnToFormatted, isAct
         data-testid="source-textarea"
         value={value}
         onChange={handleChange}
-        spellCheck={false}
+        spellCheck={spellcheckEnabled}
         aria-label="Markdown source"
       />
     </div>

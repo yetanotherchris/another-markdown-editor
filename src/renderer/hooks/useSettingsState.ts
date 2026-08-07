@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { updateSettings, getSettings } from '../state/settings'
-import type { EditorThemeName } from '../../shared/ipc-contract'
+import type { EditorThemeName, SpellcheckLanguage } from '../../shared/ipc-contract'
 import {
   useEffectiveTheme,
   themeChoiceFromOverride,
@@ -25,12 +25,18 @@ export function useSettingsState(): {
   setSettingsOpen: (open: boolean) => void
   editorTheme: EditorThemeName
   handleEditorThemeChange: (theme: EditorThemeName) => void
+  spellcheckEnabled: boolean
+  handleSpellcheckChange: (enabled: boolean) => void
+  spellcheckLanguage: SpellcheckLanguage | null
+  handleSpellcheckLanguageChange: (language: SpellcheckLanguage | null) => void
   themeChoice: ThemeChoice
   handleThemeChange: (choice: ThemeChoice) => void
   themeMode: 'light' | 'dark'
 } {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editorTheme, setEditorTheme] = useState<EditorThemeName>(getSettings().editorTheme)
+  const [spellcheckEnabled, setSpellcheckEnabled] = useState<boolean>(getSettings().spellcheckEnabled)
+  const [spellcheckLanguage, setSpellcheckLanguage] = useState<SpellcheckLanguage | null>(getSettings().spellcheckLanguage)
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() =>
     themeChoiceFromOverride(getSettings().themeOverride)
   )
@@ -57,9 +63,29 @@ export function useSettingsState(): {
     window.api.updateSettings({ themeOverride: override }).catch(() => { /* ignore */ })
   }, [])
 
+  // Spec 020 FR-006/US4: apply the spellcheck choice immediately and persist.
+  // The session-side switch flows through the IPC (applied in main's
+  // settings:update handler); the DOM attribute switch flows through
+  // `spellcheckEnabled` → the editor components' spellcheck props.
+  const handleSpellcheckChange = useCallback((enabled: boolean) => {
+    setSpellcheckEnabled(enabled)
+    updateSettings({ spellcheckEnabled: enabled })
+    window.api.updateSettings({ spellcheckEnabled: enabled }).catch(() => { /* ignore */ })
+  }, [])
+
+  // Spec 020 (2026-08-07): apply the chosen spellchecker language immediately
+  // and persist it. `null` = the platform/system default (applied in main).
+  const handleSpellcheckLanguageChange = useCallback((language: SpellcheckLanguage | null) => {
+    setSpellcheckLanguage(language)
+    updateSettings({ spellcheckLanguage: language })
+    window.api.updateSettings({ spellcheckLanguage: language }).catch(() => { /* ignore */ })
+  }, [])
+
   return {
     settingsOpen, setSettingsOpen,
     editorTheme, handleEditorThemeChange,
+    spellcheckEnabled, handleSpellcheckChange,
+    spellcheckLanguage, handleSpellcheckLanguageChange,
     themeChoice, handleThemeChange, themeMode
   }
 }

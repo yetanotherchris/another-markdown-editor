@@ -48,12 +48,12 @@ describe('loadSettingsFile', () => {
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
-  it('reads all four fields from a valid settings section', () => {
+  it('reads all six fields from a valid settings section', () => {
     const file = tempSettingsFile(JSON.stringify({
-      settings: { sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly' }
+      settings: { sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly', spellcheckEnabled: false, spellcheckLanguage: 'en-GB' }
     }))
     expect(loadSettingsFile(file))
-      .toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly' })
+      .toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly', spellcheckEnabled: false, spellcheckLanguage: 'en-GB' })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
@@ -72,6 +72,56 @@ describe('loadSettingsFile', () => {
       settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: 'yes', editorFont: 'serif' }
     }))
     expect(loadSettingsFile(file).explorerVisible).toBe(true)
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('defaults spellcheckEnabled to true when the field is missing (old configs)', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif' }
+    }))
+    const result = loadSettingsFile(file)
+    expect(result.spellcheckEnabled).toBe(true)
+    expect(result.sidebarWidth).toBe(30)
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('reads spellcheckEnabled false from a valid settings section', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: false }
+    }))
+    expect(loadSettingsFile(file).spellcheckEnabled).toBe(false)
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('rejects a non-boolean spellcheckEnabled', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: 'yes' }
+    }))
+    expect(loadSettingsFile(file).spellcheckEnabled).toBe(true)
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('defaults spellcheckLanguage to null when the field is missing (system default)', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif' }
+    }))
+    expect(loadSettingsFile(file).spellcheckLanguage).toBeNull()
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('reads a valid spellcheckLanguage', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: 'en-US' }
+    }))
+    expect(loadSettingsFile(file).spellcheckLanguage).toBe('en-US')
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('rejects an invalid spellcheckLanguage (spec 020: closed union)', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: 'klingon' }
+    }))
+    expect(loadSettingsFile(file).spellcheckLanguage).toBeNull()
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
@@ -127,7 +177,9 @@ describe('loadSettingsFile', () => {
       themeOverride: null,
       explorerVisible: false,
       editorFont: 'serif',
-      editorTheme: 'rustic'
+      editorTheme: 'rustic',
+      spellcheckEnabled: true,
+      spellcheckLanguage: null
     })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
@@ -136,13 +188,15 @@ describe('loadSettingsFile', () => {
 describe('writeSettingsFile (shared config, spec 012 FR-002)', () => {
   it('writes a settings section that round-trips', () => {
     const file = tempSettingsFile()
-    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false, editorFont: 'serif', editorTheme: 'rustic' })
+    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false, editorFont: 'serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: null })
     expect(loadSettingsFile(file)).toEqual({
       sidebarWidth: 25,
       themeOverride: null,
       explorerVisible: false,
       editorFont: 'serif',
-      editorTheme: 'rustic'
+      editorTheme: 'rustic',
+      spellcheckEnabled: true,
+      spellcheckLanguage: null
     })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
@@ -188,7 +242,7 @@ describe('migrateLegacySettingsFile (spec 012, one-time migration)', () => {
 
     const migrated = migrateLegacySettingsFile(configPath, legacyPath)
     expect(migrated).toEqual({
-      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false, editorFont: 'sans-serif', editorTheme: 'rustic'
+      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: null
     })
     // The values are now in config.json (read back through the shared file).
     expect(loadSettingsFile(configPath)).toEqual(migrated)
@@ -304,5 +358,26 @@ describe('mergeSettingsPatch (review #27: authoritative in-memory merge)', () =>
 
   it('rejects an invalid editorTheme value, keeping the current one', () => {
     expect(mergeSettingsPatch(base, { editorTheme: 'ocean' as 'rustic' }).editorTheme).toBe('rustic')
+  })
+
+  it('applies a boolean spellcheckEnabled patch', () => {
+    expect(mergeSettingsPatch(base, { spellcheckEnabled: false }).spellcheckEnabled).toBe(false)
+  })
+
+  it('rejects a non-boolean spellcheckEnabled patch, keeping the current one', () => {
+    expect(mergeSettingsPatch(base, { spellcheckEnabled: 'no' as unknown as boolean }).spellcheckEnabled).toBe(true)
+    const off = mergeSettingsPatch({ ...base, spellcheckEnabled: false }, { spellcheckEnabled: 'no' as unknown as boolean })
+    expect(off.spellcheckEnabled).toBe(false)
+  })
+
+  it('applies a valid spellcheckLanguage patch and accepts null (system default)', () => {
+    expect(mergeSettingsPatch(base, { spellcheckLanguage: 'en-GB' }).spellcheckLanguage).toBe('en-GB')
+    expect(mergeSettingsPatch({ ...base, spellcheckLanguage: 'en-GB' }, { spellcheckLanguage: null }).spellcheckLanguage).toBeNull()
+  })
+
+  it('rejects an invalid spellcheckLanguage patch, keeping the current one', () => {
+    expect(mergeSettingsPatch(base, { spellcheckLanguage: 'fr' as 'en-GB' }).spellcheckLanguage).toBeNull()
+    const gb = mergeSettingsPatch({ ...base, spellcheckLanguage: 'en-GB' }, { spellcheckLanguage: 'fr' as 'en-GB' })
+    expect(gb.spellcheckLanguage).toBe('en-GB')
   })
 })

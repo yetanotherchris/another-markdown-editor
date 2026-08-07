@@ -5,7 +5,9 @@ const defaults: Settings = {
   themeOverride: null,
   explorerVisible: true,
   editorFont: 'sans-serif',
-  editorTheme: 'rustic'
+  editorTheme: 'rustic',
+  spellcheckEnabled: true,
+  spellcheckLanguage: null
 }
 
 let cached: Settings = { ...defaults }

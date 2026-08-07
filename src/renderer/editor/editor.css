@@ -239,6 +239,73 @@
   }
 }
 
+/* Spec 020 (2026-08-07): the JS spellchecker's wavy-red underline on
+   misspelled words in the WYSIWYG editor (applied by the spellcheck plugin's
+   inline decoration). */
+.ame-spelling-error {
+  text-decoration: underline wavy #d0021b;
+  text-decoration-skip-ink: none;
+}
+
+/* The right-click correction menu (SpellingMenu.tsx). */
+.spelling-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  cursor: default;
+}
+
+.spelling-menu {
+  position: fixed;
+  z-index: 201;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--ame-bg);
+  border: 1px solid var(--ame-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  color: var(--ame-text);
+}
+
+.spelling-menu-word {
+  padding: 4px 8px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spelling-menu-none {
+  padding: 4px 8px;
+  color: var(--ame-muted);
+}
+
+.spelling-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ame-text);
+}
+
+.spelling-menu button:hover,
+.spelling-menu button:focus-visible {
+  background: var(--ame-surface);
+  outline: none;
+}
+
+.spelling-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ame-border);
+}
+
 .empty-state {
   display: flex;
   align-items: center;

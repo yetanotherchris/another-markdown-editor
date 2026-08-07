@@ -116,6 +116,11 @@ export type MenuCommand =
 export type EditorThemeName =
   | 'rustic' | 'rustic-serif' | 'monotone' | 'monotone-serif' | 'scholarly'
 
+/** Spec 020: the spellchecker languages the app can select explicitly. A
+ *  closed union — validated in main, never arbitrary text. More languages can
+ *  be added here later (the mechanism is identical). */
+export type SpellcheckLanguage = 'en-GB' | 'en-US'
+
 export interface Settings {
   sidebarWidth: number
   themeOverride: 'light' | 'dark' | null
@@ -132,6 +137,14 @@ export interface Settings {
   /** The selected editor theme (spec 016 FR-001/FR-002). Defaults to
    *  'rustic'. A closed union — validated in main, never arbitrary text. */
   editorTheme: EditorThemeName
+  /** Spec 020 FR-006/FR-009: whether the native spellchecker is enabled.
+   *  Defaults to true. A closed type — validated in main as a boolean, never
+   *  arbitrary text. Persisted via the same settings store as the rest. */
+  spellcheckEnabled: boolean
+  /** Spec 020 (2026-08-07): the explicit spellchecker language, or `null` for
+   *  the platform/system default. A closed union — validated in main. Applied
+   *  via `session.setSpellCheckerLanguages`. */
+  spellcheckLanguage: SpellcheckLanguage | null
 }
 
 export interface DesktopApi {
@@ -184,4 +197,9 @@ export interface DesktopApi {
   requestQuit(): Promise<Result<null>>
   /** Spec 010: toggle the devtools window from the hamburger's View menu. */
   toggleDevTools(): Promise<Result<null>>
+  /** Spec 020 (JS spellchecker): the user's custom dictionary words. */
+  getSpellcheckWords(): Promise<Result<string[]>>
+  /** Spec 020 (JS spellchecker): teach the JS checker a word so it is never
+   *  flagged again. Returns the updated word list. */
+  addSpellcheckWord(word: string): Promise<Result<string[]>>
 }
