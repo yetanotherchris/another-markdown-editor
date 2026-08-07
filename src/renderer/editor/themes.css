@@ -1,0 +1,203 @@
+/* Spec 016 editor themes: the five named visual styles for the formatted WYSIWYG
+ * canvas. Each theme is a block redefining Crepe's token-driven surface
+ * (`--crepe-color-*` / `--crepe-font-*`) under the matching
+ * `data-editor-theme` attribute on the app container. The base `.milkdown`
+ * rules in App.css keep the Inter default; these selectors are more specific so
+ * they win regardless of source order (research R1).
+ *
+ * The theme's values live HERE in the code — never in the config (FR-005).
+ *
+ * Rustic (the default, FR-002/FR-007/US3) is the warm cream `#fdf6e3` canvas
+ * with Inter sans body, headings in the same family, monospace inline code
+ * (warmed from Crepe's near-white `#fffdfb`, user decision 2026-08-07). Rustic
+ * Serif (FR-008/US4) is Rustic with a serif body+headings. Scholarly (FR-012/
+ * US6) is a clean white canvas with #00B0E9 headings and a Helvetica-like sans
+ * body. Monotone + Monotone Serif (FR-009/FR-010/FR-011/US5) are two-tone
+ * schemes that FOLLOW the resolved app theme — the `data-theme` attribute (spec
+ * 013) — live in system mode (research R3).
+ *
+ * The editor theme applies to the formatted canvas only; the source view keeps
+ * its existing app-theme styling (FR-013). The dark-mode canvas override in
+ * App.css was removed: the theme owns the canvas (research R5).
+ */
+
+.app-container[data-editor-theme='rustic'] .milkdown {
+  --crepe-color-background: #fdf6e3;
+  --crepe-color-on-background: #1f1b16;
+  --crepe-color-surface: #fdf3d9;
+  --crepe-color-surface-low: #fcefce;
+  --crepe-color-on-surface: #201b13;
+  --crepe-color-on-surface-variant: #4f4539;
+  --crepe-color-outline: #817567;
+  --crepe-color-primary: #805610;
+  --crepe-color-secondary: #fbdebc;
+  --crepe-color-on-secondary: #271904;
+  --crepe-color-inverse: #362f27;
+  --crepe-color-on-inverse: #fcefe2;
+  --crepe-color-inline-code: #ba1a1a;
+  --crepe-color-error: #ba1a1a;
+  --crepe-color-hover: #f9ecdf;
+  --crepe-color-selected: #ede0d4;
+  --crepe-color-inline-area: #e4d8cc;
+  --crepe-font-default: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --crepe-font-title: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
+
+.app-container[data-editor-theme='rustic-serif'] .milkdown {
+  --crepe-color-background: #fdf6e3;
+  --crepe-color-on-background: #1f1b16;
+  --crepe-color-surface: #fdf3d9;
+  --crepe-color-surface-low: #fcefce;
+  --crepe-color-on-surface: #201b13;
+  --crepe-color-on-surface-variant: #4f4539;
+  --crepe-color-outline: #817567;
+  --crepe-color-primary: #805610;
+  --crepe-color-secondary: #fbdebc;
+  --crepe-color-on-secondary: #271904;
+  --crepe-color-inverse: #362f27;
+  --crepe-color-on-inverse: #fcefe2;
+  --crepe-color-inline-code: #ba1a1a;
+  --crepe-color-error: #ba1a1a;
+  --crepe-color-hover: #f9ecdf;
+  --crepe-color-selected: #ede0d4;
+  --crepe-color-inline-area: #e4d8cc;
+  --crepe-font-default: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --crepe-font-title: Georgia, 'Times New Roman', 'Noto Serif', serif;
+}
+
+/* Spec 012 user decision (carried over): the Crepe top bar is editor CHROME,
+   not the editing surface — its heading-selector label and dropdown re-apply
+   `--crepe-font-default`, so the variable is re-declared to the sans-serif
+   Inter stack within the top-bar scope to keep the toolbar readable in the
+   serif themes. */
+.app-container[data-editor-theme='rustic-serif'] .milkdown .milkdown-top-bar,
+.app-container[data-editor-theme='monotone-serif'] .milkdown .milkdown-top-bar {
+  --crepe-font-default: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
+
+.app-container[data-editor-theme='scholarly'] .milkdown {
+  --crepe-color-background: #ffffff;
+  --crepe-color-on-background: #1a1a1a;
+  --crepe-color-surface: #f7f7f7;
+  --crepe-color-surface-low: #f2f2f2;
+  --crepe-color-on-surface: #1a1a1a;
+  --crepe-color-on-surface-variant: #4d4d4d;
+  --crepe-color-outline: #8a8a8a;
+  --crepe-color-primary: #00b0e9;
+  --crepe-color-secondary: #e5f4fb;
+  --crepe-color-on-secondary: #00313f;
+  --crepe-color-inverse: #1a1a1a;
+  --crepe-color-on-inverse: #f5f5f5;
+  --crepe-color-inline-code: #b50000;
+  --crepe-color-error: #b50000;
+  --crepe-color-hover: #f0f8fb;
+  --crepe-color-selected: #dff0f7;
+  --crepe-color-inline-area: #e4ecf0;
+  --crepe-font-default: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  --crepe-font-title: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+}
+
+/* Scholarly headings in the accent blue #00B0E9 (FR-012, US6 scenario 1). */
+.app-container[data-editor-theme='scholarly'] .milkdown h1,
+.app-container[data-editor-theme='scholarly'] .milkdown h2,
+.app-container[data-editor-theme='scholarly'] .milkdown h3,
+.app-container[data-editor-theme='scholarly'] .milkdown h4,
+.app-container[data-editor-theme='scholarly'] .milkdown h5,
+.app-container[data-editor-theme='scholarly'] .milkdown h6 {
+  color: #00b0e9;
+}
+
+/* Monotone follows the RESOLVED app theme (the `data-theme` attribute, spec
+ * 013) — two-tone, live in system mode (FR-009/FR-010, US5). Light: black on
+ * white. */
+.app-container[data-editor-theme='monotone'][data-theme='light'] .milkdown {
+  --crepe-color-background: #ffffff;
+  --crepe-color-on-background: #000000;
+  --crepe-color-surface: #ffffff;
+  --crepe-color-surface-low: #f2f2f2;
+  --crepe-color-on-surface: #000000;
+  --crepe-color-on-surface-variant: #404040;
+  --crepe-color-outline: #808080;
+  --crepe-color-primary: #000000;
+  --crepe-color-secondary: #ffffff;
+  --crepe-color-on-secondary: #000000;
+  --crepe-color-inverse: #000000;
+  --crepe-color-on-inverse: #ffffff;
+  --crepe-color-inline-code: #000000;
+  --crepe-color-error: #000000;
+  --crepe-color-hover: #e6e6e6;
+  --crepe-color-selected: #cccccc;
+  --crepe-color-inline-area: #e0e0e0;
+  --crepe-font-default: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --crepe-font-title: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
+
+/* Monotone, dark: white on black. */
+.app-container[data-editor-theme='monotone'][data-theme='dark'] .milkdown {
+  --crepe-color-background: #000000;
+  --crepe-color-on-background: #ffffff;
+  --crepe-color-surface: #000000;
+  --crepe-color-surface-low: #1a1a1a;
+  --crepe-color-on-surface: #ffffff;
+  --crepe-color-on-surface-variant: #bfbfbf;
+  --crepe-color-outline: #808080;
+  --crepe-color-primary: #ffffff;
+  --crepe-color-secondary: #000000;
+  --crepe-color-on-secondary: #ffffff;
+  --crepe-color-inverse: #ffffff;
+  --crepe-color-on-inverse: #000000;
+  --crepe-color-inline-code: #ffffff;
+  --crepe-color-error: #ffffff;
+  --crepe-color-hover: #262626;
+  --crepe-color-selected: #333333;
+  --crepe-color-inline-area: #1f1f1f;
+  --crepe-font-default: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --crepe-font-title: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
+
+/* Monotone Serif — identical two-tone schemes, Georgia serif body/headings
+ * (FR-011, US4: same colors as Monotone, serif typeface). */
+.app-container[data-editor-theme='monotone-serif'][data-theme='light'] .milkdown {
+  --crepe-color-background: #ffffff;
+  --crepe-color-on-background: #000000;
+  --crepe-color-surface: #ffffff;
+  --crepe-color-surface-low: #f2f2f2;
+  --crepe-color-on-surface: #000000;
+  --crepe-color-on-surface-variant: #404040;
+  --crepe-color-outline: #808080;
+  --crepe-color-primary: #000000;
+  --crepe-color-secondary: #ffffff;
+  --crepe-color-on-secondary: #000000;
+  --crepe-color-inverse: #000000;
+  --crepe-color-on-inverse: #ffffff;
+  --crepe-color-inline-code: #000000;
+  --crepe-color-error: #000000;
+  --crepe-color-hover: #e6e6e6;
+  --crepe-color-selected: #cccccc;
+  --crepe-color-inline-area: #e0e0e0;
+  --crepe-font-default: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --crepe-font-title: Georgia, 'Times New Roman', 'Noto Serif', serif;
+}
+
+.app-container[data-editor-theme='monotone-serif'][data-theme='dark'] .milkdown {
+  --crepe-color-background: #000000;
+  --crepe-color-on-background: #ffffff;
+  --crepe-color-surface: #000000;
+  --crepe-color-surface-low: #1a1a1a;
+  --crepe-color-on-surface: #ffffff;
+  --crepe-color-on-surface-variant: #bfbfbf;
+  --crepe-color-outline: #808080;
+  --crepe-color-primary: #ffffff;
+  --crepe-color-secondary: #000000;
+  --crepe-color-on-secondary: #ffffff;
+  --crepe-color-inverse: #ffffff;
+  --crepe-color-on-inverse: #000000;
+  --crepe-color-inline-code: #ffffff;
+  --crepe-color-error: #ffffff;
+  --crepe-color-hover: #262626;
+  --crepe-color-selected: #333333;
+  --crepe-color-inline-area: #1f1f1f;
+  --crepe-font-default: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --crepe-font-title: Georgia, 'Times New Roman', 'Noto Serif', serif;
+}

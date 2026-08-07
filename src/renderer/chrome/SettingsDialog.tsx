@@ -1,13 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { EditorThemeName } from '../../shared/ipc-contract'
 import type { ThemeChoice } from '../hooks/useEffectiveTheme'
+import { EDITOR_THEMES } from '../editor/editorThemes'
 import './settings.css'
-
-export type EditorFont = 'sans-serif' | 'serif'
-
-export const EDITOR_FONT_OPTIONS: { value: EditorFont; label: string }[] = [
-  { value: 'sans-serif', label: 'Sans-serif' },
-  { value: 'serif', label: 'Serif' }
-]
 
 /** Spec 013: the theme choices; `'system'` maps to the persisted override
  *  `null` (the setting's default and "follow the OS"). */
@@ -18,11 +13,13 @@ export const THEME_CHOICES: { value: ThemeChoice; label: string }[] = [
 ]
 
 interface SettingsDialogProps {
-  /** The currently selected editor font (from persisted settings). */
-  editorFont: EditorFont
-  /** Spec 012: the apply-immediately model — a selection persists at once. */
-  onEditorFontChange: (font: EditorFont) => void
-  /** The currently selected theme (from persisted settings). */
+  /** The currently selected editor theme (the last value committed via Save). */
+  editorTheme: EditorThemeName
+  /** Spec 016, FR-003/US1 S4: called by the Save button with the staged
+   *  selection, then the dialog closes. Closing without Save leaves the canvas
+   *  at the committed value. */
+  onEditorThemeSave: (theme: EditorThemeName) => void
+  /** The currently selected app theme (from persisted settings). */
   theme: ThemeChoice
   /** Spec 013: the apply-immediately model — a selection persists at once. */
   onThemeChange: (theme: ThemeChoice) => void
@@ -30,17 +27,20 @@ interface SettingsDialogProps {
 }
 
 /**
- * Spec 012/013 settings dialog (contracts/renderer.md). A keyboard-accessible
+ * Spec 012/013/016 settings dialog (contracts/renderer.md). A keyboard-accessible
  * React modal: `role="dialog"` + `aria-modal="true"`, focus trapped on open,
  * closed by Escape or the Close button with focus returning to the hamburger
- * trigger (FR-007). Its settings are the editor font-family choice between
- * sans-serif and serif (spec 012 FR-003/FR-004) and the theme choice between
- * Light, Dark, and System default (spec 013 FR-001), both applied immediately
- * on selection. Never touches the document session (FR-008).
+ * trigger (FR-007). Its settings are the app theme between Light, Dark, and
+ * System default (spec 013 FR-001, applied immediately) and the editor theme —
+ * one of five named canvas styles (spec 016 FR-001) — which is STAGED and only
+ * applied when the user presses **Save** (FR-003/US1 S4). Never touches the
+ * document session (FR-008/FR-014).
  */
-export default function SettingsDialog({ editorFont, onEditorFontChange, theme, onThemeChange, onClose }: SettingsDialogProps) {
+export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, onThemeChange, onClose }: SettingsDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
-  const fontGroupRef = useRef<HTMLFieldSetElement>(null)
+  // Spec 016: the staged editor-theme selection, seeded from the last committed
+  // value. Not applied on click — only the Save button commits it (US1 S4).
+  const [draftEditorTheme, setDraftEditorTheme] = useState<EditorThemeName>(editorTheme)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   // The element that had focus when the dialog opened; focus returns to it on
@@ -51,7 +51,7 @@ export default function SettingsDialog({ editorFont, onEditorFontChange, theme, 
   // restore on close.
   useEffect(() => {
     returnFocusRef.current = document.activeElement as HTMLElement | null
-    fontGroupRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus()
+    dialogRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus()
     return () => {
       returnFocusRef.current?.focus()
     }
@@ -93,7 +93,8 @@ export default function SettingsDialog({ editorFont, onEditorFontChange, theme, 
     <div
       className="settings-dialog-overlay"
       onPointerDown={(e) => {
-        // Clicking the backdrop closes the dialog (outside-click).
+        // Clicking the backdrop closes the dialog (outside-click) — discarding
+        // any staged editor-theme selection (US1 S4).
         if (e.target === e.currentTarget) onClose()
       }}
     >
@@ -117,21 +118,6 @@ export default function SettingsDialog({ editorFont, onEditorFontChange, theme, 
           </button>
         </div>
         <div className="settings-dialog-body">
-          <fieldset ref={fontGroupRef} className="settings-fieldset">
-            <legend className="settings-legend">Editor Font</legend>
-            {EDITOR_FONT_OPTIONS.map((option) => (
-              <label key={option.value} className="settings-radio">
-                <input
-                  type="radio"
-                  name="editor-font"
-                  value={option.value}
-                  checked={editorFont === option.value}
-                  onChange={() => onEditorFontChange(option.value)}
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </fieldset>
           <fieldset className="settings-fieldset">
             <legend className="settings-legend">Theme</legend>
             {THEME_CHOICES.map((option) => (
@@ -147,10 +133,35 @@ export default function SettingsDialog({ editorFont, onEditorFontChange, theme, 
               </label>
             ))}
           </fieldset>
+          <fieldset className="settings-fieldset">
+            <legend className="settings-legend">Editor Theme</legend>
+            {EDITOR_THEMES.map((option) => (
+              <label key={option.value} className="settings-radio">
+                <input
+                  type="radio"
+                  name="editor-theme"
+                  value={option.value}
+                  checked={draftEditorTheme === option.value}
+                  onChange={() => setDraftEditorTheme(option.value)}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </fieldset>
         </div>
         <div className="settings-dialog-footer">
-          <button type="button" className="settings-dialog-done" onClick={onClose}>
+          <button type="button" className="settings-dialog-close-btn" onClick={onClose}>
             Close
+          </button>
+          <button
+            type="button"
+            className="settings-dialog-save"
+            onClick={() => {
+              onEditorThemeSave(draftEditorTheme)
+              onClose()
+            }}
+          >
+            Save
           </button>
         </div>
       </div>

@@ -89,8 +89,30 @@
   margin: 4px 0;
 }
 
+/* 2026-08-07: Crepe wraps each list item's text in a <p> (li > .children > p),
+   so the general `p { margin: 0 0 16px }` rule above stacked onto the li margin
+   and made bullets sit ~20px apart — far looser than GitHub's rendered lists.
+   Zero the inner paragraph margin so the li margin alone owns the rhythm. */
+.editor-host .milkdown .ProseMirror li p {
+  margin: 0;
+  padding: 0;
+}
+
+/* 2026-08-07: Crepe fixes the list marker at height: 32px, but the body text
+   line box is 24px (reset.css), so a numbered marker's centre sat ~4px below
+   its text line. Match the label to the text line box so marker and first line
+   of text align vertically. */
+.editor-host .milkdown .milkdown-list-item-block li .label-wrapper,
+.editor-host .milkdown .milkdown-list-item-block li .label-wrapper .label {
+  height: 24px;
+}
+
 .editor-host .milkdown .ProseMirror blockquote {
   margin: 0 0 16px;
+  /* 2026-08-07: Crepe's reset.css pads blockquotes 40px left (with a 4px bar).
+     Halve the indent to 20px — the default reads too wide inside a desktop
+     canvas. */
+  padding-left: 20px;
 }
 
 .editor-host .milkdown .ProseMirror pre,
@@ -104,6 +126,16 @@
 
 .editor-host .milkdown .ProseMirror table {
   margin: 0 0 16px;
+}
+
+/* 2026-08-07: HTML comments (<!-- … -->) parse into inline `html` atom spans
+   (`span[data-type="html"]`, verified in the live editor). Hide them so the
+   visual canvas reads like rendered markdown — the atom stays in the document
+   and still round-trips to disk on save, so no content is lost. The attribute
+   value is the raw comment (e.g. `<!-- note -->`), so the prefix selector
+   catches every comment node and only comments. */
+.editor-host .milkdown .ProseMirror span[data-type="html"][data-value^="<!--"] {
+  display: none;
 }
 
 /* Crepe's inline SVGs (top-bar icons AND list-item bullet/checkbox markers)

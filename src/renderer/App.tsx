@@ -27,6 +27,7 @@ import { isWorkspaceRelative } from './explorer/operations'
 import './App.css'
 import './chrome/chrome.css'
 import './editor/editor.css'
+import './editor/themes.css'
 
 const initialSession: EditingSession = {
   documents: [],
@@ -44,11 +45,11 @@ export default function App() {
   // Spec 010, US2 (FR-007): persisted explorer visibility drives the collapsed
   // state; handleSidebarResize keeps it in sync while the panel is mounted.
   const [explorerCollapsed, setExplorerCollapsed] = useState(false)
-  // Spec 012/013: the settings-dialog state — open flag, editor font, theme
-  // choice, and the effective data-theme mode (useSettingsState owns them).
+  // Spec 012/013/016: the settings-dialog state — open flag, editor theme, app
+  // theme choice, and the effective data-theme mode (useSettingsState owns them).
   const {
     settingsOpen, setSettingsOpen,
-    editorFont, handleEditorFontChange,
+    editorTheme, handleEditorThemeChange,
     themeChoice, handleThemeChange, themeMode
   } = useSettingsState()
   const sidebarPanelRef = usePanelRef()
@@ -185,7 +186,7 @@ export default function App() {
   const hasWorkspace = workspace.name !== null
 
   return (
-    <div className="app-container" data-editor-font={editorFont} data-theme={themeMode}>
+    <div className="app-container" data-editor-theme={editorTheme} data-theme={themeMode}>
       {/* Spec 010 (2026-08-05): one header row — chrome buttons + tabs. */}
       <div className="header-bar">
         <div className="chrome-bar">
@@ -280,10 +281,10 @@ export default function App() {
 
       {settingsOpen && (
         <SettingsDialog
-          editorFont={editorFont}
-          onEditorFontChange={handleEditorFontChange}
           theme={themeChoice}
           onThemeChange={handleThemeChange}
+          editorTheme={editorTheme}
+          onEditorThemeSave={handleEditorThemeChange}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { updateSettings, getSettings } from '../state/settings'
-import type { EditorFont } from '../chrome/SettingsDialog'
+import type { EditorThemeName } from '../../shared/ipc-contract'
 import {
   useEffectiveTheme,
   themeChoiceFromOverride,
@@ -9,35 +9,41 @@ import {
 import type { ThemeChoice } from './useEffectiveTheme'
 
 /**
- * Spec 012/013: the settings-dialog state the composition root owns — the open
- * flag (single instance), the editor-font choice (spec 012), the theme choice
- * (spec 013), their apply-immediately-and-persist handlers, and the effective
+ * Spec 012/013/016: the settings-dialog state the composition root owns — the
+ * open flag (single instance), the editor theme (spec 016), the app theme
+ * choice (spec 013), their apply-and-persist handlers, and the effective
  * `data-theme` mode. Seeded from the settings cache, which main.tsx preloads
  * before the first render (spec 013 — so a persisted dark theme never flashes
- * light); each selection applies at once and persists through the existing
- * settings store + IPC.
+ * light); each selection persists through the existing settings store + IPC.
+ *
+ * Spec 016 (FR-003/US1 S4): the editor theme is applied ONLY when the dialog's
+ * Save button commits it (the dialog stages the selection locally); the app
+ * theme keeps its apply-immediately behavior (spec 013).
  */
 export function useSettingsState(): {
   settingsOpen: boolean
   setSettingsOpen: (open: boolean) => void
-  editorFont: EditorFont
-  handleEditorFontChange: (font: EditorFont) => void
+  editorTheme: EditorThemeName
+  handleEditorThemeChange: (theme: EditorThemeName) => void
   themeChoice: ThemeChoice
   handleThemeChange: (choice: ThemeChoice) => void
   themeMode: 'light' | 'dark'
 } {
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [editorFont, setEditorFont] = useState<EditorFont>(getSettings().editorFont)
+  const [editorTheme, setEditorTheme] = useState<EditorThemeName>(getSettings().editorTheme)
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() =>
     themeChoiceFromOverride(getSettings().themeOverride)
   )
   const themeMode = useEffectiveTheme(themeChoice)
 
-  // Spec 012, US2: apply the editor font immediately and persist (FR-006).
-  const handleEditorFontChange = useCallback((font: EditorFont) => {
-    setEditorFont(font)
-    updateSettings({ editorFont: font })
-    window.api.updateSettings({ editorFont: font }).catch(() => { /* ignore */ })
+  // Spec 016, FR-003/FR-004: commit the editor theme (persist + apply). Called
+  // by the dialog's Save button; the visual switch flows through `editorTheme`
+  // → the `data-editor-theme` attribute (editor/themes.css). The persisted
+  // value reaches main for validation via updateSettings.
+  const handleEditorThemeChange = useCallback((theme: EditorThemeName) => {
+    setEditorTheme(theme)
+    updateSettings({ editorTheme: theme })
+    window.api.updateSettings({ editorTheme: theme }).catch(() => { /* ignore */ })
   }, [])
 
   // Spec 013: apply the theme immediately and persist (FR-006, FR-008). The
@@ -53,7 +59,7 @@ export function useSettingsState(): {
 
   return {
     settingsOpen, setSettingsOpen,
-    editorFont, handleEditorFontChange,
+    editorTheme, handleEditorThemeChange,
     themeChoice, handleThemeChange, themeMode
   }
 }

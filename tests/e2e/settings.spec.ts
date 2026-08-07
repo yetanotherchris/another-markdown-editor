@@ -10,10 +10,12 @@ import {
 } from './launch'
 
 /**
- * Spec 012 settings suite (contracts/renderer.md §E2e): the Settings dialog,
- * the editor font-family choice (US1/US2), restart persistence (US3), the
- * dirty-document non-interference guarantee (US4/FR-008), keyboard access
- * (FR-007), and missing/malformed-config tolerance (FR-009).
+ * Spec 016 settings suite (contracts/renderer.md §E2e): the Settings dialog with
+ * the Editor Theme control (replaces the spec-012 Editor Font group — user
+ * decision 2026-08-07: the editor theme owns the typeface), the Save-gating
+ * semantics (FR-003/US1 S4), restart persistence (US2), the dirty-document
+ * non-interference guarantee (FR-014), keyboard access (FR-007), and
+ * missing/malformed-config tolerance (FR-006).
  */
 
 let app: ElectronApplication
@@ -55,90 +57,91 @@ async function openFile(): Promise<void> {
   await expect(window.locator('.ProseMirror:visible')).toBeVisible()
 }
 
-/** The editor's `--crepe-font-default` computed value — the mechanism the serif
- *  override uses (plan R2). */
-async function editorFontVar(): Promise<string> {
-  return window.locator('.milkdown').evaluate((el) =>
-    getComputedStyle(el).getPropertyValue('--crepe-font-default').trim()
-  )
+async function canvasBackground(): Promise<string> {
+  return window.locator('.milkdown').evaluate((el) => getComputedStyle(el).backgroundColor)
 }
 
-/** The top bar's resolved font — must stay sans-serif (Inter) regardless of the
- *  document font choice (user decision 2026-08-06). */
-async function toolbarFont(): Promise<string> {
-  return window.locator('.milkdown-top-bar').evaluate((el) =>
-    getComputedStyle(el).fontFamily
-  )
-}
-
-async function persistedEditorFont(): Promise<string | undefined> {
+async function persistedEditorTheme(): Promise<string | undefined> {
   const configPath = path.join(configDir, 'config.json')
   if (!fs.existsSync(configPath)) return undefined
-  return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.editorFont
+  return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.editorTheme
 }
 
-test('US1 the hamburger opens a Settings dialog whose first setting is the editor font', async () => {
+test('US1 the hamburger opens a Settings dialog with the Theme and Editor Theme groups', async () => {
   await openFile()
   const dialog = await openSettingsDialog(window)
 
   // The dialog is a labelled, modal dialog.
   await expect(dialog.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
-  // The first setting is Editor Font with exactly two options (the Theme group
-  // from spec 013 sits below it, so the count is scoped to this group).
-  await expect(dialog.getByRole('group', { name: 'Editor Font' })).toBeVisible()
-  const options = dialog.getByRole('group', { name: 'Editor Font' }).getByRole('radio')
-  await expect(options).toHaveCount(2)
-  await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).toBeVisible()
-  await expect(dialog.getByRole('radio', { name: 'Serif', exact: true })).toBeVisible()
+  // The app Theme group (spec 013) has exactly three options.
+  await expect(dialog.getByRole('group', { name: 'Theme', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('group', { name: 'Theme', exact: true }).getByRole('radio')).toHaveCount(3)
+
+  // The Editor Theme group (spec 016) lists exactly five options (FR-001).
+  const themeGroup = dialog.getByRole('group', { name: 'Editor Theme' })
+  await expect(themeGroup).toBeVisible()
+  await expect(themeGroup.getByRole('radio')).toHaveCount(5)
+  await expect(themeGroup.getByRole('radio', { name: 'Rustic', exact: true })).toBeVisible()
+  await expect(themeGroup.getByRole('radio', { name: 'Scholarly', exact: true })).toBeVisible()
 })
 
-test('US2 selecting Serif applies it to the editing surface and persists it', async () => {
+test('US1 S2/S3 selecting a theme and pressing Save applies it and persists it', async () => {
   await openFile()
-  const defaultFont = await editorFontVar()
-  expect(defaultFont).not.toContain('Georgia')
-  // The toolbar is editor chrome — sans-serif Inter by default.
-  const defaultToolbar = await toolbarFont()
-  expect(defaultToolbar).toContain('Inter')
+  // Default canvas is Rustic (warm off-white #fdf6e3).
+  await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)')
 
   const dialog = await openSettingsDialog(window)
-  await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
+  await dialog.getByRole('radio', { name: 'Scholarly', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
-  // The editing surface re-renders in a serif face immediately (FR-005).
-  await expect.poll(editorFontVar).toContain('Georgia')
+  // The canvas re-renders in Scholarly immediately (FR-003).
+  await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'scholarly')
+  await expect.poll(canvasBackground).toBe('rgb(255, 255, 255)')
 
-  // The toolbar stays sans-serif (Inter) even though the document is serif
-  // (user decision 2026-08-06: the toolbar is chrome, not the editing surface).
-  expect(await toolbarFont()).toContain('Inter')
-
-  // The choice is persisted to the shared config.json (FR-002/FR-006).
-  await expect.poll(persistedEditorFont).toBe('serif')
+  // The choice is persisted to the shared config.json (FR-004/FR-005).
+  await expect.poll(persistedEditorTheme).toBe('scholarly')
 })
 
-test('US2/FR-007 reopening the dialog shows the current font choice selected', async () => {
+test('US1 S4 closing without Save leaves the theme at the last committed value', async () => {
   await openFile()
-  let dialog = await openSettingsDialog(window)
-  await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
+  const dialog = await openSettingsDialog(window)
+  await dialog.getByRole('radio', { name: 'Monotone', exact: true }).check()
+  // Close with the X — the staged selection is discarded.
   await dialog.getByRole('button', { name: 'Close settings' }).click()
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
-  dialog = await openSettingsDialog(window)
-  await expect(dialog.getByRole('radio', { name: 'Serif', exact: true })).toBeChecked()
-  await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).not.toBeChecked()
+  await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
+  await expect.poll(persistedEditorTheme).toBe('rustic')
 })
 
-test('US3 the font choice survives a restart', async () => {
+test('US2/FR-007 reopening the dialog shows the current committed theme selected', async () => {
+  await openFile()
+  let dialog = await openSettingsDialog(window)
+  await dialog.getByRole('radio', { name: 'Rustic Serif', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
+
+  dialog = await openSettingsDialog(window)
+  await expect(dialog.getByRole('radio', { name: 'Rustic Serif', exact: true })).toBeChecked()
+  await expect(dialog.getByRole('radio', { name: 'Rustic', exact: true })).not.toBeChecked()
+})
+
+test('US2 the theme choice survives a restart', async () => {
   await openFile()
   const dialog = await openSettingsDialog(window)
-  await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
-  await expect.poll(persistedEditorFont).toBe('serif')
+  await dialog.getByRole('radio', { name: 'Monotone Serif', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(persistedEditorTheme).toBe('monotone-serif')
 
   await closeAppSafely(app)
 
-  // Restart with the same config; the editor renders serif.
+  // Restart with the same config; the dialog shows the saved theme.
   ;({ app, window } = await launchApp(configDir, testFolder))
   await openFile()
-  await expect.poll(editorFontVar).toContain('Georgia')
+  const reopened = await openSettingsDialog(window)
+  await expect(reopened.getByRole('radio', { name: 'Monotone Serif', exact: true })).toBeChecked()
 })
 
 test('US4 the dialog never discards or alters the open document', async () => {
@@ -150,11 +153,11 @@ test('US4 the dialog never discards or alters the open document', async () => {
   await expect(alphaTab.locator('.tab-dirty')).toBeVisible()
 
   const dialog = await openSettingsDialog(window)
-  await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
-  await dialog.getByRole('button', { name: 'Close settings' }).click()
+  await dialog.getByRole('radio', { name: 'Scholarly', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
-  // The typed text and the dirty marker are unchanged (FR-008).
+  // The typed text and the dirty marker are unchanged (FR-008/FR-014).
   await expect(window.locator('.ProseMirror:visible')).toContainText('EXTRA')
   await expect(alphaTab.locator('.tab-dirty')).toBeVisible()
 })
@@ -178,34 +181,39 @@ test('FR-007 the dialog is keyboard-accessible (open, navigate, close)', async (
   await window.keyboard.press('Enter')
   await expect(window.getByTestId('settings-dialog')).toBeVisible()
 
-  // The radio group is reachable and arrow keys change the selection.
+  // The Editor Theme group is reachable and arrow keys change the staged
+  // selection (the canvas does NOT change until Save).
   const dialog = window.getByTestId('settings-dialog')
-  await dialog.getByRole('radio', { name: 'Sans-serif', exact: true }).focus()
+  const themeGroup = dialog.getByRole('group', { name: 'Editor Theme' })
+  await themeGroup.getByRole('radio', { name: 'Rustic', exact: true }).focus()
   await window.keyboard.press('ArrowDown')
-  await expect(dialog.getByRole('radio', { name: 'Serif', exact: true })).toBeChecked()
-  await expect.poll(editorFontVar).toContain('Georgia')
+  await expect(themeGroup.getByRole('radio', { name: 'Rustic Serif', exact: true })).toBeChecked()
+  // Staged only — the canvas is still the default Rustic.
+  await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
 
-  // Escape closes the dialog.
+  // Escape closes the dialog without committing the staged selection.
   await window.keyboard.press('Escape')
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
+  await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
 })
 
-test('FR-009 a missing config opens with defaults and a change writes a valid config', async () => {
+test('FR-006 a missing config opens with Rustic default and a change writes a valid config', async () => {
   // No config.json exists yet (fresh AME_CONFIG_DIR).
   await openFile()
   const dialog = await openSettingsDialog(window)
-  await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).toBeChecked()
+  await expect(dialog.getByRole('radio', { name: 'Rustic', exact: true })).toBeChecked()
 
-  await dialog.getByRole('radio', { name: 'Serif', exact: true }).check()
-  await expect.poll(persistedEditorFont).toBe('serif')
+  await dialog.getByRole('radio', { name: 'Rustic Serif', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(persistedEditorTheme).toBe('rustic-serif')
   // The written config is valid JSON and still carries recentItems.
   const configPath = path.join(configDir, 'config.json')
   const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-  expect(parsed.settings.editorFont).toBe('serif')
+  expect(parsed.settings.editorTheme).toBe('rustic-serif')
   expect(parsed.recentItems).toBeDefined()
 })
 
-test('FR-009 a malformed config still opens the dialog with defaults', async () => {
+test('FR-006 a malformed config still opens the dialog with Rustic default', async () => {
   const configPath = path.join(configDir, 'config.json')
   fs.writeFileSync(configPath, '{ not json', 'utf-8')
 
@@ -214,7 +222,7 @@ test('FR-009 a malformed config still opens the dialog with defaults', async () 
   // dialog reads it (review #27 #4 — the old test was vacuous). Opening the
   // dialog directly exercises the true malformed-config tolerance path.
   const dialog = await openSettingsDialog(window)
-  await expect(dialog.getByRole('radio', { name: 'Sans-serif', exact: true })).toBeChecked()
+  await expect(dialog.getByRole('radio', { name: 'Rustic', exact: true })).toBeChecked()
   // The malformed file was not rewritten by merely opening the dialog.
   expect(fs.readFileSync(configPath, 'utf-8')).toBe('{ not json')
 })

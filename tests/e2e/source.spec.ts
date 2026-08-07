@@ -238,7 +238,16 @@ test('US5: Backspace removes an empty task item', async () => {
   // Place the caret in the paragraph text, then add one empty block.
   await window.locator('[contenteditable="true"] p').last().click()
   await window.keyboard.press('End')
+  // Wait for the new empty paragraph Enter creates to be ingested BEFORE
+  // toggling it — the toolbar button reads the block state, and clicking it
+  // before the new block lands can toggle the previous paragraph, so no list
+  // item ever appears (pre-existing race, fixed 2026-08-07).
+  const blockCount = await window.locator('[contenteditable="true"] p').count()
   await window.keyboard.press('Enter')
+  await expect(window.locator('[contenteditable="true"] p')).toHaveCount(blockCount + 1)
+  // Ensure the caret is inside the new empty block before the toolbar toggle —
+  // Enter alone may leave the selection at the old block under load.
+  await window.locator('[contenteditable="true"] p').last().click()
   // Create the task item strictly with the checklist control (SC-005) rather
   // than by typing `- [ ] ` raw — the raw path makes the button click race the
   // ingest of the typed text and is flaky.
