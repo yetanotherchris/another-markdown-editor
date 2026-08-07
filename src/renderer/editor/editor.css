@@ -34,6 +34,16 @@
   padding: 16px 48px;
 }
 
+/* Spec 018 (FR-002): the WYSIWYG editor toolbar (the TopBar Crepe renders for
+   each instance) is a shade of grey darker than the active tab pill. The main
+   app header bar keeps its existing --ame-surface; only this toolbar moves
+   darker. The override targets the top bar directly rather than redefining
+   --crepe-color-surface, which also paints the table cells and the heading
+   dropdown (research R1, FR-005). */
+.milkdown .milkdown-top-bar {
+  background: var(--ame-header);
+}
+
 /* GitHub-style block spacing (2026-08-07): Crepe's reset.css collapses block
    rhythm to `padding: 4px 0` on paragraphs and no bottom margins anywhere,
    which renders documents visually squashed. GitHub's rendered markdown
