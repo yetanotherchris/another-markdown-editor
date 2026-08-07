@@ -6,6 +6,7 @@ import { registerWorkspaceHandlers } from './handlers/workspace'
 import { registerDialogHandlers } from './handlers/dialogs'
 import { registerSettingsHandlers } from './handlers/settings'
 import { registerRecentHandlers } from './handlers/recent'
+import { registerSpellcheckHandlers } from './handlers/spellcheck'
 
 let registered = false
 
@@ -19,4 +20,5 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   registerDialogHandlers(window, ctx)
   registerSettingsHandlers(window, ctx)
   registerRecentHandlers(window, ctx)
+  registerSpellcheckHandlers(window, ctx)
 }

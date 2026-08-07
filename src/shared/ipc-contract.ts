@@ -197,4 +197,9 @@ export interface DesktopApi {
   requestQuit(): Promise<Result<null>>
   /** Spec 010: toggle the devtools window from the hamburger's View menu. */
   toggleDevTools(): Promise<Result<null>>
+  /** Spec 020 (JS spellchecker): the user's custom dictionary words. */
+  getSpellcheckWords(): Promise<Result<string[]>>
+  /** Spec 020 (JS spellchecker): teach the JS checker a word so it is never
+   *  flagged again. Returns the updated word list. */
+  addSpellcheckWord(word: string): Promise<Result<string[]>>
 }

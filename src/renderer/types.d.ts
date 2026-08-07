@@ -6,4 +6,10 @@ declare global {
   }
 }
 
+/** Vite `?raw` imports (spec 020: bundled Hunspell dictionary files). */
+declare module '*?raw' {
+  const content: string
+  export default content
+}
+
 export {}

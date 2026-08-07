@@ -18,6 +18,9 @@ import { useWorkspaceFolder } from './hooks/useWorkspaceFolder'
 import { useSidebarLayout } from './hooks/useSidebarLayout'
 import { useSettingsState } from './hooks/useSettingsState'
 import EditorPanel from './editor/EditorPanel'
+import SpellingMenu from './editor/SpellingMenu'
+import type { SpellingMenuState } from './editor/spellcheckPlugin'
+import { updateSpellcheckRuntime } from './editor/spellcheckRuntime'
 import Tree from './explorer/Tree'
 import TabBar from './tabs/TabBar'
 import StatusFooter from './status/StatusFooter'
@@ -42,6 +45,8 @@ export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(workspaceReducer, initialWorkspaceState)
   const [pendingEditId, setPendingEditId] = useState<string | null>(null)
   const [footerNote, setFooterNote] = useState<string | null>(null)
+  // Spec 020 (JS spellchecker): the open correction menu, or null.
+  const [spellMenu, setSpellMenu] = useState<SpellingMenuState | null>(null)
   // Spec 010, US2 (FR-007): persisted explorer visibility drives the collapsed
   // state; handleSidebarResize keeps it in sync while the panel is mounted.
   const [explorerCollapsed, setExplorerCollapsed] = useState(false)
@@ -54,6 +59,19 @@ export default function App() {
     spellcheckLanguage, handleSpellcheckLanguageChange,
     themeChoice, handleThemeChange, themeMode
   } = useSettingsState()
+
+  // Spec 020 (JS spellchecker): keep the shared runtime in sync with the
+  // persisted settings, and load the user dictionary once on startup.
+  useEffect(() => {
+    updateSpellcheckRuntime({ enabled: spellcheckEnabled, language: spellcheckLanguage })
+  }, [spellcheckEnabled, spellcheckLanguage])
+  useEffect(() => {
+    let alive = true
+    window.api.getSpellcheckWords().then((res) => {
+      if (res.ok && alive) updateSpellcheckRuntime({ customWords: new Set(res.value) })
+    }).catch(() => { /* non-critical */ })
+    return () => { alive = false }
+  }, [])
   const sidebarPanelRef = usePanelRef()
   // Spec 010, US2 (FR-007): set once the initial restore has run, so resize
   // events while the panel settles are not persisted as the user's choice.
@@ -263,6 +281,7 @@ export default function App() {
                     document={doc}
                     isActive={doc.id === session.activeId}
                     spellcheckEnabled={spellcheckEnabled}
+                    onSpellingMenu={setSpellMenu}
                     onContentChange={sessionApi.handleContentChange}
                     onBaselineCapture={sessionApi.handleBaselineCapture}
                     onCursorState={sessionApi.handleCursorState}
@@ -295,6 +314,8 @@ export default function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
+
+      {spellMenu && <SpellingMenu menu={spellMenu} onDismiss={() => setSpellMenu(null)} />}
     </div>
   )
 }
