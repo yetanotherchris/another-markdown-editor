@@ -14,7 +14,7 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true })
+      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: null })
     }
   })
 
@@ -33,8 +33,8 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
       applyThemeOverride(updated.themeOverride)
       // Spec 020 FR-006/US4 S1: a spellcheck toggle applies immediately — the
       // session spellchecker flips now, so markers vanish/return without
-      // waiting for the debounced disk write.
-      applySpellcheckSetting(updated.spellcheckEnabled)
+      // waiting for the debounced disk write. The language is applied too.
+      applySpellcheckSetting(updated.spellcheckEnabled, updated.spellcheckLanguage)
       return ok(updated)
     } catch (e: unknown) {
       return err('IO', sanitizeError(e, null))

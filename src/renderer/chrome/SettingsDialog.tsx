@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { EditorThemeName } from '../../shared/ipc-contract'
+import type { EditorThemeName, SpellcheckLanguage } from '../../shared/ipc-contract'
 import type { ThemeChoice } from '../hooks/useEffectiveTheme'
 import { EDITOR_THEMES } from '../editor/editorThemes'
 import './settings.css'
@@ -10,6 +10,14 @@ export const THEME_CHOICES: { value: ThemeChoice; label: string }[] = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'system', label: 'System default' }
+]
+
+/** Spec 020 (2026-08-07): the explicit spellchecker languages offered, with
+ *  `''` mapping to the persisted `null` ("follow the system"). A closed list —
+ *  more languages can be added here later. */
+export const SPELLCHECK_LANGUAGE_CHOICES: { value: SpellcheckLanguage; label: string }[] = [
+  { value: 'en-GB', label: 'English (United Kingdom)' },
+  { value: 'en-US', label: 'English (United States)' }
 ]
 
 interface SettingsDialogProps {
@@ -27,6 +35,10 @@ interface SettingsDialogProps {
    *  on change (S1: markers vanish the moment the box is unchecked). */
   spellcheckEnabled: boolean
   onSpellcheckChange: (enabled: boolean) => void
+  /** Spec 020 (2026-08-07): the explicit spellchecker language, or `null` for
+   *  the system default. Applied immediately. */
+  spellcheckLanguage: SpellcheckLanguage | null
+  onSpellcheckLanguageChange: (language: SpellcheckLanguage | null) => void
   onClose: () => void
 }
 
@@ -40,7 +52,7 @@ interface SettingsDialogProps {
  * applied when the user presses **Save** (FR-003/US1 S4). Never touches the
  * document session (FR-008/FR-014).
  */
-export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, onThemeChange, spellcheckEnabled, onSpellcheckChange, onClose }: SettingsDialogProps) {
+export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, onThemeChange, spellcheckEnabled, onSpellcheckChange, spellcheckLanguage, onSpellcheckLanguageChange, onClose }: SettingsDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   // Spec 016: the staged editor-theme selection, seeded from the last committed
   // value. Not applied on click — only the Save button commits it (US1 S4).
@@ -162,6 +174,21 @@ export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, 
                 onChange={(e) => onSpellcheckChange(e.target.checked)}
               />
               <span>Check spelling while typing</span>
+            </label>
+            <label className="settings-select-label" htmlFor="spellcheck-language">
+              <span>Language</span>
+              <select
+                id="spellcheck-language"
+                data-testid="spellcheck-language"
+                value={spellcheckLanguage ?? ''}
+                disabled={!spellcheckEnabled}
+                onChange={(e) => onSpellcheckLanguageChange(e.target.value === '' ? null : e.target.value as SpellcheckLanguage)}
+              >
+                <option value="">System default</option>
+                {SPELLCHECK_LANGUAGE_CHOICES.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </label>
           </fieldset>
         </div>

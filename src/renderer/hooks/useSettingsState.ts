@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { updateSettings, getSettings } from '../state/settings'
-import type { EditorThemeName } from '../../shared/ipc-contract'
+import type { EditorThemeName, SpellcheckLanguage } from '../../shared/ipc-contract'
 import {
   useEffectiveTheme,
   themeChoiceFromOverride,
@@ -27,6 +27,8 @@ export function useSettingsState(): {
   handleEditorThemeChange: (theme: EditorThemeName) => void
   spellcheckEnabled: boolean
   handleSpellcheckChange: (enabled: boolean) => void
+  spellcheckLanguage: SpellcheckLanguage | null
+  handleSpellcheckLanguageChange: (language: SpellcheckLanguage | null) => void
   themeChoice: ThemeChoice
   handleThemeChange: (choice: ThemeChoice) => void
   themeMode: 'light' | 'dark'
@@ -34,6 +36,7 @@ export function useSettingsState(): {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editorTheme, setEditorTheme] = useState<EditorThemeName>(getSettings().editorTheme)
   const [spellcheckEnabled, setSpellcheckEnabled] = useState<boolean>(getSettings().spellcheckEnabled)
+  const [spellcheckLanguage, setSpellcheckLanguage] = useState<SpellcheckLanguage | null>(getSettings().spellcheckLanguage)
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() =>
     themeChoiceFromOverride(getSettings().themeOverride)
   )
@@ -70,10 +73,19 @@ export function useSettingsState(): {
     window.api.updateSettings({ spellcheckEnabled: enabled }).catch(() => { /* ignore */ })
   }, [])
 
+  // Spec 020 (2026-08-07): apply the chosen spellchecker language immediately
+  // and persist it. `null` = the platform/system default (applied in main).
+  const handleSpellcheckLanguageChange = useCallback((language: SpellcheckLanguage | null) => {
+    setSpellcheckLanguage(language)
+    updateSettings({ spellcheckLanguage: language })
+    window.api.updateSettings({ spellcheckLanguage: language }).catch(() => { /* ignore */ })
+  }, [])
+
   return {
     settingsOpen, setSettingsOpen,
     editorTheme, handleEditorThemeChange,
     spellcheckEnabled, handleSpellcheckChange,
+    spellcheckLanguage, handleSpellcheckLanguageChange,
     themeChoice, handleThemeChange, themeMode
   }
 }

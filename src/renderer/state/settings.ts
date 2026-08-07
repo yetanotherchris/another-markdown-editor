@@ -6,7 +6,8 @@ const defaults: Settings = {
   explorerVisible: true,
   editorFont: 'sans-serif',
   editorTheme: 'rustic',
-  spellcheckEnabled: true
+  spellcheckEnabled: true,
+  spellcheckLanguage: null
 }
 
 let cached: Settings = { ...defaults }

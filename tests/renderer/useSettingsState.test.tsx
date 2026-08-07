@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { useSettingsState } from '../../src/renderer/hooks/useSettingsState'
 import { getSettings, updateSettings } from '../../src/renderer/state/settings'
-import type { EditorThemeName } from '../../src/shared/ipc-contract'
+import type { EditorThemeName, SpellcheckLanguage } from '../../src/shared/ipc-contract'
 import type { ThemeChoice } from '../../src/renderer/hooks/useEffectiveTheme'
 
 /**
@@ -17,10 +17,10 @@ import type { ThemeChoice } from '../../src/renderer/hooks/useEffectiveTheme'
 // Minimal stub of the two DesktopApi calls the hook makes. The preload surface
 // types `window.api` globally (src/renderer/types.d.ts); tests replace it.
 function stubApi(): void {
-  const calls: Array<{ editorTheme?: EditorThemeName; spellcheckEnabled?: boolean }> = []
-  ;(globalThis as unknown as { __apiCalls: Array<{ editorTheme?: EditorThemeName; spellcheckEnabled?: boolean }> }).__apiCalls = calls
+  const calls: Array<{ editorTheme?: EditorThemeName; spellcheckEnabled?: boolean; spellcheckLanguage?: SpellcheckLanguage | null }> = []
+  ;(globalThis as unknown as { __apiCalls: Array<{ editorTheme?: EditorThemeName; spellcheckEnabled?: boolean; spellcheckLanguage?: SpellcheckLanguage | null }> }).__apiCalls = calls
   window.api = {
-    updateSettings: (patch: { editorTheme?: EditorThemeName; spellcheckEnabled?: boolean }) => {
+    updateSettings: (patch: { editorTheme?: EditorThemeName; spellcheckEnabled?: boolean; spellcheckLanguage?: SpellcheckLanguage | null }) => {
       calls.push(patch)
       return Promise.resolve({ ok: true, value: getSettings() as never })
     }
@@ -104,6 +104,23 @@ describe('useSettingsState (spec 016)', () => {
     updateSettings({ spellcheckEnabled: true })
     const { read } = renderHook()
     expect(read().spellcheckEnabled).toBe(true)
+  })
+
+  it('exposes the persisted spellcheckLanguage (null = system default)', () => {
+    updateSettings({ spellcheckLanguage: 'en-GB' })
+    const { read } = renderHook()
+    expect(read().spellcheckLanguage).toBe('en-GB')
+  })
+
+  it('handleSpellcheckLanguageChange updates local state, the cache, and the IPC', () => {
+    const { read } = renderHook()
+    act(() => {
+      read().handleSpellcheckLanguageChange('en-US')
+    })
+    expect(read().spellcheckLanguage).toBe('en-US')
+    expect(getSettings().spellcheckLanguage).toBe('en-US')
+    const calls = (globalThis as unknown as { __apiCalls: { spellcheckLanguage?: SpellcheckLanguage | null }[] }).__apiCalls
+    expect(calls).toEqual([{ spellcheckLanguage: 'en-US' }])
   })
 
   it('still exposes the app-theme choice plumbing (spec 013)', () => {

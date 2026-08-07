@@ -87,7 +87,7 @@ app.whenReady().then(() => {
   applyThemeOverride(loadSettings().themeOverride)
   // Spec 020 FR-006/FR-009: apply the persisted spellcheck choice BEFORE the
   // window loads, so the first paint already honours it.
-  applySpellcheckSetting(loadSettings().spellcheckEnabled)
+  applySpellcheckSetting(loadSettings().spellcheckEnabled, loadSettings().spellcheckLanguage)
   createWindow()
 })
 

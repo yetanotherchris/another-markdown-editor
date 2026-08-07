@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import type { Settings, EditorThemeName } from '../shared/ipc-contract'
+import type { Settings, EditorThemeName, SpellcheckLanguage } from '../shared/ipc-contract'
 import { atomicWrite } from './fs/atomicWrite'
 
 /**
@@ -25,7 +25,8 @@ export const DEFAULTS: Settings = {
   explorerVisible: true,
   editorFont: 'sans-serif',
   editorTheme: 'rustic',
-  spellcheckEnabled: true
+  spellcheckEnabled: true,
+  spellcheckLanguage: null
 }
 
 /** Read the whole shared config file, tolerantly: `{}` when missing or invalid.
@@ -44,8 +45,15 @@ const EDITOR_THEME_NAMES: readonly EditorThemeName[] = [
   'rustic', 'rustic-serif', 'monotone', 'monotone-serif', 'scholarly'
 ]
 
+/** The closed union of selectable spellcheck languages (spec 020). */
+const SPELLCHECK_LANGUAGES: readonly SpellcheckLanguage[] = ['en-GB', 'en-US']
+
 function isEditorThemeName(value: unknown): value is EditorThemeName {
   return typeof value === 'string' && (EDITOR_THEME_NAMES as readonly string[]).includes(value)
+}
+
+function isSpellcheckLanguage(value: unknown): value is SpellcheckLanguage {
+  return typeof value === 'string' && (SPELLCHECK_LANGUAGES as readonly string[]).includes(value)
 }
 
 function validateSettings(raw: unknown): Settings {
@@ -61,7 +69,9 @@ function validateSettings(raw: unknown): Settings {
       ? parsed.editorFont : DEFAULTS.editorFont,
     editorTheme: isEditorThemeName(parsed.editorTheme) ? parsed.editorTheme : DEFAULTS.editorTheme,
     spellcheckEnabled: typeof parsed.spellcheckEnabled === 'boolean'
-      ? parsed.spellcheckEnabled : DEFAULTS.spellcheckEnabled
+      ? parsed.spellcheckEnabled : DEFAULTS.spellcheckEnabled,
+    spellcheckLanguage: parsed.spellcheckLanguage === null || isSpellcheckLanguage(parsed.spellcheckLanguage)
+      ? parsed.spellcheckLanguage : DEFAULTS.spellcheckLanguage
   }
 }
 
@@ -85,7 +95,9 @@ export function mergeSettingsPatch(current: Settings, patch: Partial<Settings>):
       : current.editorFont,
     editorTheme: isEditorThemeName(patch.editorTheme) ? patch.editorTheme : current.editorTheme,
     spellcheckEnabled: typeof patch.spellcheckEnabled === 'boolean'
-      ? patch.spellcheckEnabled : current.spellcheckEnabled
+      ? patch.spellcheckEnabled : current.spellcheckEnabled,
+    spellcheckLanguage: patch.spellcheckLanguage === null || isSpellcheckLanguage(patch.spellcheckLanguage)
+      ? patch.spellcheckLanguage : current.spellcheckLanguage
   }
 }
 
@@ -115,7 +127,7 @@ export function migrateLegacySettingsFile(configPath: string, legacyPath: string
   // legacy file with, say, only `themeOverride` should still be imported rather
   // than dropped whole. validateSettings recovers every field individually.
   if (!legacy || typeof legacy !== 'object') return null
-  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont', 'editorTheme', 'spellcheckEnabled']
+  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont', 'editorTheme', 'spellcheckEnabled', 'spellcheckLanguage']
   if (!known.some((k) => k in legacy)) return null
   const migrated = validateSettings(legacy)
   try {

@@ -116,6 +116,11 @@ export type MenuCommand =
 export type EditorThemeName =
   | 'rustic' | 'rustic-serif' | 'monotone' | 'monotone-serif' | 'scholarly'
 
+/** Spec 020: the spellchecker languages the app can select explicitly. A
+ *  closed union — validated in main, never arbitrary text. More languages can
+ *  be added here later (the mechanism is identical). */
+export type SpellcheckLanguage = 'en-GB' | 'en-US'
+
 export interface Settings {
   sidebarWidth: number
   themeOverride: 'light' | 'dark' | null
@@ -136,6 +141,10 @@ export interface Settings {
    *  Defaults to true. A closed type — validated in main as a boolean, never
    *  arbitrary text. Persisted via the same settings store as the rest. */
   spellcheckEnabled: boolean
+  /** Spec 020 (2026-08-07): the explicit spellchecker language, or `null` for
+   *  the platform/system default. A closed union — validated in main. Applied
+   *  via `session.setSpellCheckerLanguages`. */
+  spellcheckLanguage: SpellcheckLanguage | null
 }
 
 export interface DesktopApi {

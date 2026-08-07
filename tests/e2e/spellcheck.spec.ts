@@ -328,3 +328,30 @@ test('US4 the spellcheck choice persists across restarts', async () => {
   expect(await sessionEnabled(app)).toBe(false)
   expect(await editorSpellcheck(window)).toBe(false)
 })
+
+test('the spellcheck language setting applies immediately and persists', async () => {
+  await openWorkspaceFile(window, 'note.md')
+
+  // Default: the platform/system default, no explicit override.
+  await openSettingsDialog(window)
+  await expect(window.getByTestId('spellcheck-language')).toHaveValue('')
+  await window.getByRole('button', { name: 'Close settings' }).click()
+
+  // Pick an explicit language (en-US): applied to the session immediately and
+  // written to the settings store.
+  await openSettingsDialog(window)
+  await window.getByTestId('spellcheck-language').selectOption('en-US')
+  await window.getByRole('button', { name: 'Close settings' }).click()
+  expect(await app.evaluate(({ session }) => session.defaultSession.getSpellCheckerLanguages())).toEqual(['en-US'])
+  await expect.poll(() => {
+    const configPath = path.join(configDir, 'config.json')
+    if (!fs.existsSync(configPath)) return undefined
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.spellcheckLanguage
+  }).toBe('en-US')
+
+  // Restart: the persisted language is applied at startup.
+  await closeAppSafely(app)
+  ;({ app, window } = await launchApp(configDir, testFolder, userDataDir))
+  await installSpellcheckHooks(app)
+  expect(await app.evaluate(({ session }) => session.defaultSession.getSpellCheckerLanguages())).toEqual(['en-US'])
+})

@@ -51,6 +51,7 @@ export default function App() {
     settingsOpen, setSettingsOpen,
     editorTheme, handleEditorThemeChange,
     spellcheckEnabled, handleSpellcheckChange,
+    spellcheckLanguage, handleSpellcheckLanguageChange,
     themeChoice, handleThemeChange, themeMode
   } = useSettingsState()
   const sidebarPanelRef = usePanelRef()
@@ -289,6 +290,8 @@ export default function App() {
           onEditorThemeSave={handleEditorThemeChange}
           spellcheckEnabled={spellcheckEnabled}
           onSpellcheckChange={handleSpellcheckChange}
+          spellcheckLanguage={spellcheckLanguage}
+          onSpellcheckLanguageChange={handleSpellcheckLanguageChange}
           onClose={() => setSettingsOpen(false)}
         />
       )}
