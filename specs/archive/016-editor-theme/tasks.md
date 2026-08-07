@@ -80,7 +80,7 @@ and validates end-to-end through `settings:get`/`settings:update`.
 - [X] T007 Create `src/renderer/editor/themes.css` with one
       `.app-container[data-editor-theme='X'] .milkdown` block per theme
       redefining Crepe's `--crepe-color-*`/`--crepe-font-*` tokens (research
-      R1/R2). Rustic = `#fffdfb` warm canvas + Inter sans + monospace code
+      R1/R2). Rustic = `#fdf6e3` warm canvas + Inter sans + monospace code
       (FR-007, US3). Rustic Serif = same palette, Georgia serif body/headings
       (FR-008, US4). Scholarly = white canvas, `#00B0E9` headings, Arial/
       'Helvetica Neue' body, same monospace code (FR-012, US6). Monotone +
@@ -135,7 +135,7 @@ pressing Save re-themes the canvas; closing without Save leaves it unchanged.
       persistence, and keep the general dialog tests (keyboard access, config
       tolerance, dirty-doc non-interference).
 - [X] T016 Update `tests/e2e/theme.spec.ts` FR-010: the default Rustic canvas stays
-      `#fffdfb` in dark mode; the Monotone theme follows the app theme (research
+      `#fdf6e3` in dark mode; the Monotone theme follows the app theme (research
       R5). Keep the chrome/app-theme assertions unchanged.
 - [X] T016b Addendum (user request, spec addendum 2026-08-07): four CSS-only
       canvas polish fixes in `src/renderer/editor/editor.css` — tight list-item

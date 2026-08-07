@@ -127,7 +127,7 @@ test('US1 S4 closing the dialog without Save leaves the canvas unchanged', async
   await openFile(window, 'alpha.md')
   // The default canvas is Rustic (warm off-white).
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
-  await expect.poll(canvasBackground).toBe('rgb(255, 253, 251)') // #fffdfb
+  await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)') // #fdf6e3
 
   const dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Scholarly', exact: true }).check()
@@ -136,7 +136,7 @@ test('US1 S4 closing the dialog without Save leaves the canvas unchanged', async
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
-  await expect.poll(canvasBackground).toBe('rgb(255, 253, 251)')
+  await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)')
   await expect.poll(persistedEditorTheme).toBe('rustic')
 })
 
@@ -161,7 +161,7 @@ test('US3 the default canvas is the Rustic theme', async () => {
   await openFile(window, 'alpha.md')
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
   // Warm off-white canvas, sans-serif (Inter) body, monospace inline code.
-  await expect.poll(canvasBackground).toBe('rgb(255, 253, 251)') // #fffdfb
+  await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)') // #fdf6e3
   expect(isSerif(await bodyFont())).toBe(false)
   const codeFont = await window.locator('.milkdown').evaluate((el) =>
     getComputedStyle(el).getPropertyValue('--crepe-font-code').trim()
@@ -177,7 +177,7 @@ test('US4 Rustic Serif keeps the warm canvas but renders body and headings in a 
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic-serif')
-  await expect.poll(canvasBackground).toBe('rgb(255, 253, 251)') // same warm canvas
+  await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)') // same warm canvas
   await expect.poll(bodyFont).toBe('Georgia, \'Times New Roman\', \'Noto Serif\', serif')
 })
 
@@ -287,7 +287,7 @@ test('FR-006 a missing config opens with the default Rustic theme and a change w
   // No config.json exists yet (fresh AME_CONFIG_DIR).
   await openFile(window, 'alpha.md')
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
-  await expect.poll(canvasBackground).toBe('rgb(255, 253, 251)')
+  await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)')
 
   const dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Rustic Serif', exact: true }).check()

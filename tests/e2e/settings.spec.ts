@@ -88,8 +88,8 @@ test('US1 the hamburger opens a Settings dialog with the Theme and Editor Theme 
 
 test('US1 S2/S3 selecting a theme and pressing Save applies it and persists it', async () => {
   await openFile()
-  // Default canvas is Rustic (warm off-white #fffdfb).
-  await expect.poll(canvasBackground).toBe('rgb(255, 253, 251)')
+  // Default canvas is Rustic (warm off-white #fdf6e3).
+  await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)')
 
   const dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Scholarly', exact: true }).check()

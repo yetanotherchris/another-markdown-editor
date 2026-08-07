@@ -11,7 +11,7 @@ theme the app loads via `@milkdown/crepe/theme/classic.css`):
 
 ```css
 .milkdown {
-  --crepe-color-background: #fffdfb;      /* warm off-white canvas */
+  --crepe-color-background: #fdf6e3;      /* warm off-white canvas */
   --crepe-color-on-background: #1f1b16;   /* body text */
   --crepe-font-title: Georgia, Cambria, 'Times New Roman', Times, serif;
   --crepe-font-default: 'Open Sans', Arial, Helvetica, sans-serif;
@@ -22,10 +22,13 @@ theme the app loads via `@milkdown/crepe/theme/classic.css`):
 
 Two consequences:
 
-1. **Rustic == the current canvas.** `#fffdfb` background and the Inter
-   `--crepe-font-*` override in `App.css` (spec 003/012) already describe the
-   Rustic theme exactly (US3/FR-007). The theme block re-asserts them explicitly
-   so the theme is self-contained in code (FR-005), but it is a visual no-op.
+1. **Rustic derives from the current canvas.** The Inter `--crepe-font-*`
+   override in `App.css` (spec 003/012) and Crepe's warm base already define the
+   Rustic look; the theme block re-asserts the tokens so the theme is
+   self-contained in code (FR-005). The canvas background was warmed from the
+   near-white `#fffdfb` to the cream `#fdf6e3` (user decision 2026-08-07) — so
+   the block is no longer a pure no-op for the background, but it remains a
+   single-token swap.
 2. **Themes are CSS swaps.** Every theme is a `.app-container[data-editor-theme='X']
    .milkdown { ... }` block redefining the tokens; the selector is more specific
    than the bare `.milkdown`, so source order is irrelevant. Inline code follows
@@ -96,4 +99,4 @@ so Rustic/Scholarly keep their fixed palettes in dark chrome. The chrome palette
 (`--ame-*`, sidebar, header, tabs) is untouched — spec 013's app-theme behavior is
 preserved; only the *canvas* stops following dark mode except for Monotone. The
 archived `theme.spec.ts` FR-010 test is updated to assert: default Rustic canvas
-stays `#fffdfb` in dark mode; Monotone flips to black/white.
+stays `#fdf6e3` in dark mode; Monotone flips to black/white.

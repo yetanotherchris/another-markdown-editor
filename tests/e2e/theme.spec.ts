@@ -134,10 +134,10 @@ test('US4 the theme survives a restart', async () => {
 
 test('FR-010 the default Rustic canvas keeps its palette in dark mode; Monotone follows', async () => {
   await openFile(window, 'alpha.md')
-  // The default editor theme is Rustic: warm off-white #fffdfb (spec 016 FR-007).
+  // The default editor theme is Rustic: warm off-white #fdf6e3 (spec 016 FR-007).
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
   const lightBackground = await editorBackground()
-  expect(lightBackground).toBe('rgb(255, 253, 251)') // #fffdfb
+  expect(lightBackground).toBe('rgb(253, 246, 227)') // #fdf6e3
 
   // The app theme can be dark WITHOUT re-theming the canvas — the editor theme
   // owns the canvas; only the Monotone themes follow the resolved app theme
@@ -147,7 +147,7 @@ test('FR-010 the default Rustic canvas keeps its palette in dark mode; Monotone 
   await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark')
   await expect.poll(headerBackground).toBe('rgb(31, 31, 31)') // chrome dark
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
-  await expect.poll(editorBackground).toBe('rgb(255, 253, 251)') // canvas stays warm
+  await expect.poll(editorBackground).toBe('rgb(253, 246, 227)') // canvas stays warm
 
   // Monotone follows the app theme: dark → white text on a black canvas.
   await dialog.getByRole('radio', { name: 'Monotone', exact: true }).check()

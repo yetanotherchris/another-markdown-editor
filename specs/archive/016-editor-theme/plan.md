@@ -19,7 +19,7 @@ config file (FR-005).
 
 1. **The editor theme owns the canvas.** The formatted canvas's palette and
    typeface come entirely from the selected editor theme — NOT from the app
-   light/dark mode (spec 013). Rustic's warm off-white `#fffdfb` canvas stays warm
+   light/dark mode (spec 013). Rustic's warm off-white `#fdf6e3` canvas stays warm
    even when the app chrome is dark; only the **Monotone** themes follow the
    resolved app light/dark, live in system mode (FR-009/FR-010). This supersedes
    the spec-013 behavior where dark mode darkened the canvas; the archived
@@ -160,16 +160,17 @@ blocks each, scoped additionally by `[data-theme='light']`/`[data-theme='dark']`
 
 | Theme | Background | Body text | Headings | Body/heading typeface | Inline code |
 |-------|-----------|-----------|----------|----------------------|-------------|
-| Rustic | `#fffdfb` | `#1f1b16` (current) | same as body | Inter (sans) | monospace (unchanged) |
-| Rustic Serif | `#fffdfb` | `#1f1b16` | same | Georgia/'Times New Roman'/serif | monospace |
+| Rustic | `#fdf6e3` | `#1f1b16` (current) | same as body | Inter (sans) | monospace (unchanged) |
+| Rustic Serif | `#fdf6e3` | `#1f1b16` | same | Georgia/'Times New Roman'/serif | monospace |
 | Monotone (light) | `#ffffff` | `#000000` | `#000000` | Inter (sans) | monospace |
 | Monotone (dark) | `#000000` | `#ffffff` | `#ffffff` | Inter (sans) | monospace |
 | Monotone Serif (light/dark) | as Monotone | | | Georgia stack | monospace |
 | Scholarly | `#ffffff` | dark text | `#00B0E9` | Arial/'Helvetica Neue'/sans (Helvetica-like) | monospace |
 
-Rustic equals the current canvas (R2: Crepe classic is already `#fffdfb` + the
-Inter `--crepe-font-*` override in `App.css`), so it is the safe default and a
-no-op against today's look (US3). The dark-mode canvas overrides and the
+Rustic derives from the current canvas (R2: Crepe classic warm base + the Inter
+`--crepe-font-*` override in `App.css`), with the canvas background warmed from
+`#fffdfb` to the cream `#fdf6e3` (user decision 2026-08-07) — it is the safe
+default (US3). The dark-mode canvas overrides and the
 `[data-theme='dark'] .milkdown` block in `App.css` are **removed** (theme owns the
 canvas; only Monotone follows the app theme). The `.source-view` keeps resolving
 `--ame-editor-bg`/`--ame-text` (FR-013).
@@ -254,7 +255,7 @@ existing `getSettings`/`updateSettings` — no new IPC (Principle I).
 | Adding a fifth field to `Settings` after spec 012 deliberately stopped at four | The editor theme is a first-class persisted setting with its own name; reusing an existing field would mislabel it | Mapping the five themes onto `editorFont`'s serif/sans union (loses three themes) |
 | Keeping the now-inert persisted `editorFont` field | User decision: removing it would orphan existing configs and require a schema-breaking migration with no user value; it is validated/ignored but never applied | Deleting the field (breaks migration of existing `config.json` files) |
 | Removing the spec-012 Editor Font group (behavior change to an archived spec) | User decision 2026-08-07: the editor theme owns the typeface; serif/sans is expressed through theme choice. Keeping both created contradictory canvas states | Keeping the group (two controls fight over the same `--crepe-font-*` variables) |
-| Editor theme owns the canvas palette, superseding spec-013 dark-canvas behavior | User decision 2026-08-07: themes are the canvas's source of truth; only Monotone follows the app light/dark. This is the spec's FR-009/FR-010 intent | Keeping dark mode darken every canvas (Rustic could never be `#fffdfb` in dark chrome, contradicting FR-007) |
+| Editor theme owns the canvas palette, superseding spec-013 dark-canvas behavior | User decision 2026-08-07: themes are the canvas's source of truth; only Monotone follows the app light/dark. This is the spec's FR-009/FR-010 intent | Keeping dark mode darken every canvas (Rustic could never be `#fdf6e3` in dark chrome, contradicting FR-007) |
 
 ## Decision log
 
@@ -291,6 +292,10 @@ existing `getSettings`/`updateSettings` — no new IPC (Principle I).
   24px text line box, and HTML comments hidden on the canvas (atom stays in the
   document, round-trips to disk). All in `src/renderer/editor/editor.css`,
   documented in the spec's Addendum, covered by an e2e test.
+- **Rustic canvas warmed to `#fdf6e3` (user decision 2026-08-07)**: the Rustic
+  and Rustic Serif canvas background is the warm cream `#fdf6e3` (RGB
+  253,246,227), warmed from Crepe's near-white `#fffdfb`. Recorded in the spec
+  Clarifications; all e2e assertions and artifact docs updated.
 - **Pre-existing flaky test hardened (archived spec 002)**: the US5 task-backspace
   e2e test could fail intermittently — after pressing Enter, it clicked the
   "Task list" toolbar control before the new empty block was ingested, so the

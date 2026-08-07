@@ -79,7 +79,7 @@ npm run dev
    (`%APPDATA%/ame/config.json`, or your `AME_CONFIG_DIR`) — `.settings.editorTheme`
    is `"scholarly"`.
 3. **US3 — Rustic default**: Wipe the config (or point `AME_CONFIG_DIR` at a fresh
-   dir). The canvas is the warm off-white `#fffdfb` with a sans-serif (Inter) body
+   dir). The canvas is the warm off-white `#fdf6e3` with a sans-serif (Inter) body
    and monospace inline code.
 4. **US4 — serif variant**: Switch to **Rustic Serif** and Save. The same warm
    canvas now renders body and headings in a serif (Georgia) face.

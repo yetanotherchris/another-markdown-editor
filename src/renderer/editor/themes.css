@@ -7,13 +7,14 @@
  *
  * The theme's values live HERE in the code — never in the config (FR-005).
  *
- * Rustic (the default, FR-002/FR-007/US3) equals the current canvas: warm
- * off-white #fffdfb, Inter sans body, headings in the same family, monospace
- * inline code. Rustic Serif (FR-008/US4) is Rustic with a serif body+headings.
- * Scholarly (FR-012/US6) is a clean white canvas with #00B0E9 headings and a
- * Helvetica-like sans body. Monotone + Monotone Serif (FR-009/FR-010/FR-011/US5)
- * are two-tone schemes that FOLLOW the resolved app theme — the `data-theme`
- * attribute (spec 013) — live in system mode (research R3).
+ * Rustic (the default, FR-002/FR-007/US3) is the warm cream `#fdf6e3` canvas
+ * with Inter sans body, headings in the same family, monospace inline code
+ * (warmed from Crepe's near-white `#fffdfb`, user decision 2026-08-07). Rustic
+ * Serif (FR-008/US4) is Rustic with a serif body+headings. Scholarly (FR-012/
+ * US6) is a clean white canvas with #00B0E9 headings and a Helvetica-like sans
+ * body. Monotone + Monotone Serif (FR-009/FR-010/FR-011/US5) are two-tone
+ * schemes that FOLLOW the resolved app theme — the `data-theme` attribute (spec
+ * 013) — live in system mode (research R3).
  *
  * The editor theme applies to the formatted canvas only; the source view keeps
  * its existing app-theme styling (FR-013). The dark-mode canvas override in
@@ -21,10 +22,10 @@
  */
 
 .app-container[data-editor-theme='rustic'] .milkdown {
-  --crepe-color-background: #fffdfb;
+  --crepe-color-background: #fdf6e3;
   --crepe-color-on-background: #1f1b16;
-  --crepe-color-surface: #fff8f4;
-  --crepe-color-surface-low: #fff1e5;
+  --crepe-color-surface: #fdf3d9;
+  --crepe-color-surface-low: #fcefce;
   --crepe-color-on-surface: #201b13;
   --crepe-color-on-surface-variant: #4f4539;
   --crepe-color-outline: #817567;
@@ -43,10 +44,10 @@
 }
 
 .app-container[data-editor-theme='rustic-serif'] .milkdown {
-  --crepe-color-background: #fffdfb;
+  --crepe-color-background: #fdf6e3;
   --crepe-color-on-background: #1f1b16;
-  --crepe-color-surface: #fff8f4;
-  --crepe-color-surface-low: #fff1e5;
+  --crepe-color-surface: #fdf3d9;
+  --crepe-color-surface-low: #fcefce;
   --crepe-color-on-surface: #201b13;
   --crepe-color-on-surface-variant: #4f4539;
   --crepe-color-outline: #817567;

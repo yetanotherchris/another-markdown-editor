@@ -31,7 +31,8 @@ no longer applied to the canvas; the Editor Font group is removed from the dialo
 `--crepe-color-*`/`--crepe-font-*` tokens under
 `.app-container[data-editor-theme='X'] .milkdown`. Monotone themes add a
 `[data-theme='light'|'dark']` qualifier so they follow the resolved app theme,
-live in system mode (FR-010). Rustic equals the current canvas (R1/R2).
+live in system mode (FR-010). Rustic derives from the current canvas with a
+warmed cream `#fdf6e3` background (R1/R2, user decision 2026-08-07).
 
 The canvas-only scope (FR-013): the source view keeps resolving
 `--ame-editor-bg`/`--ame-text` and is not re-themed by this feature. The dark-mode
@@ -65,9 +66,9 @@ dialog MUST NOT touch the document session (unchanged, FR-014).
    and `data-editor-theme` are unchanged.
 4. **US2** — save Scholarly, restart with the same `AME_CONFIG_DIR`: the canvas
    reopens in Scholarly (FR-004).
-5. **US3** — default canvas is Rustic: `.milkdown` background `#fffdfb`, body text
+5. **US3** — default canvas is Rustic: `.milkdown` background `#fdf6e3`, body text
    in a sans-serif face (Inter), inline code monospace.
-6. **US4** — switch Rustic → Rustic Serif: same `#fffdfb` canvas, body + headings
+6. **US4** — switch Rustic → Rustic Serif: same `#fdf6e3` canvas, body + headings
    now a serif face.
 7. **US5** — Monotone: with app theme Light, `.milkdown` is white bg / black text;
    with app theme Dark, black bg / white text. In system mode, `emulateMedia`

@@ -53,7 +53,7 @@ The Rustic theme is the default and reproduces the current WYSIWYG editing surfa
 **Acceptance Scenarios**:
 
 1. **Given** no editor theme has been saved, **When** the user edits a document in the formatted view, **Then** the canvas uses the Rustic theme.
-2. **Given** the Rustic theme is active, **When** the user views a document, **Then** the canvas background is the warm off-white `#fffdfb`.
+2. **Given** the Rustic theme is active, **When** the user views a document, **Then** the canvas background is the warm off-white `#fdf6e3`.
 3. **Given** the Rustic theme is active, **When** the user views body text, **Then** it renders in a modern sans-serif typeface at the base reading size, with headings in the same family at progressively larger fixed sizes.
 4. **Given** the Rustic theme is active, **When** the user views inline code, **Then** it renders in a monospace typeface.
 
@@ -69,7 +69,7 @@ The Rustic Serif and Monotone Serif themes keep everything about their non-serif
 
 **Acceptance Scenarios**:
 
-1. **Given** the Rustic Serif theme is active, **When** the user views body text and headings, **Then** both render in a serif typeface, and the canvas background remains `#fffdfb`.
+1. **Given** the Rustic Serif theme is active, **When** the user views body text and headings, **Then** both render in a serif typeface, and the canvas background remains `#fdf6e3`.
 2. **Given** the Monotone Serif theme is active, **When** the user views body text and headings, **Then** both render in a serif typeface, and the colors still follow the resolved app theme exactly as the Monotone theme does.
 
 ---
@@ -128,7 +128,7 @@ The Scholarly theme renders the editor canvas with a clean white background, a d
 - **FR-004**: The editor theme selection MUST persist across application restarts.
 - **FR-005**: The configuration file MUST store the selected theme by name; the visual values for each theme MUST live in the application code, not in the configuration file.
 - **FR-006**: A missing, unreadable, malformed, or unknown theme value in the configuration file MUST fall back to the default Rustic theme without breaking the application.
-- **FR-007**: The Rustic theme MUST match the current formatted editor canvas: a warm off-white background (`#fffdfb`), a modern sans-serif body typeface, headings in the same family at fixed progressively larger sizes, and monospace inline code.
+- **FR-007**: The Rustic theme MUST match the current formatted editor canvas: a warm off-white background (`#fdf6e3`), a modern sans-serif body typeface, headings in the same family at fixed progressively larger sizes, and monospace inline code.
 - **FR-008**: The Rustic Serif theme MUST reproduce the Rustic theme exactly except that body text and headings render in a serif typeface.
 - **FR-009**: The Monotone theme MUST render the canvas in a two-tone scheme matching the resolved app theme: black text on white in light mode, white text on black in dark mode.
 - **FR-010**: When the app theme is set to system mode and a Monotone or Monotone Serif theme is active, the canvas MUST follow the operating system's light/dark mode, updating live while the application is running.
@@ -178,6 +178,11 @@ The Scholarly theme renders the editor canvas with a clean white background, a d
 - **2026-08-06 — Themes apply to the formatted canvas only.** The raw markdown
   source view retains its existing styling and is not re-themed (FR-013, US4/5
   edge cases).
+- **2026-08-07 — Rustic's canvas is the warm cream `#fdf6e3`, not `#fffdfb`.**
+  The Rustic (and Rustic Serif) canvas background was warmed from Crepe's
+  near-white `#fffdfb` to `#fdf6e3` (user decision). This amends FR-007, FR-008,
+  US3 scenario 2, and US4 scenario 1: "warm off-white" is the warmer cream
+  `#fdf6e3` (RGB 253,246,227). Everything else about Rustic is unchanged.
 
 ## Addendum — Editor canvas polish (2026-08-07)
 

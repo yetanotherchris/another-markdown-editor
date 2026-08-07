@@ -12,8 +12,8 @@ concrete values (colors, typefaces, sizes) live in the application CSS
 
 | Name | Value | Canvas background | Body text | Headings | Typeface |
 |------|-------|-------------------|-----------|----------|----------|
-| Rustic | `'rustic'` | `#fffdfb` | `#1f1b16` | same as body | Inter (sans-serif) |
-| Rustic Serif | `'rustic-serif'` | `#fffdfb` | `#1f1b16` | same | Georgia stack (serif) |
+| Rustic | `'rustic'` | `#fdf6e3` | `#1f1b16` | same as body | Inter (sans-serif) |
+| Rustic Serif | `'rustic-serif'` | `#fdf6e3` | `#1f1b16` | same | Georgia stack (serif) |
 | Monotone | `'monotone'` | white/black per app theme | black/white per app theme | same | Inter (sans-serif) |
 | Monotone Serif | `'monotone-serif'` | as Monotone | as Monotone | same | Georgia stack (serif) |
 | Scholarly | `'scholarly'` | `#ffffff` | dark text | `#00B0E9` | Arial/'Helvetica Neue' (Helvetica-like sans) |
