@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-06
 
-**Status**: Archived (implemented in `018-header-bar-shade`, merged to `main` 2026-08-07)
+**Status**: Archived (implemented in `018-header-bar-shade`, PR #34)
 
 **Input**: User description: "The header bar in the wysiwg editor should be a shade of grey - slightly darker than the tab/pill grey"
 

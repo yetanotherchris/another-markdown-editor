@@ -94,14 +94,16 @@ toolbar resolves `--ame-header` in both themes and the header bar is unchanged.
 
 **Purpose**: verify consistency and run the full gate.
 
-- [ ] T006 Final gates: `npm run lint`, `npm run typecheck`, `npm run test`,
+- [X] T006 Final gates: `npm run lint`, `npm run typecheck`, `npm run test`,
       `npm run test:e2e`, `npm run check` all green; verify plan/research/
       contracts are consistent with the final code; mark this task `[X]` only
       then.
 
 **Checkpoint**: the five-command gate passes. (NOTE: `npm run check` reports one
 pre-existing violation — `src/renderer/state/documents.ts` at 543 lines, the
-500-line limit — in a file this feature does not touch.)
+500-line limit — in a file this feature does not touch. The full `test:e2e`
+suite shows one pre-existing ordering-dependent flake, `US5 task backspace` in
+`tests/e2e/source.spec.ts`, which reproduces on clean `main`.)
 
 ---
 
