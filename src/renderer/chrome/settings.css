@@ -94,7 +94,6 @@
   border-top: 1px solid var(--ame-border);
 }
 
-.settings-dialog-done,
 .settings-dialog-close-btn,
 .settings-dialog-save {
   padding: 6px 16px;
@@ -104,14 +103,12 @@
   cursor: pointer;
 }
 
-.settings-dialog-done,
 .settings-dialog-close-btn {
   background: var(--ame-surface-secondary);
   color: var(--ame-text);
   border: 1px solid var(--ame-border);
 }
 
-.settings-dialog-done:hover,
 .settings-dialog-close-btn:hover {
   background: var(--ame-surface);
 }
@@ -127,7 +124,6 @@
 
 /* outline: none is offset by a visible keyboard focus indicator (WCAG 2.4.11). */
 .settings-dialog-close:focus-visible,
-.settings-dialog-done:focus-visible,
 .settings-dialog-close-btn:focus-visible,
 .settings-dialog-save:focus-visible,
 .settings-radio:focus-within {
