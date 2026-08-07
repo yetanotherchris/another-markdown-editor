@@ -33,6 +33,7 @@ describe('loadSettingsFile', () => {
     expect(result).toEqual(DEFAULTS)
     expect(result.explorerVisible).toBe(true)
     expect(result.editorFont).toBe('sans-serif')
+    expect(result.editorTheme).toBe('rustic')
   })
 
   it('returns the defaults when the file is malformed', () => {
@@ -49,10 +50,10 @@ describe('loadSettingsFile', () => {
 
   it('reads all four fields from a valid settings section', () => {
     const file = tempSettingsFile(JSON.stringify({
-      settings: { sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif' }
+      settings: { sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly' }
     }))
     expect(loadSettingsFile(file))
-      .toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif' })
+      .toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly' })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
@@ -90,6 +91,33 @@ describe('loadSettingsFile', () => {
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
+  it('defaults editorTheme to rustic when the field is missing', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif' }
+    }))
+    expect(loadSettingsFile(file).editorTheme).toBe('rustic')
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
+  it('accepts each of the five editorTheme values', () => {
+    const themes = ['rustic', 'rustic-serif', 'monotone', 'monotone-serif', 'scholarly'] as const
+    for (const theme of themes) {
+      const file = tempSettingsFile(JSON.stringify({
+        settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: theme }
+      }))
+      expect(loadSettingsFile(file).editorTheme).toBe(theme)
+      fs.rmSync(path.dirname(file), { recursive: true, force: true })
+    }
+  })
+
+  it('rejects an invalid editorTheme value (spec 016: closed union)', () => {
+    const file = tempSettingsFile(JSON.stringify({
+      settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'ocean' }
+    }))
+    expect(loadSettingsFile(file).editorTheme).toBe('rustic')
+    fs.rmSync(path.dirname(file), { recursive: true, force: true })
+  })
+
   it('keeps recoverable fields from a partially-corrupt file', () => {
     const file = tempSettingsFile(JSON.stringify({
       settings: { sidebarWidth: 'wide', themeOverride: null, explorerVisible: false, editorFont: 'serif' }
@@ -98,7 +126,8 @@ describe('loadSettingsFile', () => {
       sidebarWidth: 30,
       themeOverride: null,
       explorerVisible: false,
-      editorFont: 'serif'
+      editorFont: 'serif',
+      editorTheme: 'rustic'
     })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
@@ -107,12 +136,13 @@ describe('loadSettingsFile', () => {
 describe('writeSettingsFile (shared config, spec 012 FR-002)', () => {
   it('writes a settings section that round-trips', () => {
     const file = tempSettingsFile()
-    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false, editorFont: 'serif' })
+    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false, editorFont: 'serif', editorTheme: 'rustic' })
     expect(loadSettingsFile(file)).toEqual({
       sidebarWidth: 25,
       themeOverride: null,
       explorerVisible: false,
-      editorFont: 'serif'
+      editorFont: 'serif',
+      editorTheme: 'rustic'
     })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
@@ -158,7 +188,7 @@ describe('migrateLegacySettingsFile (spec 012, one-time migration)', () => {
 
     const migrated = migrateLegacySettingsFile(configPath, legacyPath)
     expect(migrated).toEqual({
-      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false, editorFont: 'sans-serif'
+      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false, editorFont: 'sans-serif', editorTheme: 'rustic'
     })
     // The values are now in config.json (read back through the shared file).
     expect(loadSettingsFile(configPath)).toEqual(migrated)
@@ -218,6 +248,25 @@ describe('migrateLegacySettingsFile (spec 012, one-time migration)', () => {
     expect(loadSettingsFile(configPath).themeOverride).toBe('dark')
     fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
   })
+
+  it('imports a valid legacy editorTheme value during migration', () => {
+    const configPath = tempSettingsFile()
+    const legacyPath = path.join(path.dirname(configPath), 'settings.json')
+    fs.writeFileSync(legacyPath, JSON.stringify({ editorTheme: 'scholarly' }), 'utf-8')
+    const migrated = migrateLegacySettingsFile(configPath, legacyPath)
+    expect(migrated?.editorTheme).toBe('scholarly')
+    expect(loadSettingsFile(configPath).editorTheme).toBe('scholarly')
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
+
+  it('defaults editorTheme to rustic when the legacy file lacks it', () => {
+    const configPath = tempSettingsFile()
+    const legacyPath = path.join(path.dirname(configPath), 'settings.json')
+    fs.writeFileSync(legacyPath, JSON.stringify({ themeOverride: 'dark' }), 'utf-8')
+    const migrated = migrateLegacySettingsFile(configPath, legacyPath)
+    expect(migrated?.editorTheme).toBe('rustic')
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true })
+  })
 })
 
 describe('mergeSettingsPatch (review #27: authoritative in-memory merge)', () => {
@@ -246,5 +295,14 @@ describe('mergeSettingsPatch (review #27: authoritative in-memory merge)', () =>
     expect(mergeSettingsPatch(base, { themeOverride: 'dark' }).themeOverride).toBe('dark')
     expect(mergeSettingsPatch(base, { themeOverride: null }).themeOverride).toBe(null)
     expect(mergeSettingsPatch(base, { themeOverride: 'sepia' as 'dark' }).themeOverride).toBe(null)
+  })
+
+  it('applies a valid editorTheme patch', () => {
+    expect(mergeSettingsPatch(base, { editorTheme: 'monotone' }).editorTheme).toBe('monotone')
+    expect(mergeSettingsPatch(base, { editorTheme: 'scholarly' }).editorTheme).toBe('scholarly')
+  })
+
+  it('rejects an invalid editorTheme value, keeping the current one', () => {
+    expect(mergeSettingsPatch(base, { editorTheme: 'ocean' as 'rustic' }).editorTheme).toBe('rustic')
   })
 })

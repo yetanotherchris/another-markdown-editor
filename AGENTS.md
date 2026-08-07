@@ -285,7 +285,7 @@ AGENTS.md                         This file
 | 013-theme-setting | Archived | Complete |
 | 014-view-source-icon | Spec only | Not yet planned |
 | 015-explorer-reveal-location | Spec only | Not yet planned |
-| 016-editor-theme | Spec only | Not yet planned |
+| 016-editor-theme | Archived | Complete |
 | 017-codebase-refactor | Archived | Complete |
 | 018-header-bar-shade | Archived | Complete |
 | 021-frontmatter-handling | Archived | Complete |

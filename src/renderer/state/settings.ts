@@ -4,7 +4,8 @@ const defaults: Settings = {
   sidebarWidth: 30,
   themeOverride: null,
   explorerVisible: true,
-  editorFont: 'sans-serif'
+  editorFont: 'sans-serif',
+  editorTheme: 'rustic'
 }
 
 let cached: Settings = { ...defaults }

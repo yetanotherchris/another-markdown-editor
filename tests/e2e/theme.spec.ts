@@ -60,28 +60,9 @@ async function editorBackground(): Promise<string> {
   return window.locator('.milkdown').evaluate((el) => getComputedStyle(el).backgroundColor)
 }
 
-/** The sidebar's resolved background — the chrome's `--ame-surface-secondary`
- *  token (the VS Code palette's "Sidebar file explorer" #181818). */
-async function sidebarBackground(): Promise<string> {
-  return window.locator('.sidebar-panel').evaluate((el) => getComputedStyle(el).backgroundColor)
-}
-
 /** The editor's default text colour (the `--crepe-color-on-background` token). */
 async function editorTextColor(): Promise<string> {
   return window.locator('.milkdown').evaluate((el) => getComputedStyle(el).color)
-}
-
-/** The editor's heading colour ("Header text in the editor", #CCCCCC). */
-async function headingColor(): Promise<string> {
-  return window.locator('.milkdown h1').evaluate((el) => getComputedStyle(el).color)
-}
-
-/** Sum the RGB channels of an `rgb(r, g, b)` string — a coarse "how light is
- *  it" measure for the FR-010 "canvas lighter than the window" check. */
-function channelSum(rgb: string): number {
-  const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(rgb)
-  if (!m) throw new Error(`expected an rgb() color, got ${rgb}`)
-  return Number(m[1]) + Number(m[2]) + Number(m[3])
 }
 
 async function persistedThemeOverride(): Promise<string | null | undefined> {
@@ -151,34 +132,33 @@ test('US4 the theme survives a restart', async () => {
   await expect.poll(headerBackground).toBe('rgb(31, 31, 31)')
 })
 
-test('FR-010 the WYSIWYG editor content area follows the dark theme', async () => {
+test('FR-010 the default Rustic canvas keeps its palette in dark mode; Monotone follows', async () => {
   await openFile(window, 'alpha.md')
-  // The editor starts on the existing light surface (Crepe's classic palette).
+  // The default editor theme is Rustic: warm off-white #fffdfb (spec 016 FR-007).
+  await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
   const lightBackground = await editorBackground()
   expect(lightBackground).toBe('rgb(255, 253, 251)') // #fffdfb
 
+  // The app theme can be dark WITHOUT re-theming the canvas — the editor theme
+  // owns the canvas; only the Monotone themes follow the resolved app theme
+  // (spec 016 user decision 2026-08-07; research R5). The chrome flips dark.
   const dialog = await openSettingsDialog(window)
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).check()
   await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark')
+  await expect.poll(headerBackground).toBe('rgb(31, 31, 31)') // chrome dark
+  await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
+  await expect.poll(editorBackground).toBe('rgb(255, 253, 251)') // canvas stays warm
 
-  // The editing surface flips to the VS Code Dark palette (FR-010): canvas
-  // #1F1F1F, body text #8C8C8C (Primary Text), headings #CCCCCC.
-  await expect.poll(editorBackground).toBe('rgb(31, 31, 31)') // #1F1F1F
-  expect(await editorTextColor()).toBe('rgb(140, 140, 140)') // #8C8C8C
-  expect(await headingColor()).toBe('rgb(204, 204, 204)') // #CCCCCC
-
-  // The canvas (#1F1F1F) is lighter than the sidebar (#181818) but still dark.
-  const canvas = channelSum(await editorBackground())
-  const sidebar = channelSum(await sidebarBackground())
-  expect(sidebar).toBe(channelSum('rgb(24, 24, 24)'))
-  expect(canvas).toBeGreaterThan(sidebar)
-  expect(canvas).toBeLessThan(channelSum('rgb(255, 255, 255)'))
-
-  // Close the dialog, then check the source view follows the theme — the "Back
-  // to visual editing" button must not fall back to black text on the dark
-  // surface (regression guard).
-  await dialog.getByRole('button', { name: 'Close settings' }).click()
+  // Monotone follows the app theme: dark → white text on a black canvas.
+  await dialog.getByRole('radio', { name: 'Monotone', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
+  await expect.poll(editorBackground).toBe('rgb(0, 0, 0)')
+  expect(await editorTextColor()).toBe('rgb(255, 255, 255)')
+
+  // The source view still follows the app theme — the "Back to visual editing"
+  // button must not fall back to black text on the dark surface (regression
+  // guard, unchanged from spec 013).
   await window.getByRole('button', { name: 'View source' }).click()
   await expect(window.getByTestId('source-view')).toBeVisible()
   expect(await window.locator('.source-return').evaluate((el) => getComputedStyle(el).color))
@@ -190,7 +170,7 @@ test('FR-007 the Theme group is keyboard-reachable and arrow-key navigable', asy
   const dialog = await openSettingsDialog(window)
 
   // The theme radios are real radios in the dialog's focus trap.
-  const themeGroup = dialog.getByRole('group', { name: 'Theme' })
+  const themeGroup = dialog.getByRole('group', { name: 'Theme', exact: true })
   await expect(themeGroup.getByRole('radio')).toHaveCount(3)
 
   // Arrow keys move the selection and apply the theme immediately.

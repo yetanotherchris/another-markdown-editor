@@ -110,6 +110,12 @@ export type MenuCommand =
   | 'close-tab' | 'new-file'
   | { type: 'open-recent'; path: string; kind: RecentKind }
 
+/** The five named visual styles for the formatted WYSIWYG canvas (spec 016).
+ *  A closed union — validated in main, never arbitrary text. The theme's values
+ *  (colors, typefaces) live in renderer CSS, not in the config (FR-005). */
+export type EditorThemeName =
+  | 'rustic' | 'rustic-serif' | 'monotone' | 'monotone-serif' | 'scholarly'
+
 export interface Settings {
   sidebarWidth: number
   themeOverride: 'light' | 'dark' | null
@@ -118,8 +124,14 @@ export interface Settings {
    *  toggles it, the choice persists across restarts. */
   explorerVisible: boolean
   /** The editor font-family choice (spec 012 FR-003/FR-004). Defaults to
-   *  'sans-serif'. A closed union — validated in main, never arbitrary text. */
+   *  'sans-serif'. A closed union — validated in main, never arbitrary text.
+   *  KEPT persisted but INERT since spec 016 (user decision 2026-08-07): the
+   *  editor theme owns the typeface, so this field no longer affects the
+   *  canvas. It survives for clean config migration only. */
   editorFont: 'sans-serif' | 'serif'
+  /** The selected editor theme (spec 016 FR-001/FR-002). Defaults to
+   *  'rustic'. A closed union — validated in main, never arbitrary text. */
+  editorTheme: EditorThemeName
 }
 
 export interface DesktopApi {

@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-06
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "A spec for the editor theme, which is configurable in the settings window. It will store the theme name in the configuration file, the theme values will live in the code. Five editor themes: Rustic, Rustic Serif, Monotone, Monotone Serif, Scholarly. Selecting one of these themes and pressing 'save' in the settings changes the editor theme."
 
@@ -178,3 +178,33 @@ The Scholarly theme renders the editor canvas with a clean white background, a d
 - **2026-08-06 — Themes apply to the formatted canvas only.** The raw markdown
   source view retains its existing styling and is not re-themed (FR-013, US4/5
   edge cases).
+
+## Addendum — Editor canvas polish (2026-08-07)
+
+Requested during implementation as small visual corrections to the formatted
+canvas (user request). They are **out of scope** for the editor-theme feature
+itself but were folded into this PR because they touch the same editor surface
+and the user asked for them. They are behavioural, CSS-only changes with no
+schema, IPC, or document-state impact.
+
+1. **Tight list-item spacing.** The 021 GitHub-style block spacing
+   (`p { margin: 0 0 16px }`) applied to the inner `<p>` Crepe wraps each list
+   item's text in, stacking onto `li { margin: 4px 0 }` and producing ~20px gaps
+   between bullets. Inner list paragraphs are now zeroed (`li p { margin: 0 }`)
+   so the `li` margin alone owns the rhythm — lists render tight like GitHub.
+2. **Blockquote indent halved.** Crepe's reset pads blockquotes 40px left (with a
+   4px coloured bar); the editor now overrides it to 20px — the default reads too
+   wide inside a desktop canvas.
+3. **Numbered-list vertical alignment.** Crepe fixes the list-marker label at
+   `height: 32px`, but the body text line box is 24px, so a number's centre sat
+   ~4px below its text line. The label height is matched to the 24px line box so
+   marker and text line align vertically.
+4. **HTML comments hidden in the visual editor.** `<!-- … -->` comments parse into
+   inline `html` atom spans (`span[data-type="html"]`) that rendered their raw
+   text. They are now hidden on the formatted canvas (`display: none`). The atom
+   stays in the document and still round-trips to disk on save, so no content is
+   lost — this is a presentation-only change.
+
+These changes live in `src/renderer/editor/editor.css` and are covered by
+e2e assertions in `tests/e2e/editor-theme.spec.ts` (visual + round-trip checks)
+where they are visible on the theme canvas.

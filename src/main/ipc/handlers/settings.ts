@@ -13,7 +13,7 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif' })
+      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic' })
     }
   })
 

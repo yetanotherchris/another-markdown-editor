@@ -124,8 +124,11 @@ test('FR-007 in dark mode the toolbar stays a step below the dark pill', async (
   // FR-002: the main app header bar keeps its existing dark colour (#1F1F1F).
   await expect.poll(headerBg).toBe('rgb(31, 31, 31)')
 
-  // FR-006: still distinct from the dark canvas (#1F1F1F).
-  await expect.poll(canvasBg).toBe('rgb(31, 31, 31)')
+  // FR-006: still distinct from the canvas. Spec 016 (user decision 2026-08-07):
+  // the editor theme owns the canvas — the default Rustic canvas stays warm
+  // #FFFDFB in dark mode, so the dark toolbar (#262626) remains clearly distinct.
+  await expect.poll(canvasBg).toBe('rgb(255, 253, 251)')
+  expect(channelSum(await toolbarBg())).toBeLessThan(channelSum('rgb(255, 253, 251)'))
 })
 
 test('edge case no open tabs — the header keeps its existing colour', async () => {

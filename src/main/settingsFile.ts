@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import type { Settings } from '../shared/ipc-contract'
+import type { Settings, EditorThemeName } from '../shared/ipc-contract'
 import { atomicWrite } from './fs/atomicWrite'
 
 /**
@@ -23,7 +23,8 @@ export const DEFAULTS: Settings = {
   sidebarWidth: 30,
   themeOverride: null,
   explorerVisible: true,
-  editorFont: 'sans-serif'
+  editorFont: 'sans-serif',
+  editorTheme: 'rustic'
 }
 
 /** Read the whole shared config file, tolerantly: `{}` when missing or invalid.
@@ -37,6 +38,15 @@ export function readConfigFile(filePath: string): Record<string, unknown> {
   }
 }
 
+/** The closed five-name union of editor themes (spec 016 FR-001/FR-006). */
+const EDITOR_THEME_NAMES: readonly EditorThemeName[] = [
+  'rustic', 'rustic-serif', 'monotone', 'monotone-serif', 'scholarly'
+]
+
+function isEditorThemeName(value: unknown): value is EditorThemeName {
+  return typeof value === 'string' && (EDITOR_THEME_NAMES as readonly string[]).includes(value)
+}
+
 function validateSettings(raw: unknown): Settings {
   if (!raw || typeof raw !== 'object') return { ...DEFAULTS }
   const parsed = raw as Record<string, unknown>
@@ -47,7 +57,8 @@ function validateSettings(raw: unknown): Settings {
       ? parsed.themeOverride : DEFAULTS.themeOverride,
     explorerVisible: typeof parsed.explorerVisible === 'boolean' ? parsed.explorerVisible : DEFAULTS.explorerVisible,
     editorFont: (parsed.editorFont === 'sans-serif' || parsed.editorFont === 'serif')
-      ? parsed.editorFont : DEFAULTS.editorFont
+      ? parsed.editorFont : DEFAULTS.editorFont,
+    editorTheme: isEditorThemeName(parsed.editorTheme) ? parsed.editorTheme : DEFAULTS.editorTheme
   }
 }
 
@@ -68,7 +79,8 @@ export function mergeSettingsPatch(current: Settings, patch: Partial<Settings>):
     explorerVisible: typeof patch.explorerVisible === 'boolean' ? patch.explorerVisible : current.explorerVisible,
     editorFont: patch.editorFont === 'sans-serif' || patch.editorFont === 'serif'
       ? patch.editorFont as 'sans-serif' | 'serif'
-      : current.editorFont
+      : current.editorFont,
+    editorTheme: isEditorThemeName(patch.editorTheme) ? patch.editorTheme : current.editorTheme
   }
 }
 
@@ -98,7 +110,7 @@ export function migrateLegacySettingsFile(configPath: string, legacyPath: string
   // legacy file with, say, only `themeOverride` should still be imported rather
   // than dropped whole. validateSettings recovers every field individually.
   if (!legacy || typeof legacy !== 'object') return null
-  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont']
+  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont', 'editorTheme']
   if (!known.some((k) => k in legacy)) return null
   const migrated = validateSettings(legacy)
   try {
