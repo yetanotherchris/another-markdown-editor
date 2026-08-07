@@ -136,7 +136,7 @@ scenario depends on
 - [X] T021 [P] Run `npm run lint`, `npm run typecheck`, and `npm run test` — all must pass
 - [X] T022 [P] Run `npm run test:e2e` (build + Playwright) — full suite must pass including the new spellcheck spec
 - [X] T023 Archive the implemented spec: `git mv specs/020-editor-spellcheck specs/archive/020-editor-spellcheck`, set its **Status** to `Archived`, and update the Current implementation status table in AGENTS.md
-- [ ] T024 Open the phase PR against main with the changes, PR description ending with the AI usage line
+- [X] T024 Open the phase PR against main with the changes, PR description ending with the AI usage line
 
 ---
 
