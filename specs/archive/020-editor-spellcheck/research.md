@@ -181,6 +181,28 @@ the setting through the existing `settings:update` channel and the correction
 flow is entirely main↔Chromium, so there is no preload change and no new
 channel to secure. The pure action-builder is the only unit-testable seam.
 
+## R8 — Spellcheck language setting (added 2026-08-07)
+
+**Decision**: A persisted `spellcheckLanguage: SpellcheckLanguage | null` setting
+(`null` = system default) is applied in main via
+`session.defaultSession.setSpellCheckerLanguages(language ? [language] : <system>)`.
+The first apply captures the platform's own language list so "System default"
+can restore it after a user has chosen an explicit language.
+
+**Rationale**: A British-English writer whose OS dictionary is en-US gets every
+correct British spelling (e.g. "behaviour", "colour") flagged as an error — the
+observed complaint behind this change. The app previously used the platform
+default unconditionally. The union is closed and validated (en-GB, en-US);
+more languages are a one-line extension of the same mechanism.
+
+**Verified**: `setSpellCheckerLanguages(['en-US'])` reflects in
+`getSpellCheckerLanguages()` immediately (the getter is deterministic even
+before a dictionary for that language finishes downloading; an unavailable
+dictionary is the documented no-op case). Ordering gotcha: calling
+`setSpellCheckerLanguages` after `setSpellCheckerEnabled(false)` implicitly
+RE-ENABLES the spellchecker, so the enable flag must be written last (found and
+fixed during the e2e run).
+
 ## R-Process — no process or isolation change
 
 **Decision**: No new IPC channels, no preload methods, no `contextBridge`

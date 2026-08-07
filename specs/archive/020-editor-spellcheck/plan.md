@@ -169,7 +169,9 @@ modules it feeds and is unit-tested without Electron.
 
 ## Deferred / later features
 
-- Multi-language selection (spec assumption: platform default only)
+- Additional spellcheck languages beyond English (UK/US) — the mechanism
+  (`session.setSpellCheckerLanguages`) is in place; extending the closed union
+  is a one-line change (2026-08-07)
 - A dedicated "learned words" management UI (native OS dictionary is opaque)
 - A non-spelling right-click edit menu (Cut/Copy/Paste) — out of scope; the app
   currently has no context menu, and FR-008 only forbids *suppressing* one

@@ -11,11 +11,16 @@ The IPC surface is **unchanged** except for one new boolean on the existing
 ## Settings contract — `src/shared/ipc-contract.ts`
 
 ```ts
+export type SpellcheckLanguage = 'en-GB' | 'en-US'
+
 export interface Settings {
   // …existing fields…
   /** Spec 020 FR-006/FR-009: whether the native spellchecker is enabled.
    *  Defaults to true. Persisted via the existing settings store. */
   spellcheckEnabled: boolean
+  /** Spec 020 (2026-08-07): the explicit spellchecker language, or `null`
+   *  for the platform/system default. A closed union. */
+  spellcheckLanguage: SpellcheckLanguage | null
 }
 ```
 
@@ -23,8 +28,10 @@ export interface Settings {
 - Default `true` (FR-006).
 - A non-boolean value loads/merges as the current default (`true`) — never
   arbitrary text.
-- Legacy migration: a pre-020 config without the field inherits the default
-  `true`.
+- `spellcheckLanguage` defaults to `null` (system default); only `en-GB`,
+  `en-US`, or `null` load/merge — never arbitrary text.
+- Legacy migration: a pre-020 config without the fields inherits the defaults
+  (`true`, `null`).
 
 ## Pure main contract — `src/main/spellcheckMenu.ts`
 

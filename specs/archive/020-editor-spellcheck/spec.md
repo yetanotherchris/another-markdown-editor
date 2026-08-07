@@ -116,11 +116,12 @@ A user who does not want spellcheck (or finds it distracting) can disable it thr
 ## Clarifications
 
 - **2026-08-07** — Re-enable behaviour (US4 S2): the platform's native spellchecker removes existing highlights the moment spellcheck is disabled, and re-enables for **new or edited** content. Words already rendered on screen are NOT re-highlighted immediately when spellcheck is turned back on; they are re-highlighted as the user edits them. This native behaviour is accepted (user decision 2026-08-07); forcing an immediate re-check would require remounting the editor and discarding undo history, which violates Principle IV (Calm, Predictable Editing).
+- **2026-08-07** — Spellcheck language is now selectable (was "platform default only"): the Settings dialog offers System default / English (UK) / English (US), persisted as `spellcheckLanguage` (`null` = system default). This addresses a British-English writer whose OS default dictionary is en-US flagging correct British spellings (e.g. "behaviour") as errors. The mechanism (`session.setSpellCheckerLanguages`) is identical for any additional languages added later.
 
 ## Assumptions
 
 - The built-in spellchecker uses the platform's native spellchecking engine, which is available by default in the desktop shell and requires no additional dependencies.
 - Spellcheck dictionaries for the user's primary language are available or can be downloaded automatically by the platform.
 - The right-click context menu for spelling corrections will use the platform's native context menu for the editor area.
-- Spellcheck language selection is limited to the platform's default language for the initial implementation; multi-language support can be added later.
+- Spellcheck language selection defaults to the platform's default language; the user can explicitly choose System default / English (UK) / English (US) in Settings (2026-08-07). Additional languages can be added by extending the closed union later.
 - The source view enables native spellcheck. Markdown syntax characters (e.g., `#`, `**`, `[]`) may occasionally be flagged by the platform spellchecker; this is accepted as a minor trade-off of using native behaviour everywhere.

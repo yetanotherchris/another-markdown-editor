@@ -11,6 +11,7 @@
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `spellcheckEnabled` | `boolean` | `true` | NEW (spec 020 FR-006/FR-009). Whether the native spellchecker is on. Persisted in `appData/ame/config.json` `.settings` via the existing validated store. A closed type — main validates it is a boolean. |
+| `spellcheckLanguage` | `SpellcheckLanguage \| null` | `null` | NEW (2026-08-07). The explicit spellchecker language (`en-GB`/`en-US`), or `null` for the platform/system default. Closed union — validated in main. Applied via `session.setSpellCheckerLanguages` (research R8). |
 
 ### Personal Dictionary (spec: Key Entities)
 
