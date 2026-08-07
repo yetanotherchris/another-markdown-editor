@@ -59,6 +59,10 @@ button, input, select, textarea {
   --ame-surface: #f9f9fb;
   --ame-surface-secondary: #f8f8fa;
   --ame-active-tab: #eaeaea;
+  /* Spec 018: the WYSIWYG editor toolbar (header bar) surface — a shade
+     darker than the active tab pill. The main app header bar keeps
+     --ame-surface; only the editor toolbar uses this token. */
+  --ame-header: #e0e0e0;
   --ame-text: #1a1a1a;
   --ame-text-secondary: #222222;
   --ame-muted: #666666;
@@ -85,6 +89,9 @@ button, input, select, textarea {
   --ame-surface: #1f1f1f;
   --ame-surface-secondary: #181818;
   --ame-active-tab: #2d2d2d;
+  /* Spec 018: the dark WYSIWYG editor-toolbar equivalent — a step darker
+     than the dark-mode tab pill (FR-007). */
+  --ame-header: #262626;
   --ame-text: #8c8c8c;
   --ame-text-secondary: #7a7a7a;
   --ame-muted: #8c8c8c;

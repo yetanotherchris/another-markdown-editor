@@ -287,4 +287,5 @@ AGENTS.md                         This file
 | 015-explorer-reveal-location | Spec only | Not yet planned |
 | 016-editor-theme | Spec only | Not yet planned |
 | 017-codebase-refactor | Archived | Complete |
+| 018-header-bar-shade | Archived | Complete |
 | 021-frontmatter-handling | Archived | Complete |
