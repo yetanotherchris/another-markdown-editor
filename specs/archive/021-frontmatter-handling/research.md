@@ -113,8 +113,12 @@ bytes, so no new field is required for the source-view check.
 - source view: `joinFrontmatter(frontmatter, content)`;
 - formatted, clean (not dirty-live): `joinFrontmatter(frontmatter, content)` —
   the raw body bytes, so a no-edit save writes the exact original bytes;
-- formatted, dirty: `joinFrontmatter(frontmatter, getMarkdown() ?? content)` —
-  the editor's serialization of the edited body.
+- formatted, dirty: prefer the raw stored body when the live serialization
+  matches it modulo the tolerated trailing newline (`markdownSame(live, content)`)
+  — a document made dirty by a FRONTMATTER-ONLY source edit has an untouched
+  body and must not have its bytes rewritten by the editor's normalisation
+  (2026-08-07 review). Only a body Crepe cannot represent verbatim (real drift)
+  takes the serialization path (FR-12 in spec 002).
 
 With no frontmatter, `joinFrontmatter('', body)` is just `body`, so files
 without frontmatter never gain an empty block (FR-010).
@@ -122,7 +126,26 @@ without frontmatter never gain an empty block (FR-010).
 **Rationale**: Recombination is a pure string concatenation of the two stored
 parts. The clean path reuses the raw body bytes rather than the editor
 serialization, preserving the byte-identical round trip that the raw-bytes
-policy (spec 002) established for normal files.
+policy (spec 002) established for normal files. The dirty-path refinement
+extends the same principle to frontmatter-only edits.
+
+## R6 — SAVE_SUCCESS keeps the store partition (2026-08-07 review)
+
+**Decision**: `SAVE_SUCCESS` does NOT re-split the written text into frontmatter
+and body. The written text was built by `joinFrontmatter` from the stored parts,
+so the store's partition is already correct and must not be re-derived from the
+written bytes. Re-splitting would wrongly PROMOTE a `---` block that the user
+pasted into the VISUAL editor (a body start) into the `frontmatter` field,
+contradicting the spec edge case that pasted `---` content is body. The reducer
+derives the written body as the written text with the stored frontmatter prefix
+removed, sets `baseline` to the full written bytes, and computes `dirty` by
+comparing the pre-update recombined text against the written text (the
+level-corrected form of the original `d.content !== content` mid-write guard).
+
+**Rationale**: The store's frontmatter/content partition is authoritative once
+the file is open; only the load, source-edit, and reload boundaries re-derive it
+(R3). Re-deriving it at save time introduces a second, conflicting source of
+truth and breaks the "pasted `---` stays body" rule.
 
 ## R-Process — no process/isolation change
 

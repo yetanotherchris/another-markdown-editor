@@ -282,10 +282,18 @@ export function handleCaptureBaseline(state: EditingSession, payload: { id: stri
 
 export function handleSaveSuccess(state: EditingSession, payload: { id: string; path: string; content: string }): EditingSession {
   const { id, path, content } = payload
-  // Spec 021: the written full text (frontmatter + body) is re-split so the
-  // store stays in sync with disk. `baseline` keeps the full written bytes for
-  // the source-view byte check and the no-edit round trip (research R3).
-  const { frontmatter, body } = splitFrontmatter(content)
+  // Spec 021: the written full text was built by `joinFrontmatter` from the
+  // stored parts, so the store's partition is already correct and must NOT be
+  // re-derived from the written bytes — a `---` block the user pasted into the
+  // visual editor is body content and must stay body (spec edge case). The
+  // frontmatter is the written text's prefix; the written body is the suffix.
+  // `baseline` keeps the full written bytes for the source-view byte check and
+  // the no-edit round trip (research R3); `dirty` compares the pre-update full
+  // text against the written text (the original `d.content !== content` guard,
+  // level-corrected for the split model — a keystroke during the async write
+  // leaves the document dirty).
+  const frontmatter = state.documents.find(d => d.id === id)?.frontmatter ?? ''
+  const body = content.startsWith(frontmatter) ? content.slice(frontmatter.length) : content
   return {
     ...state,
     documents: state.documents.map(d =>
@@ -294,11 +302,9 @@ export function handleSaveSuccess(state: EditingSession, payload: { id: string; 
             ...d,
             path: path || d.path,
             title: path ? path.split('/').pop() || d.title : d.title,
-            frontmatter,
-            content: body,
             baseline: content,
             editorBaseline: body,
-            dirty: d.content !== body,
+            dirty: joinFrontmatter(d.frontmatter, d.content) !== content,
             externalState: 'clean'
           }
         : d

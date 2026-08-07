@@ -128,6 +128,48 @@ describe('documents reducer — save with frontmatter (spec 021)', () => {
     })
     expect(getContentToSave(state.documents[0], markdownReturning(null))).toBe('# Plain\n')
   })
+
+  it('a frontmatter-only edit saves the raw untouched body, not the editor serialization', () => {
+    // The file has no trailing newline in the body. After editing ONLY the
+    // frontmatter in source view and returning to formatted, the save must
+    // write the raw body bytes — the editor's appended newline is not adopted.
+    const state = documentsReducer(createSession(), {
+      type: 'OPEN_EXISTING',
+      payload: { path: 'f.md', name: 'f.md', content: '---\ntitle: a\n---\nbody', mtimeMs: 1, size: 17, view: 'source' }
+    })
+    const doc = state.documents[0]
+    const edited = documentsReducer(state, {
+      type: 'UPDATE_CONTENT',
+      payload: { id: doc.id, content: '---\ntitle: b\n---\nbody' }
+    })
+    const dirty = edited.documents[0]
+    // The editor would serialize the body with a trailing newline; the store
+    // keeps the raw bytes so the save stays byte-faithful to the body.
+    expect(getContentToSave(dirty, markdownReturning('body\n'))).toBe('---\ntitle: b\n---\nbody')
+  })
+
+  it('a body starting with --- pasted in the visual editor is NOT promoted to frontmatter on save', () => {
+    // Spec edge case: pasted `---` content in the visual editor is body. The
+    // store partition must survive the save (SAVE_SUCCESS must not re-derive
+    // the frontmatter from the written bytes).
+    const state = documentsReducer(createSession(), {
+      type: 'OPEN_EXISTING',
+      payload: { path: 'p.md', name: 'p.md', content: 'paragraph', mtimeMs: 1, size: 9 }
+    })
+    const doc = state.documents[0]
+    const pasted = documentsReducer(state, {
+      type: 'UPDATE_CONTENT',
+      payload: { id: doc.id, content: '---\nbody content\n---\nmore' }
+    })
+    const saved = documentsReducer(pasted, {
+      type: 'SAVE_SUCCESS',
+      payload: { id: doc.id, path: 'p.md', content: '---\nbody content\n---\nmore' }
+    })
+    const after = saved.documents[0]
+    expect(after.frontmatter).toBe('')
+    expect(after.content).toBe('---\nbody content\n---\nmore')
+    expect(after.dirty).toBe(false)
+  })
 })
 
 describe('documents reducer — source view with frontmatter (spec 021)', () => {
