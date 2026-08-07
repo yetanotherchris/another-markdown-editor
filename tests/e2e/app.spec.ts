@@ -92,3 +92,34 @@ test('editor shows the persistent menu bar instead of the floating toolbar', asy
   // The floating selection toolbar is disabled in favour of the menu bar.
   await expect(window.locator('.milkdown-toolbar')).toHaveCount(0)
 })
+
+test('bullet and ordered list markers both render (clip-path neutralised)', async () => {
+  // Regression (2026-08-07): Crepe's list bullet markers are SVGs whose
+  // `clip-path` references a document-global url(#clip0_...) id. With several
+  // editor hosts in the DOM the id resolves to a hidden host and the dots
+  // silently never paint — the same defect the top-bar rule fixes (R22), now
+  // extended to all milkdown SVGs. The DOM-computed clip-path must be `none`
+  // on the ACTIVE tab while a second (hidden) editor host exists.
+  fs.writeFileSync(path.join(testFolder, 'list.md'), '- bullet one\n- bullet two\n\n1. first\n2. second')
+  fs.writeFileSync(path.join(testFolder, 'other.md'), '- other bullet')
+  await clickHamburgerItem(window, 'Open Folder…')
+
+  await window.getByRole('treeitem').getByText('other.md').click()
+  await expect(window.locator('.ProseMirror:visible')).toBeVisible()
+  await window.getByRole('treeitem').getByText('list.md').click()
+  await expect(window.locator('.ProseMirror:visible')).toBeVisible()
+
+  const clips = await window
+    .locator('.ProseMirror:visible .list-item .label-wrapper svg g[clip-path]')
+    .evaluateAll((gs) => gs.map((g) => getComputedStyle(g).clipPath))
+  expect(clips.length).toBeGreaterThan(0)
+  for (const clip of clips) {
+    expect(clip).toBe('none')
+  }
+
+  // Ordered labels render as text; bullets as the (now visible) SVG circle.
+  const ordered = await window
+    .locator('.ProseMirror:visible .list-item .label-wrapper .label.ordered')
+    .evaluateAll((els) => els.map((el) => el.textContent))
+  expect(ordered).toEqual(['1.', '2.'])
+})

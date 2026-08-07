@@ -63,7 +63,9 @@ export default function EditorPanel({
     return <div className="editor-host evicted" />
   }
 
-  const sourceView = document.view === 'source' && (
+  const inSource = document.view === 'source'
+
+  const sourceView = inSource && (
     <SourceView
       value={joinFrontmatter(document.frontmatter, document.content)}
       onChange={(content) => onContentChange(document.id, content)}
@@ -80,8 +82,8 @@ export default function EditorPanel({
       <CrepeHost
         key={`${document.id}-v${document.contentVersion}`}
         defaultValue={document.content}
-        active={isActive && !sourceView}
-        locked={document.view === 'source'}
+        active={isActive && !inSource}
+        locked={inSource}
         restoreCursor={{ cursorOffset: document.cursorOffset, scrollTop: document.scrollTop }}
         onMarkdownUpdated={handleMarkdownUpdated}
         onReady={handleReady}

@@ -6,6 +6,7 @@ import { TextSelection } from '@milkdown/kit/prose/state'
 import type { EditorView } from '@milkdown/kit/prose/view'
 import { applyToolbarLabels } from './toolbarLabels'
 import { planTaskBackspace } from './taskBackspace'
+import { tightListPlugins } from './tightList'
 
 export interface CursorState {
   cursorOffset: number
@@ -135,6 +136,14 @@ export default function CrepeHost({
           }
         })
       })
+
+      // Tight/loose list serialization fix (tightList.ts): milkdown's default
+      // bullet_list/list_item runners pass the `spread` attr through as a
+      // string, which remark's stringifier treats as truthy and serializes as
+      // a LOOSE list (blank lines between items). These overrides coerce it to
+      // a real boolean so tight lists round-trip tight; genuinely loose lists
+      // stay loose. Task-item handling is preserved via gfm's extension.
+      tightListPlugins.forEach((plugin) => crepe.editor.use(plugin))
 
       await crepe.create()
       if (!mounted) {

@@ -95,6 +95,50 @@ test('US1 no-edit round trip keeps content and dirty state', async () => {
 })
 })
 
+// ---------- US1 regressions (2026-08-07): theme focus ring ----------
+
+test.describe('US1 source-view regressions', () => {
+test('returning to formatted editing removes the source view immediately (no exit animation)', async () => {
+  await openFolder()
+  await openFile('alpha.md')
+  await getViewSourceButton().click()
+  await expect(window.getByTestId('source-view')).toBeVisible()
+  await expect(window.getByTestId('source-view')).toHaveCSS('transform', 'none')
+
+  await window.getByRole('button', { name: /Back to visual editing/ }).click()
+
+  // The overlay is removed without a lingering slide-out animation.
+  await expect(window.getByTestId('source-view')).toHaveCount(0)
+})
+
+test('the source textarea focus ring is a subtle theme-neutral colour, not the loud accent or a hardcoded blue', async () => {
+  await openFolder()
+  await openFile('alpha.md')
+  await getViewSourceButton().click()
+  await expect(window.getByTestId('source-view')).toBeVisible()
+  await window.getByTestId('source-textarea').focus()
+
+  const outlineColor = await window
+    .getByTestId('source-textarea')
+    .evaluate((el) => getComputedStyle(el).outlineColor)
+  // The ring resolves to the same rgb as --ame-muted (a neutral focus colour),
+  // never the loud accent (orange in light) or the old hardcoded #4a90d9
+  // (rgb(74, 144, 217)) which read as a window border around the source view.
+  const mutedToRgb = await window.evaluate(() => {
+    const probe = document.createElement('div')
+    probe.style.color = getComputedStyle(document.documentElement)
+      .getPropertyValue('--ame-muted')
+      .trim()
+    document.body.appendChild(probe)
+    const rgb = getComputedStyle(probe).color
+    probe.remove()
+    return rgb
+  })
+  expect(outlineColor).toBe(mutedToRgb)
+  expect(outlineColor).not.toBe('rgb(74, 144, 217)')
+})
+})
+
 // ---------- US2: explorer context menu ----------
 
 test.describe('US2 explorer context menu', () => {

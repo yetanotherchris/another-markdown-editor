@@ -34,13 +34,77 @@
   padding: 16px 48px;
 }
 
-/* Crepe's top-bar icons are inline SVGs whose clip-path references a
+/* GitHub-style block spacing (2026-08-07): Crepe's reset.css collapses block
+   rhythm to `padding: 4px 0` on paragraphs and no bottom margins anywhere,
+   which renders documents visually squashed. GitHub's rendered markdown
+   separates blocks with vertical margins (paragraphs 16px, headings ~24px top
+   / 16px bottom, lists 16px, blockquote/pre/code 16px) and indents list
+   markers with 2em. Mirror that rhythm for a GitHub-like reading feel while
+   keeping the WYSIWYG editable. */
+.editor-host .milkdown .ProseMirror {
+  line-height: 1.6;
+}
+
+.editor-host .milkdown .ProseMirror p {
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.editor-host .milkdown .ProseMirror h1,
+.editor-host .milkdown .ProseMirror h2,
+.editor-host .milkdown .ProseMirror h3,
+.editor-host .milkdown .ProseMirror h4,
+.editor-host .milkdown .ProseMirror h5,
+.editor-host .milkdown .ProseMirror h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  padding: 0;
+  line-height: 1.25;
+}
+
+.editor-host .milkdown .ProseMirror ul,
+.editor-host .milkdown .ProseMirror ol {
+  padding-left: 2em;
+  margin: 0 0 16px;
+}
+
+.editor-host .milkdown .ProseMirror ul ul,
+.editor-host .milkdown .ProseMirror ol ol,
+.editor-host .milkdown .ProseMirror ul ol,
+.editor-host .milkdown .ProseMirror ol ul {
+  margin: 0;
+}
+
+.editor-host .milkdown .ProseMirror li {
+  margin: 4px 0;
+}
+
+.editor-host .milkdown .ProseMirror blockquote {
+  margin: 0 0 16px;
+}
+
+.editor-host .milkdown .ProseMirror pre,
+.editor-host .milkdown .ProseMirror .milkdown-codeblock {
+  margin: 0 0 16px;
+}
+
+.editor-host .milkdown .ProseMirror hr {
+  margin: 24px 0;
+}
+
+.editor-host .milkdown .ProseMirror table {
+  margin: 0 0 16px;
+}
+
+/* Crepe's inline SVGs (top-bar icons AND list-item bullet/checkbox markers)
+   wrap their paths in `<g clip-path="url(#clip0_977_...)">` referencing a
    `<defs><clipPath>` with a generated id. Every editor instance duplicates
    the same ids, and `url(#clip0_977_...)` is a document-global lookup — the
    browser paints the FIRST match, which on the second/third document sits in
-   a hidden editor host, so those icons silently never paint. The clip path
-   is a full-view-box rect (a visual no-op), so disabling it is a pure fix. */
-.milkdown-top-bar svg g[clip-path] {
+   a hidden editor host, so those icons and bullet dots silently never paint.
+   The clip path is a full-view-box rect (a visual no-op), so disabling it is
+   a pure fix (research.md R22; extended to list bullets 2026-08-07). */
+.milkdown svg g[clip-path] {
   clip-path: none;
 }
 
@@ -108,9 +172,13 @@
   color: var(--ame-text);
 }
 
-/* outline: none is offset by a visible keyboard focus indicator (WCAG 2.4.11). */
+/* outline: none is offset by a visible keyboard focus indicator (WCAG 2.4.11).
+   The textarea fills the whole source surface, so a 2px outline reads as a
+   window border. Use a subtle theme-neutral ring (--ame-muted) instead of the
+   loud accent colour, so it signals keyboard focus without framing the window
+   (fix 2026-08-07: was the accent, orange in light theme). */
 .source-textarea:focus-visible {
-  outline: 2px solid #4a90d9;
+  outline: 2px solid var(--ame-muted);
   outline-offset: -2px;
 }
 
