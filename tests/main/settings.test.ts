@@ -53,7 +53,7 @@ describe('loadSettingsFile', () => {
       settings: { sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly', spellcheckEnabled: false, spellcheckLanguage: 'en-GB' }
     }))
     expect(loadSettingsFile(file))
-      .toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly', spellcheckEnabled: false, spellcheckLanguage: 'en-GB' })
+      .toEqual({ sidebarWidth: 42, themeOverride: 'dark', explorerVisible: false, editorFont: 'serif', editorTheme: 'scholarly', editorColors: null, spellcheckEnabled: false, spellcheckLanguage: 'en-GB' })
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
@@ -168,6 +168,50 @@ describe('loadSettingsFile', () => {
     fs.rmSync(path.dirname(file), { recursive: true, force: true })
   })
 
+  describe('editorColors validation (spec 023 FR-010)', () => {
+    const validColors = {
+      background: '#fdf6e3', foreground: '#1f1b16', accent: '#805610',
+      surface: '#fdf3d9', outline: '#817567', code: '#ba1a1a'
+    }
+
+    it('accepts null (no custom colours)', () => {
+      const file = tempSettingsFile(JSON.stringify({ settings: { editorColors: null } }))
+      expect(loadSettingsFile(file).editorColors).toBeNull()
+      fs.rmSync(path.dirname(file), { recursive: true, force: true })
+    })
+
+    it('accepts a valid six-key hex record', () => {
+      const file = tempSettingsFile(JSON.stringify({ settings: { editorColors: validColors } }))
+      expect(loadSettingsFile(file).editorColors).toEqual(validColors)
+      fs.rmSync(path.dirname(file), { recursive: true, force: true })
+    })
+
+    it('rejects a non-hex colour and falls back to null', () => {
+      const file = tempSettingsFile(JSON.stringify({ settings: { editorColors: { ...validColors, background: 'red' } } }))
+      expect(loadSettingsFile(file).editorColors).toBeNull()
+      fs.rmSync(path.dirname(file), { recursive: true, force: true })
+    })
+
+    it('rejects a missing key and falls back to null', () => {
+      const { background, ...rest } = validColors
+      const file = tempSettingsFile(JSON.stringify({ settings: { editorColors: rest } }))
+      expect(loadSettingsFile(file).editorColors).toBeNull()
+      fs.rmSync(path.dirname(file), { recursive: true, force: true })
+    })
+
+    it('rejects an unknown extra key and falls back to null', () => {
+      const file = tempSettingsFile(JSON.stringify({ settings: { editorColors: { ...validColors, extra: '#000000' } } }))
+      expect(loadSettingsFile(file).editorColors).toBeNull()
+      fs.rmSync(path.dirname(file), { recursive: true, force: true })
+    })
+
+    it('rejects a non-object and falls back to null', () => {
+      const file = tempSettingsFile(JSON.stringify({ settings: { editorColors: '#fdf6e3' } }))
+      expect(loadSettingsFile(file).editorColors).toBeNull()
+      fs.rmSync(path.dirname(file), { recursive: true, force: true })
+    })
+  })
+
   it('keeps recoverable fields from a partially-corrupt file', () => {
     const file = tempSettingsFile(JSON.stringify({
       settings: { sidebarWidth: 'wide', themeOverride: null, explorerVisible: false, editorFont: 'serif' }
@@ -178,6 +222,7 @@ describe('loadSettingsFile', () => {
       explorerVisible: false,
       editorFont: 'serif',
       editorTheme: 'rustic',
+      editorColors: null,
       spellcheckEnabled: true,
       spellcheckLanguage: null
     })
@@ -188,13 +233,14 @@ describe('loadSettingsFile', () => {
 describe('writeSettingsFile (shared config, spec 012 FR-002)', () => {
   it('writes a settings section that round-trips', () => {
     const file = tempSettingsFile()
-    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false, editorFont: 'serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: null })
+    writeSettingsFile(file, { sidebarWidth: 25, themeOverride: null, explorerVisible: false, editorFont: 'serif', editorTheme: 'rustic', editorColors: null, spellcheckEnabled: true, spellcheckLanguage: null })
     expect(loadSettingsFile(file)).toEqual({
       sidebarWidth: 25,
       themeOverride: null,
       explorerVisible: false,
       editorFont: 'serif',
       editorTheme: 'rustic',
+      editorColors: null,
       spellcheckEnabled: true,
       spellcheckLanguage: null
     })
@@ -242,7 +288,7 @@ describe('migrateLegacySettingsFile (spec 012, one-time migration)', () => {
 
     const migrated = migrateLegacySettingsFile(configPath, legacyPath)
     expect(migrated).toEqual({
-      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: null
+      sidebarWidth: 44, themeOverride: 'dark', explorerVisible: false, editorFont: 'sans-serif', editorTheme: 'rustic', editorColors: null, spellcheckEnabled: true, spellcheckLanguage: null
     })
     // The values are now in config.json (read back through the shared file).
     expect(loadSettingsFile(configPath)).toEqual(migrated)

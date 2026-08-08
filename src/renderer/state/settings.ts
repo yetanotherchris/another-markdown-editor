@@ -6,6 +6,7 @@ const defaults: Settings = {
   explorerVisible: true,
   editorFont: 'sans-serif',
   editorTheme: 'rustic',
+  editorColors: null,
   spellcheckEnabled: true,
   spellcheckLanguage: null
 }
