@@ -91,8 +91,16 @@ export function toAppError(e: unknown): { code: ErrorCode; message: string } {
 }
 
 const ERROR_CODES = new Set<ErrorCode>([
-  'OUTSIDE_WORKSPACE', 'NOT_FOUND', 'CONFLICT', 'PERMISSION', 'LOCKED',
-  'TOO_LARGE', 'NOT_TEXT', 'TRASH_UNAVAILABLE', 'NO_WORKSPACE', 'IO'
+  'OUTSIDE_WORKSPACE',
+  'NOT_FOUND',
+  'CONFLICT',
+  'PERMISSION',
+  'LOCKED',
+  'TOO_LARGE',
+  'NOT_TEXT',
+  'TRASH_UNAVAILABLE',
+  'NO_WORKSPACE',
+  'IO'
 ])
 
 export function ensureString(val: unknown, name: string): asserts val is string {

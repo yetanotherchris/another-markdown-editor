@@ -137,7 +137,9 @@ export function useDocumentSession(opts: {
   const saveDocument = useCallback(
     async (doc: DocumentState, forceDialog = false): Promise<SaveResult> => {
       const previous = saveQueuesRef.current.get(doc.id) ?? Promise.resolve<SaveResult>('saved')
-      const next = previous.catch(() => 'failed' as const).then(() => saveDocumentNow(doc, forceDialog))
+      const next = previous
+        .catch(() => 'failed' as const)
+        .then(() => saveDocumentNow(doc, forceDialog))
       saveQueuesRef.current.set(doc.id, next)
       try {
         return await next
