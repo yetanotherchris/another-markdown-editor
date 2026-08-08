@@ -9,6 +9,8 @@ import { applySpellcheckSetting } from './spellcheck'
 import { registerSpellcheckContextMenu } from './contextMenu'
 import { resolveLaunchBounds, trackWindowState, flushWindowState } from './windowState'
 import { reconcileExplorerClosedWithoutWorkspace } from './workspaceExplorerState'
+import { legacyConfigPath, universalConfigPath, migrateConfigFile } from './configPath'
+import * as os from 'os'
 
 // Spec 020 test seam (research R6): `MM_USER_DATA_DIR` relocates the Chromium
 // profile — the home of the native spellcheck dictionary — so the e2e suite can
@@ -75,6 +77,32 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Spec 022 FR-004: move an existing config from the legacy appData location
+  // to the universal ~/.config location BEFORE anything reads it. Skipped under
+  // the MM_CONFIG_DIR test seam (tests must never move the developer's real
+  // config, US4/FR-010), when the home directory is unavailable (FR-011), or
+  // when the legacy and universal paths coincide (Linux without XDG — FR-005).
+  if (!process.env.MM_CONFIG_DIR) {
+    const homeDir = os.homedir()
+    if (homeDir) {
+      const legacy = legacyConfigPath({
+        homeDir,
+        platform: process.platform,
+        appDataDir: app.getPath('appData')
+      })
+      const universal = universalConfigPath({
+        homeDir,
+        platform: process.platform,
+        xdgConfigHome: process.env.XDG_CONFIG_HOME
+      })
+      if (legacy !== universal) {
+        const outcome = migrateConfigFile(legacy, universal)
+        if (outcome === 'failed') {
+          console.warn('[config] could not migrate config to universal location')
+        }
+      }
+    }
+  }
   // Spec 011 FR-013: with no folder open the explorer is closed and that
   // closed state is persisted. Runs before the window is created so the config
   // is already honest when the renderer loads it.
