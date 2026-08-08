@@ -29,13 +29,14 @@ test.beforeEach(async () => {
   await openFolder(window)
   // Stub the OS file-manager calls and record their targets.
   await app.evaluate(({ shell }) => {
-    ;(globalThis as any).__revealShown = []
-    ;(globalThis as any).__revealOpened = []
+    const g = globalThis as unknown as { __revealShown: string[]; __revealOpened: string[] }
+    g.__revealShown = []
+    g.__revealOpened = []
     shell.showItemInFolder = (p: string) => {
-      ;(globalThis as any).__revealShown.push(p)
+      g.__revealShown.push(p)
     }
     shell.openPath = async (p: string) => {
-      ;(globalThis as any).__revealOpened.push(p)
+      g.__revealOpened.push(p)
       return ''
     }
   })
@@ -50,16 +51,22 @@ test.afterAll(async () => {
 })
 
 async function shownCalls(): Promise<string[]> {
-  return app.evaluate(() => (globalThis as any).__revealShown ?? [])
+  return app.evaluate(() => {
+    const g = globalThis as unknown as { __revealShown: string[] }
+    return g.__revealShown ?? []
+  })
 }
 
 async function openedCalls(): Promise<string[]> {
-  return app.evaluate(() => (globalThis as any).__revealOpened ?? [])
+  return app.evaluate(() => {
+    const g = globalThis as unknown as { __revealOpened: string[] }
+    return g.__revealOpened ?? []
+  })
 }
 
 async function revealLabel(): Promise<string> {
   return window.evaluate(() => {
-    const platform = (globalThis as any).api?.platform
+    const platform = (globalThis as unknown as { api?: { platform?: string } }).api?.platform
     if (platform === 'darwin') return 'Reveal in Finder'
     if (platform === 'win32') return 'Reveal in Explorer'
     return 'Reveal in file manager'
@@ -120,8 +127,9 @@ test('US4 an OS launch failure is surfaced quietly and the session is untouched'
   await window.getByRole('treeitem').getByText('nested').click({ button: 'right' })
   // Make openPath fail like an unlaunchable file manager (FR-006 scenario 2).
   await app.evaluate(({ shell }) => {
+    const g = globalThis as unknown as { __revealOpened: string[] }
     shell.openPath = async (p: string) => {
-      ;(globalThis as any).__revealOpened.push(p)
+      g.__revealOpened.push(p)
       return 'Failed to open folder'
     }
   })
