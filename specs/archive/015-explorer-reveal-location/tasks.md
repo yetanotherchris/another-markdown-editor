@@ -13,13 +13,13 @@ errors, then e2e-verify.
 
 ## Phase 1: Foundational (IPC Operation)
 
-- [ ] T001 Add `revealEntry(path: string, kind: EntryKind): Promise<Result<null>>`
+- [X] T001 Add `revealEntry(path: string, kind: EntryKind): Promise<Result<null>>`
       to `DesktopApi` in `src/shared/ipc-contract.ts`, and a `platform: NodeJS.Platform`
       field (from `process.platform`) (contract `entry:reveal`; FR-005).
-- [ ] T002 Wire both in `src/preload/index.ts`:
+- [X] T002 Wire both in `src/preload/index.ts`:
       `revealEntry: (path, kind) => ipcRenderer.invoke('entry:reveal', { path, kind })`
       and `platform: process.platform`.
-- [ ] T003 Add the `entry:reveal` handler in `src/main/ipc/handlers/files.ts`
+- [X] T003 Add the `entry:reveal` handler in `src/main/ipc/handlers/files.ts`
       (alongside the other `entry:*` handlers): validate shape/kind, resolve with
       `resolveFile`/`resolveDirectory` under `withWorkspace`, then
       `shell.showItemInFolder` for files and `await shell.openPath` for folders
@@ -32,12 +32,12 @@ errors, then e2e-verify.
 
 ## Phase 2: User Stories 1 + 2 + 3 - Context Menu Action
 
-- [ ] T004 [US1] Add an `onReveal: (node: TreeNode) => void` prop to the `Tree` in
+- [X] T004 [US1] Add an `onReveal: (node: TreeNode) => void` prop to the `Tree` in
       `src/renderer/explorer/Tree.tsx` and a context-menu item labelled
       `Reveal in Explorer` (Windows) / `Reveal in Finder` (macOS) /
       `Reveal in file manager` (other) via the `platform` from the preload, shown
       for both files and folders (FR-003/007).
-- [ ] T005 [US1] Wire `onReveal` in `src/renderer/App.tsx`: call
+- [X] T005 [US1] Wire `onReveal` in `src/renderer/App.tsx`: call
       `window.api.revealEntry(node.id, node.kind)`; on error set the footer note
       to the sanitized message, leaving the session untouched (FR-006).
 
@@ -48,20 +48,20 @@ reveal action; failures surface as a quiet footer note.
 
 ## Phase 3: User Story 4 - Verification
 
-- [ ] T006 [US4] Add `tests/e2e/reveal.spec.ts` stubbing
+- [X] T006 [US4] Add `tests/e2e/reveal.spec.ts` stubbing
       `shell.showItemInFolder` / `shell.openPath` in main
       (`electronApp.evaluate`): a file reveal calls `showItemInFolder` with the
       file's absolute path (nested folder included), a folder reveal calls
       `openPath` with the folder's absolute path, a deleted target shows the
       footer note and the session is unchanged, and the label matches the
       platform (US1-4 acceptance scenarios).
-- [ ] T007 [US4] Run `npx playwright test tests/e2e/reveal.spec.ts` and confirm green.
+- [X] T007 [US4] Run `npx playwright test tests/e2e/reveal.spec.ts` and confirm green.
 
 ## Phase 4: Polish
 
-- [ ] T008 Run the gates: `npm run lint`, `npm run typecheck`, `npm run test`,
+- [X] T008 Run the gates: `npm run lint`, `npm run typecheck`, `npm run test`,
       `npm run test:e2e`.
-- [ ] T009 Archive the feature (`git mv specs/015-explorer-reveal-location
+- [X] T009 Archive the feature (`git mv specs/015-explorer-reveal-location
       specs/archive/015-explorer-reveal-location`), set the spec's **Status** to
       `Archived`, mark all tasks `[X]`, and update the
       `015-explorer-reveal-location` row in `AGENTS.md` to `Archived` / `Complete`.

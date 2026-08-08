@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-05
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "A new explorer context menu item - open file (or folder) location. This opens explorer or the OS-equivalent for the file/folder location."
 
