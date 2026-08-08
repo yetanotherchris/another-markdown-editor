@@ -10,10 +10,10 @@ $ErrorActionPreference = 'Stop'
 # The three artifacts the Homebrew formula installs (FR-006). Each hash MUST
 # match its exact published file (FR-008). A missing artifact throws — the
 # workflow must never commit a formula pointing at a failed build (FR-010).
-# Asset names use the short `ameditor` prefix (spec 009).
-$macArm64File = "ameditor-$Version-macos-arm64.zip"
-$macX64File = "ameditor-$Version-macos-x64.zip"
-$linuxX64File = "ameditor-$Version-linux-x64.AppImage"
+# Asset names use the short `markdownmeister` prefix (spec 019).
+$macArm64File = "markdownmeister-$Version-macos-arm64.zip"
+$macX64File = "markdownmeister-$Version-macos-x64.zip"
+$linuxX64File = "markdownmeister-$Version-linux-x64.AppImage"
 
 foreach ($f in @($macArm64File, $macX64File, $linuxX64File)) {
     $p = Join-Path $ArtifactsDir $f
@@ -30,7 +30,7 @@ Write-Host "SHA256 ${macArm64File}: $macArm64Hash"
 Write-Host "SHA256 ${macX64File}: $macX64Hash"
 Write-Host "SHA256 ${linuxX64File}: $linuxX64Hash"
 
-$formulaPath = Join-Path $PSScriptRoot "Formula" "another-markdown-editor.rb"
+$formulaPath = Join-Path $PSScriptRoot "Formula" "markdownmeister.rb"
 if (-not (Test-Path -LiteralPath $formulaPath)) {
     throw "Unable to locate Homebrew formula at $formulaPath"
 }
@@ -42,23 +42,23 @@ $content = Get-Content -LiteralPath $formulaPath -Raw
 $content = $content -replace "`r", ""
 
 # The release download URL is deterministic: v<version>/<artifact name>. The
-# `ameditor` prefix has no spaces, so no URL encoding is needed (spec 009). Tag
-# and version share the numeric part (FR-003). The filename segment is matched
-# loosely so the rewrite works whether the committed formula still carries the
-# legacy product-name prefix or the current `ameditor` prefix, and always writes
-# the `ameditor-<version>` name.
+# `markdownmeister` prefix has no spaces, so no URL encoding is needed (spec
+# 019). Tag and version share the numeric part (FR-003). The filename segment is
+# matched loosely so the rewrite works whether the committed formula still
+# carries the legacy product-name prefix or the current `markdownmeister`
+# prefix, and always writes the `markdownmeister-<version>` name.
 $baseUrl = "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v$Version"
 
 $content = $content -replace 'version "[\d\.]+"', "version `"$Version`""
 
 # The release tag in each URL path is rewritten to v$Version, not just the
 # filename, so the committed formula never points at a previous tag.
-$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(macos-arm64\.zip")', "`${1}v$Version/ameditor-$Version-`${2}"
-$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(macos-x64\.zip")', "`${1}v$Version/ameditor-$Version-`${2}"
-$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(linux-x64\.AppImage")', "`${1}v$Version/ameditor-$Version-`${2}"
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(macos-arm64\.zip")', "`${1}v$Version/markdownmeister-$Version-`${2}"
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(macos-x64\.zip")', "`${1}v$Version/markdownmeister-$Version-`${2}"
+$content = $content -replace '(url "https://github\.com/yetanotherchris/another-markdown-editor/releases/download/)v[\d\.]+/[^"]*(linux-x64\.AppImage")', "`${1}v$Version/markdownmeister-$Version-`${2}"
 
 # Update the sha256 that follows each known url line (order matches the formula
-# structure in Formula/another-markdown-editor.rb).
+# structure in Formula/markdownmeister.rb).
 $lines = $content -split "`n"
 for ($i = 0; $i -lt $lines.Length; $i++) {
     if ($lines[$i] -match 'macos-arm64\.zip' -and $i + 1 -lt $lines.Length -and $lines[$i + 1] -match 'sha256') {
@@ -71,17 +71,17 @@ for ($i = 0; $i -lt $lines.Length; $i++) {
 }
 $content = $lines -join "`n"
 
-# The Linux bin.install filename embeds the version (spec 009 FR-004).
-$content = $content -replace '(bin\.install ")[^"]*(linux-x64\.AppImage")', "`${1}ameditor-$Version-`${2}"
+# The Linux bin.install filename embeds the version (spec 019 FR-002).
+$content = $content -replace '(bin\.install ")[^"]*(linux-x64\.AppImage")', "`${1}markdownmeister-$Version-`${2}"
 
 # Guard: every expected rewrite MUST have happened. A silent no-op here is what
 # produced the stale v0.0.83 URLs on main (release review CRITICAL finding) —
 # fail loudly rather than commit a broken formula.
 $expected = @(
-    "ameditor-$Version-macos-arm64.zip",
-    "ameditor-$Version-macos-x64.zip",
-    "ameditor-$Version-linux-x64.AppImage",
-    "bin.install `"ameditor-$Version-linux-x64.AppImage`" => `"ameditor`""
+    "markdownmeister-$Version-macos-arm64.zip",
+    "markdownmeister-$Version-macos-x64.zip",
+    "markdownmeister-$Version-linux-x64.AppImage",
+    "bin.install `"markdownmeister-$Version-linux-x64.AppImage`" => `"markdownmeister`""
 )
 foreach ($e in $expected) {
     if (-not $content.Contains($e)) {

@@ -169,10 +169,10 @@ jobs:
         with:
           name: artifacts-${{ matrix.suffix }}
           path: |
-            dist/ameditor-*.exe
-            dist/ameditor-*.zip
-            dist/ameditor-*.dmg
-            dist/ameditor-*.AppImage
+            dist/markdownmeister-*.exe
+            dist/markdownmeister-*.zip
+            dist/markdownmeister-*.dmg
+            dist/markdownmeister-*.AppImage
           if-no-files-found: error
 
   release:
@@ -212,13 +212,13 @@ jobs:
         run: |
           set -euo pipefail
           required=(
-            "ameditor-${{ steps.version.outputs.VERSION }}-windows-x64.exe"
-            "ameditor-${{ steps.version.outputs.VERSION }}-windows-x64.zip"
-            "ameditor-${{ steps.version.outputs.VERSION }}-macos-x64.dmg"
-            "ameditor-${{ steps.version.outputs.VERSION }}-macos-x64.zip"
-            "ameditor-${{ steps.version.outputs.VERSION }}-macos-arm64.dmg"
-            "ameditor-${{ steps.version.outputs.VERSION }}-macos-arm64.zip"
-            "ameditor-${{ steps.version.outputs.VERSION }}-linux-x64.AppImage"
+            "markdownmeister-${{ steps.version.outputs.VERSION }}-windows-x64.exe"
+            "markdownmeister-${{ steps.version.outputs.VERSION }}-windows-x64.zip"
+            "markdownmeister-${{ steps.version.outputs.VERSION }}-macos-x64.dmg"
+            "markdownmeister-${{ steps.version.outputs.VERSION }}-macos-x64.zip"
+            "markdownmeister-${{ steps.version.outputs.VERSION }}-macos-arm64.dmg"
+            "markdownmeister-${{ steps.version.outputs.VERSION }}-macos-arm64.zip"
+            "markdownmeister-${{ steps.version.outputs.VERSION }}-linux-x64.AppImage"
           )
           for f in "${required[@]}"; do
             if [ ! -s "artifacts/$f" ]; then
@@ -283,7 +283,7 @@ jobs:
         with:
           commit_message: 'chore(release): update package definitions to v${{ steps.version.outputs.VERSION }}'
           branch: main
-          file_pattern: another-markdown-editor.json Formula/another-markdown-editor.rb package.json
+          file_pattern: markdownmeister.json Formula/markdownmeister.rb package.json
           commit_user_name: github-actions[bot]
           commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
 
