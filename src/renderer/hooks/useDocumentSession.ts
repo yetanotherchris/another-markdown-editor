@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import type { DocumentsAction, EditingSession, DocumentState } from '../state/documents'
 import { planClose } from '../state/documents'
 import type { OpenedFile } from '../../shared/ipc-contract'
@@ -53,6 +53,7 @@ export function useDocumentSession(opts: {
 }): DocumentSessionApi {
   const { dispatch, sessionRef, dialog, enforcePoolCap } = opts
   const { dialogInFlightRef, releaseDialogSurface } = dialog
+  const saveQueuesRef = useRef(new Map<string, Promise<SaveResult>>())
 
   const getMarkdown = useCallback((id: string) => instancePool.getMarkdown(id), [])
 
@@ -84,7 +85,7 @@ export function useDocumentSession(opts: {
     }
   }, [dispatch, getMarkdown, sessionRef])
 
-  const saveDocument = useCallback(
+  const saveDocumentNow = useCallback(
     async (doc: DocumentState, forceDialog = false): Promise<SaveResult> => {
       const content = getContentToSave(doc)
       const revision = doc.revision ?? 0
@@ -131,6 +132,20 @@ export function useDocumentSession(opts: {
       return 'cancelled'
     },
     [dispatch, getContentToSave, sessionRef]
+  )
+
+  const saveDocument = useCallback(
+    async (doc: DocumentState, forceDialog = false): Promise<SaveResult> => {
+      const previous = saveQueuesRef.current.get(doc.id) ?? Promise.resolve<SaveResult>('saved')
+      const next = previous.catch(() => 'failed' as const).then(() => saveDocumentNow(doc, forceDialog))
+      saveQueuesRef.current.set(doc.id, next)
+      try {
+        return await next
+      } finally {
+        if (saveQueuesRef.current.get(doc.id) === next) saveQueuesRef.current.delete(doc.id)
+      }
+    },
+    [saveDocumentNow]
   )
 
   const doClose = useCallback(
