@@ -131,8 +131,8 @@ export function useSourceViewToggle(opts: {
       // Spec 024 (FR-008): context-menu "Open" routes through the session gate
       // so a clean active tab is replaced. view:'formatted' also flips a
       // reopened evicted tab that had been in source view back to visual
-      // editing (OPEN_EXISTING applies the view).
-      session.openFileFromTree(read.value)
+      // editing (the reducer applies the requested view).
+      session.openFileFromTree({ ...read.value, view: 'formatted' })
     },
     [openFileFromTree, sessionRef, session]
   )

@@ -216,9 +216,9 @@ function TreeRow({ node, attrs, innerRef, children, onKeyboardMenu, onRenameKey,
       onClick={node.handleClick}
       onKeyDown={onKeyDown}
       onAuxClick={(e) => {
-        // Spec 024 FR-005: middle-click opens the file in a new tab, bypassing
-        // the replace-clean-tab behaviour.
-        if (e.button === 1) {
+        // Spec 024 FR-005: middle-click opens a FILE in a new tab, bypassing
+        // the replace-clean-tab behaviour. Directories are not openable.
+        if (e.button === 1 && node.data.kind === 'file') {
           e.preventDefault()
           onOpenNewTab(node.data)
         }

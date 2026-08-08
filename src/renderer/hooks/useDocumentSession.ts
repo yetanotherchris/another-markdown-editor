@@ -28,8 +28,9 @@ export interface DocumentSessionApi {
   handleNew: () => void
   /** Spec 024: open a file read from disk, replacing the active tab's content
    *  when it is live-clean and no explicit-new-tab action was used; otherwise
-   *  create a new tab. Existing-tab activation is preserved (FR-001-005). */
-  openFileFromTree: (file: OpenedFile, explicitNew?: boolean) => void
+   *  create a new tab. Existing-tab activation is preserved (FR-001-005).
+   *  An optional `view` (spec 002) is applied by the reducer. */
+  openFileFromTree: (file: OpenedFile & { view?: 'formatted' | 'source' }, explicitNew?: boolean) => void
   getLiveContent: (doc: DocumentState) => string | null
   isDirtyLive: (doc: DocumentState) => boolean
 }
@@ -290,12 +291,18 @@ export function useDocumentSession(opts: {
   // the active tab. The gate is the LIVE dirty check (pool), never the debounced
   // store flag — a keystroke inside the 200 ms debounce must not be silently
   // discarded (Principle III). Existing-tab activation happens in the reducer.
-  const openFileFromTree = useCallback((file: OpenedFile, explicitNew = false) => {
+  const openFileFromTree = useCallback((file: OpenedFile & { view?: 'formatted' | 'source' }, explicitNew = false) => {
     const current = sessionRef.current
     const active = current.documents.find(d => d.id === current.activeId) ?? null
     const alreadyOpen = file.path !== null && current.documents.some(d => d.path === file.path)
     const replaceActive = !explicitNew && !alreadyOpen && active !== null && !isDirtyLive(active)
     dispatch({ type: 'OPEN_EXISTING', payload: { value: file, mode: replaceActive ? 'replace' : 'new' } })
+    if (replaceActive && active) {
+      // Spec 024 (Assumptions): a replaced tab's editor instance is handled the
+      // same way as a closed tab's — drop it from the pool explicitly instead
+      // of leaving it to linger until LRU eviction.
+      instancePool.remove(active.id)
+    }
     enforcePoolCap(sessionRef.current.activeId)
   }, [dispatch, enforcePoolCap, isDirtyLive, sessionRef])
 
