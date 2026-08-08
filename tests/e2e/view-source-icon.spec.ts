@@ -16,6 +16,7 @@ import { closeAppSafely, launchApp, openFile, openSettingsDialog } from './launc
 let app: ElectronApplication
 let window: Page
 let testFolder: string
+let configDir: string
 
 test.beforeAll(async () => {
   testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-view-source-e2e-'))
@@ -23,12 +24,16 @@ test.beforeAll(async () => {
 })
 
 test.beforeEach(async () => {
-  ;({ app, window } = await launchApp(undefined, testFolder))
+  // Isolated per-test config so a theme change can never touch the developer's
+  // real config (MM_CONFIG_DIR seam, spec 019 R6).
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-view-source-config-'))
+  ;({ app, window } = await launchApp(configDir, testFolder))
   await openFile(window, 'alpha.md')
 })
 
 test.afterEach(async () => {
   await closeAppSafely(app)
+  fs.rmSync(configDir, { recursive: true, force: true })
 })
 
 test.afterAll(async () => {
