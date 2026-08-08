@@ -84,7 +84,7 @@ test('US3 a failed recent open never leaks an absolute path in the error', async
   await expectMessageBox(ctx)
   const body = await messageBoxBody(ctx)
   expect(body).not.toContain(doomedFolder)
-  expect(body).not.toMatch(/[A-Za-z]:\\[^\s]*ame-recent-e2e/)
+  expect(body).not.toMatch(/[A-Za-z]:\\[^\s]*mm-recent-e2e/)
 })
 
 test('US3 a deleted recent folder explains, preserves the workspace, and is removed', async () => {
