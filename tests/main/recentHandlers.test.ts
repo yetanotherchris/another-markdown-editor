@@ -18,15 +18,15 @@ describe('isRecentEntry (R4 recent-open guard)', () => {
   let prev: string | undefined
 
   beforeEach(() => {
-    dir = path.join(os.tmpdir(), `ame-recent-entry-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    dir = path.join(os.tmpdir(), `mm-recent-entry-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     fs.mkdirSync(dir, { recursive: true })
-    prev = process.env.AME_CONFIG_DIR
-    process.env.AME_CONFIG_DIR = dir
+    prev = process.env.MM_CONFIG_DIR
+    process.env.MM_CONFIG_DIR = dir
   })
 
   afterEach(() => {
-    if (prev === undefined) delete process.env.AME_CONFIG_DIR
-    else process.env.AME_CONFIG_DIR = prev
+    if (prev === undefined) delete process.env.MM_CONFIG_DIR
+    else process.env.MM_CONFIG_DIR = prev
     fs.rmSync(dir, { recursive: true, force: true })
   })
 

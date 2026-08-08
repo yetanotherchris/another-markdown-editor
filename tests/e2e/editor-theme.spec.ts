@@ -28,12 +28,12 @@ let testFolder: string
 let configDir: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-editor-theme-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-editor-theme-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world with `code`.\n')
 })
 
 test.beforeEach(async () => {
-  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-editor-theme-config-'))
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-editor-theme-config-'))
   ;({ app, window } = await launchApp(configDir, testFolder))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world with `code`.\n')
 })
@@ -284,7 +284,7 @@ test('FR-014 changing the editor theme leaves document content, dirty state, and
 })
 
 test('FR-006 a missing config opens with the default Rustic theme and a change writes a valid config', async () => {
-  // No config.json exists yet (fresh AME_CONFIG_DIR).
+  // No config.json exists yet (fresh MM_CONFIG_DIR).
   await openFile(window, 'alpha.md')
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
   await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)')

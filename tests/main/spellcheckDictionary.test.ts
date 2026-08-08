@@ -10,7 +10,7 @@ import { loadSpellcheckWords, addSpellcheckWord } from '../../src/main/spellchec
  */
 
 function tempConfig(content?: string): string {
-  const dir = path.join(os.tmpdir(), `ame-scd-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const dir = path.join(os.tmpdir(), `mm-scd-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   fs.mkdirSync(dir, { recursive: true })
   const file = path.join(dir, 'config.json')
   if (content !== undefined) fs.writeFileSync(file, content, 'utf-8')

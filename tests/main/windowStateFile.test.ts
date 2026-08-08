@@ -12,7 +12,7 @@ import { readConfigFile } from '../../src/main/settingsFile'
 import type { RecentItem } from '../../src/shared/ipc-contract'
 
 function tempDir(): string {
-  return path.join(os.tmpdir(), `ame-winstate-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  return path.join(os.tmpdir(), `mm-winstate-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 }
 
 function tempConfigFile(content?: string): string {

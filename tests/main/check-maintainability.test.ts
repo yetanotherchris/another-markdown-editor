@@ -10,7 +10,7 @@ let tmpRoot: string
 
 beforeEach(() => {
   cwd = process.cwd()
-  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-guardrail-'))
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-guardrail-'))
   process.chdir(tmpRoot)
   fs.mkdirSync(path.join(tmpRoot, 'src'))
   fs.mkdirSync(path.join(tmpRoot, 'src', 'orchestration'))

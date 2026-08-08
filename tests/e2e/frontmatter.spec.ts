@@ -39,7 +39,7 @@ const COMPLEX_FILE = [
 ].join('\n')
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-fm-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-fm-e2e-'))
 })
 
 test.beforeEach(async () => {

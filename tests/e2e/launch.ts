@@ -3,10 +3,10 @@
  *
  * The app runs under Chromium's `--headless` switch so the suite never steals
  * desktop focus while it runs (the Electron windows are not shown on screen).
- * Set `AME_E2E_HEADED=1` to run with a visible, interactive window — e.g. when
+ * Set `MM_E2E_HEADED=1` to run with a visible, interactive window — e.g. when
  * debugging a failing scenario locally.
  */
-export const electronLaunchArgs: string[] = process.env.AME_E2E_HEADED
+export const electronLaunchArgs: string[] = process.env.MM_E2E_HEADED
   ? ['out/main/index.js']
   : ['out/main/index.js', '--headless']
 
@@ -216,20 +216,20 @@ export interface LaunchResult {
 }
 
 /**
- * Launch the built app with an optional isolated `AME_CONFIG_DIR` config dir,
+ * Launch the built app with an optional isolated `MM_CONFIG_DIR` config dir,
  * stub the open-dialog to return `openFolderPath` when a native folder picker
  * is requested, and install the deterministic message-box stub. The per-spec
  * beforeEach calls this (replacing the near-identical local `launchApp()` and
  * inline `electron.launch` copies).
  *
  * `userDataDir`, when given, relocates the Chromium profile via the
- * `AME_USER_DATA_DIR` seam (spec 020 research R6) so the native spellcheck
+ * `MM_USER_DATA_DIR` seam (spec 020 research R6) so the native spellcheck
  * dictionary never leaks into — or out of — a test.
  */
 export async function launchApp(configDir?: string, openFolderPath?: string, userDataDir?: string): Promise<LaunchResult> {
   const env: Record<string, string> = { ...process.env } as Record<string, string>
-  if (configDir) env.AME_CONFIG_DIR = configDir
-  if (userDataDir) env.AME_USER_DATA_DIR = userDataDir
+  if (configDir) env.MM_CONFIG_DIR = configDir
+  if (userDataDir) env.MM_USER_DATA_DIR = userDataDir
   const instance = await electron.launch({
     args: electronLaunchArgs,
     env

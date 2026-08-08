@@ -7,8 +7,8 @@
   position: relative;
   overflow: hidden;
   /* Spec 013 FR-010: the region behind/around the editor canvas follows the
-     theme (--ame-editor-bg: white in light, a dark surface in dark). */
-  background: var(--ame-editor-bg);
+     theme (--mm-editor-bg: white in light, a dark surface in dark). */
+  background: var(--mm-editor-bg);
 }
 
 .editor-host {
@@ -36,12 +36,12 @@
 
 /* Spec 018 (FR-002): the WYSIWYG editor toolbar (the TopBar Crepe renders for
    each instance) is a shade of grey darker than the active tab pill. The main
-   app header bar keeps its existing --ame-surface; only this toolbar moves
+   app header bar keeps its existing --mm-surface; only this toolbar moves
    darker. The override targets the top bar directly rather than redefining
    --crepe-color-surface, which also paints the table cells and the heading
    dropdown (research R1, FR-005). */
 .milkdown .milkdown-top-bar {
-  background: var(--ame-header);
+  background: var(--mm-header);
 }
 
 /* GitHub-style block spacing (2026-08-07): Crepe's reset.css collapses block
@@ -157,17 +157,17 @@
 /* Spec 002: the source view is an opaque overlay inside the editor host,
    sliding in from the right to replace the formatted editor (FR-003, FR-009).
    The Crepe host stays mounted underneath but is covered while source shows.
-   Spec 013 FR-010: it follows the theme via the --ame-* tokens. */
+   Spec 013 FR-010: it follows the theme via the --mm-* tokens. */
 .source-view {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--ame-editor-bg);
+  background: var(--mm-editor-bg);
   /* The whole source surface follows the theme text color; the "Back to visual
      editing" button inherits it (fix: it previously fell back to default black,
      which was unreadable on the dark surface). */
-  color: var(--ame-text);
+  color: var(--mm-text);
   animation: source-slide-in 160ms ease-out;
   z-index: 20;
 }
@@ -178,8 +178,8 @@
   gap: 8px;
   height: 48px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--ame-border);
-  background: var(--ame-surface-secondary);
+  border-bottom: 1px solid var(--mm-border);
+  background: var(--mm-surface-secondary);
   flex-shrink: 0;
 }
 
@@ -188,16 +188,16 @@
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
-  border: 1px solid var(--ame-border);
+  border: 1px solid var(--mm-border);
   border-radius: 6px;
-  background: var(--ame-bg);
+  background: var(--mm-bg);
   font-size: 13px;
   color: inherit;
   cursor: pointer;
 }
 
 .source-return:hover {
-  background: var(--ame-surface-secondary);
+  background: var(--mm-surface-secondary);
 }
 
 .source-textarea {
@@ -210,17 +210,17 @@
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 14px;
   line-height: 1.6;
-  background: var(--ame-editor-bg);
-  color: var(--ame-text);
+  background: var(--mm-editor-bg);
+  color: var(--mm-text);
 }
 
 /* outline: none is offset by a visible keyboard focus indicator (WCAG 2.4.11).
    The textarea fills the whole source surface, so a 2px outline reads as a
-   window border. Use a subtle theme-neutral ring (--ame-muted) instead of the
+   window border. Use a subtle theme-neutral ring (--mm-muted) instead of the
    loud accent colour, so it signals keyboard focus without framing the window
    (fix 2026-08-07: was the accent, orange in light theme). */
 .source-textarea:focus-visible {
-  outline: 2px solid var(--ame-muted);
+  outline: 2px solid var(--mm-muted);
   outline-offset: -2px;
 }
 
@@ -242,7 +242,7 @@
 /* Spec 020 (2026-08-07): the JS spellchecker's wavy-red underline on
    misspelled words in the WYSIWYG editor (applied by the spellcheck plugin's
    inline decoration). */
-.ame-spelling-error {
+.mm-spelling-error {
   text-decoration: underline wavy #d0021b;
   text-decoration-skip-ink: none;
 }
@@ -260,12 +260,12 @@
   z-index: 201;
   min-width: 190px;
   padding: 4px;
-  background: var(--ame-bg);
-  border: 1px solid var(--ame-border);
+  background: var(--mm-bg);
+  border: 1px solid var(--mm-border);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   font-size: 13px;
-  color: var(--ame-text);
+  color: var(--mm-text);
 }
 
 .spelling-menu-word {
@@ -278,7 +278,7 @@
 
 .spelling-menu-none {
   padding: 4px 8px;
-  color: var(--ame-muted);
+  color: var(--mm-muted);
 }
 
 .spelling-menu button {
@@ -291,19 +291,19 @@
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--ame-text);
+  color: var(--mm-text);
 }
 
 .spelling-menu button:hover,
 .spelling-menu button:focus-visible {
-  background: var(--ame-surface);
+  background: var(--mm-surface);
   outline: none;
 }
 
 .spelling-menu-sep {
   height: 1px;
   margin: 4px 0;
-  background: var(--ame-border);
+  background: var(--mm-border);
 }
 
 .empty-state {
@@ -311,6 +311,6 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--ame-muted);
+  color: var(--mm-muted);
   font-size: 14px;
 }

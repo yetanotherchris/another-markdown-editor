@@ -19,7 +19,7 @@ let configDir: string
 const LONG_NAME = 'a-very-long-filename-that-should-truncate-its-label-with-ellipsis.md'
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-chrome-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-chrome-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
   fs.writeFileSync(path.join(testFolder, LONG_NAME), '# Long')
@@ -27,8 +27,8 @@ test.beforeAll(async () => {
 
 test.beforeEach(async () => {
   // Isolated config dir per test so a persisted explorerVisible (or any other
-  // setting) from a previous test/run cannot leak in (AME_CONFIG_DIR seam).
-  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-chrome-config-'))
+  // setting) from a previous test/run cannot leak in (MM_CONFIG_DIR seam).
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-chrome-config-'))
   ;({ app, window } = await launchApp(configDir, testFolder))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })

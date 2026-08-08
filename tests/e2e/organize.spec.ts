@@ -9,7 +9,7 @@ let window: Page
 let testFolder: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-organize-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-organize-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta')
   fs.mkdirSync(path.join(testFolder, 'sub'))

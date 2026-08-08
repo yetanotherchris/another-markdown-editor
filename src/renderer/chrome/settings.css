@@ -17,11 +17,11 @@
 .settings-dialog {
   width: 360px;
   max-width: calc(100vw - 32px);
-  background: var(--ame-bg);
-  border: 1px solid var(--ame-border);
+  background: var(--mm-bg);
+  border: 1px solid var(--mm-border);
   border-radius: 10px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-  color: var(--ame-text);
+  color: var(--mm-text);
 }
 
 .settings-dialog-header {
@@ -29,7 +29,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--ame-border);
+  border-bottom: 1px solid var(--mm-border);
 }
 
 .settings-dialog-title {
@@ -43,14 +43,14 @@
   background: transparent;
   font-size: 20px;
   line-height: 1;
-  color: var(--ame-muted);
+  color: var(--mm-muted);
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 6px;
 }
 
 .settings-dialog-close:hover {
-  background: var(--ame-surface-secondary);
+  background: var(--mm-surface-secondary);
 }
 
 .settings-dialog-body {
@@ -66,7 +66,7 @@
 .settings-legend {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ame-text);
+  color: var(--mm-text);
   margin-bottom: 8px;
   padding: 0;
 }
@@ -79,11 +79,11 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--ame-text);
+  color: var(--mm-text);
 }
 
 .settings-radio:hover {
-  background: var(--ame-surface);
+  background: var(--mm-surface);
 }
 
 .settings-select-label {
@@ -94,13 +94,13 @@
   padding: 6px 8px;
   border-radius: 6px;
   font-size: 13px;
-  color: var(--ame-text);
+  color: var(--mm-text);
 }
 
 .settings-select-label select {
-  background: var(--ame-surface-secondary);
-  color: var(--ame-text);
-  border: 1px solid var(--ame-border);
+  background: var(--mm-surface-secondary);
+  color: var(--mm-text);
+  border: 1px solid var(--mm-border);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 13px;
@@ -115,7 +115,7 @@
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid var(--ame-border);
+  border-top: 1px solid var(--mm-border);
 }
 
 .settings-dialog-close-btn,
@@ -128,17 +128,17 @@
 }
 
 .settings-dialog-close-btn {
-  background: var(--ame-surface-secondary);
-  color: var(--ame-text);
-  border: 1px solid var(--ame-border);
+  background: var(--mm-surface-secondary);
+  color: var(--mm-text);
+  border: 1px solid var(--mm-border);
 }
 
 .settings-dialog-close-btn:hover {
-  background: var(--ame-surface);
+  background: var(--mm-surface);
 }
 
 .settings-dialog-save {
-  background: var(--ame-control);
+  background: var(--mm-control);
   color: #fff;
 }
 
@@ -152,6 +152,6 @@
 .settings-dialog-save:focus-visible,
 .settings-radio:focus-within,
 .settings-select-label select:focus-visible {
-  outline: 2px solid var(--ame-accent);
+  outline: 2px solid var(--mm-accent);
   outline-offset: 1px;
 }

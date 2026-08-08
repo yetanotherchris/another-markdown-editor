@@ -34,33 +34,33 @@ button, input, select, textarea {
 
 /* Spec 010, FR-006: the modern grey palette. Prefixed custom properties scoped
    to the chrome. Spec 013 FR-010: the editor canvas and source view resolve the
-   --ame-editor-bg token (white in light, dark in dark) so the editing surface
+   --mm-editor-bg token (white in light, dark in dark) so the editing surface
    follows the theme. */
 :root {
-  --ame-bg: #ffffff;
-  --ame-surface: #f9f9fb;
-  --ame-surface-secondary: #f8f8fa;
-  --ame-active-tab: #eaeaea;
+  --mm-bg: #ffffff;
+  --mm-surface: #f9f9fb;
+  --mm-surface-secondary: #f8f8fa;
+  --mm-active-tab: #eaeaea;
   /* Spec 018: the WYSIWYG editor toolbar (header bar) surface — a shade
      darker than the active tab pill. The main app header bar keeps
-     --ame-surface; only the editor toolbar uses this token. */
-  --ame-header: #e0e0e0;
-  --ame-text: #1a1a1a;
-  --ame-text-secondary: #222222;
-  --ame-muted: #666666;
-  --ame-muted-secondary: #707070;
-  --ame-border: #e5e5e5;
-  --ame-border-secondary: #ececec;
-  --ame-accent: #d96b27;
-  --ame-control: #2d2d2d;
-  --ame-editor-bg: #ffffff;
+     --mm-surface; only the editor toolbar uses this token. */
+  --mm-header: #e0e0e0;
+  --mm-text: #1a1a1a;
+  --mm-text-secondary: #222222;
+  --mm-muted: #666666;
+  --mm-muted-secondary: #707070;
+  --mm-border: #e5e5e5;
+  --mm-border-secondary: #ececec;
+  --mm-accent: #d96b27;
+  --mm-control: #2d2d2d;
+  --mm-editor-bg: #ffffff;
 }
 
 /* Spec 013, FR-002/FR-003: the dark palette (VS Code Dark, user decision
    2026-08-06). Main Editor Background #1F1F1F, Sidebar #181818, Primary Text
    #8C8C8C, Editor Header Text #CCCCCC, Links/Highlights #3794FF; buttons are a
    neutral grey (the palette's #0E639C blue is deliberately not used). Every
-   chrome surface resolves the --ame-* tokens from .app-container, so redefining
+   chrome surface resolves the --mm-* tokens from .app-container, so redefining
    them here retints the whole chrome in one place when the effective theme
    (nativeTheme.themeSource → prefers-color-scheme → data-theme, see
    useEffectiveTheme) is dark.
@@ -68,25 +68,25 @@ button, input, select, textarea {
    theme owns the canvas (research R5). Only the Monotone themes re-scope their
    --crepe-color-* tokens against [data-theme] (editor/themes.css); Rustic,
    Rustic Serif, and Scholarly keep their fixed palettes in dark chrome. The
-   source view still resolves --ame-editor-bg/--ame-text and follows the app
+   source view still resolves --mm-editor-bg/--mm-text and follows the app
    theme (FR-013). */
 .app-container[data-theme='dark'] {
-  --ame-bg: #1f1f1f;
-  --ame-surface: #1f1f1f;
-  --ame-surface-secondary: #181818;
-  --ame-active-tab: #2d2d2d;
+  --mm-bg: #1f1f1f;
+  --mm-surface: #1f1f1f;
+  --mm-surface-secondary: #181818;
+  --mm-active-tab: #2d2d2d;
   /* Spec 018: the dark WYSIWYG editor-toolbar equivalent — a step darker
      than the dark-mode tab pill (FR-007). */
-  --ame-header: #262626;
-  --ame-text: #8c8c8c;
-  --ame-text-secondary: #7a7a7a;
-  --ame-muted: #8c8c8c;
-  --ame-muted-secondary: #6e6e6e;
-  --ame-border: #3a3a3a;
-  --ame-border-secondary: #333333;
-  --ame-accent: #3794ff;
-  --ame-control: #3a3a3a;
-  --ame-editor-bg: #1f1f1f;
+  --mm-header: #262626;
+  --mm-text: #8c8c8c;
+  --mm-text-secondary: #7a7a7a;
+  --mm-muted: #8c8c8c;
+  --mm-muted-secondary: #6e6e6e;
+  --mm-border: #3a3a3a;
+  --mm-border-secondary: #333333;
+  --mm-accent: #3794ff;
+  --mm-control: #3a3a3a;
+  --mm-editor-bg: #1f1f1f;
 }
 
 .app-container {
@@ -118,11 +118,11 @@ button, input, select, textarea {
   /* Overflow is clipped so a collapsed panel (0-width) never lets the tree
      spill over the editor (spec 010 US2: hiding must actually hide). */
   overflow: hidden;
-  background: var(--ame-surface-secondary);
-  border-right: 1px solid var(--ame-border);
+  background: var(--mm-surface-secondary);
+  border-right: 1px solid var(--mm-border);
   /* The explorer tree has no color of its own; pinning the token here keeps its
      text readable in both the light and dark palettes (spec 013). */
-  color: var(--ame-text);
+  color: var(--mm-text);
 }
 
 .sidebar {
@@ -137,13 +137,13 @@ button, input, select, textarea {
 
 .resize-handle {
   width: 4px;
-  background: var(--ame-border);
+  background: var(--mm-border);
   cursor: col-resize;
   transition: background 0.15s;
 }
 
 .resize-handle:hover {
-  background: var(--ame-muted);
+  background: var(--mm-muted);
 }
 
 .editor-panel {

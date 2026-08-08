@@ -14,7 +14,7 @@ import {
 import type { RecentItem, RecentKind } from '../../src/shared/ipc-contract'
 
 function createTempDir(): string {
-  const dir = path.join(os.tmpdir(), `ame-recent-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const dir = path.join(os.tmpdir(), `mm-recent-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   fs.mkdirSync(dir, { recursive: true })
   return dir
 }

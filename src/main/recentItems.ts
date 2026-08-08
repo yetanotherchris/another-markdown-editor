@@ -6,8 +6,8 @@ import type { RecentItem, RecentKind } from '../shared/ipc-contract'
 /**
  * Pure, electron-free store for the spec-004 recent-items list (research R1/R4).
  *
- * The config file lives at `appData/ame/config.json` (on Linux
- * `~/.config/ame/config.json` per FR-004); this module never resolves that path
+ * The config file lives at `appData/markdownmeister/config.json` (on Linux
+ * `~/.config/markdownmeister/config.json` per FR-004); this module never resolves that path
  * itself — callers pass the file path in, so it stays unit-testable without
  * mocking Electron.
  *

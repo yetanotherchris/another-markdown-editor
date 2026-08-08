@@ -27,7 +27,7 @@ const TASK_LIST = [
 ].join('\n')
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-tightlist-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-tightlist-e2e-'))
 })
 
 test.beforeEach(async () => {

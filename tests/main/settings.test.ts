@@ -14,7 +14,7 @@ import {
 import type { RecentItem } from '../../src/shared/ipc-contract'
 
 function tempDir(): string {
-  return path.join(os.tmpdir(), `ame-settings-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  return path.join(os.tmpdir(), `mm-settings-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 }
 
 function tempSettingsFile(content?: string): string {

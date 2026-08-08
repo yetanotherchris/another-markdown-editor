@@ -23,13 +23,13 @@ let testFolder: string
 let configDir: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-header-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-header-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
 })
 
 test.beforeEach(async () => {
-  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-header-config-'))
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-header-config-'))
   ;({ app, window } = await launchApp(configDir, testFolder))
 })
 
@@ -67,7 +67,7 @@ test('US1 the editor toolbar is a shade darker than the active tab pill', async 
   // The active pill is still the spec-010 #EAEAEA pill (FR-003).
   await expect.poll(pillBg).toBe('rgb(234, 234, 234)')
 
-  // FR-001: the editor toolbar is the --ame-header shade and strictly darker.
+  // FR-001: the editor toolbar is the --mm-header shade and strictly darker.
   await expect.poll(toolbarBg).toBe('rgb(224, 224, 224)')
   expect(channelSum(await toolbarBg())).toBeLessThan(channelSum('rgb(234, 234, 234)'))
 
@@ -75,7 +75,7 @@ test('US1 the editor toolbar is a shade darker than the active tab pill', async 
   const canvas = channelSum(await canvasBg())
   expect(canvas).toBeGreaterThan(channelSum('rgb(224, 224, 224)'))
 
-  // FR-002: the main app header bar keeps its existing --ame-surface colour.
+  // FR-002: the main app header bar keeps its existing --mm-surface colour.
   await expect.poll(headerBg).toBe('rgb(249, 249, 251)')
 })
 
@@ -95,7 +95,7 @@ test('FR-005 no other UI element changes', async () => {
   await openFile(window, 'alpha.md')
 
   // The main app header bar, sidebar, and status footer keep their existing
-  // --ame-* values (the source toolbar renders only when the source view is
+  // --mm-* values (the source toolbar renders only when the source view is
   // open).
   await expect.poll(headerBg).toBe('rgb(249, 249, 251)')
   await expect.poll(sidebarBg).toBe('rgb(248, 248, 250)')
@@ -116,7 +116,7 @@ test('FR-007 in dark mode the toolbar stays a step below the dark pill', async (
   // The dark pill stays #2D2D2D (FR-003 holds in dark mode).
   await expect.poll(pillBg).toBe('rgb(45, 45, 45)')
 
-  // FR-007: the toolbar is the dark --ame-header — strictly darker than the
+  // FR-007: the toolbar is the dark --mm-header — strictly darker than the
   // pill.
   await expect.poll(toolbarBg).toBe('rgb(38, 38, 38)')
   expect(channelSum(await toolbarBg())).toBeLessThan(channelSum('rgb(45, 45, 45)'))

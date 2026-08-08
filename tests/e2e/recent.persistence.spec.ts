@@ -60,7 +60,7 @@ test('only folders recorded: no leading/dangling separator (spec edge)', async (
   await expect(ctx.window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
 
   const labels = (await recentMenuStructure(ctx)).map((i) => i.label)
-  expect(labels[0]?.includes('ame-recent-e2e')).toBe(true)
+  expect(labels[0]?.includes('mm-recent-e2e')).toBe(true)
   expect(labels[1]).toBeFalsy()
   expect(labels[2]).toBe('Clear Recent Items')
 })
@@ -177,7 +177,7 @@ test('US2 folders are grouped above files, then Clear Recent Items (FR-015)', as
   // an empty label in Electron). Without a type prefix the group position
   // identifies the kind: the folder entry names the workspace temp dir, the
   // file entry ends in .md.
-  expect(labels[0]?.includes('ame-recent-e2e')).toBe(true)
+  expect(labels[0]?.includes('mm-recent-e2e')).toBe(true)
   expect(labels[1]).toBeFalsy()
   expect(labels[2]?.endsWith('external.md')).toBe(true)
   expect(labels[3]).toBeFalsy()
@@ -210,7 +210,7 @@ test('US4 Clear Recent Items empties the history, untouched session, persists ac
 })
 
 test('FR-011 a config write failure is a quiet footer note and does not fail the open', async () => {
-  // Break the config path: the directory named by AME_CONFIG_DIR becomes a
+  // Break the config path: the directory named by MM_CONFIG_DIR becomes a
   // file, so the atomic write (mkdir + temp + rename) cannot proceed.
   fs.rmSync(ctx.configDir, { recursive: true, force: true })
   fs.writeFileSync(ctx.configDir, 'x')

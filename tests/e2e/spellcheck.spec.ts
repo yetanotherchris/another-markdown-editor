@@ -9,7 +9,7 @@ import { launchApp, closeAppSafely, openFile as openWorkspaceFile, openSettingsD
  *
  * The WYSIWYG editor checks the whole document on open and as you type, using
  * bundled Hunspell dictionaries (nspell) running in the renderer. Misspelled
- * words get the `ame-spelling-error` decoration (wavy-red underline) and the
+ * words get the `mm-spelling-error` decoration (wavy-red underline) and the
  * right-click correction menu is the renderer's own DOM menu
  * (`[data-testid="spelling-menu"]`) — so unlike the earlier native-engine spec,
  * nothing here needs main-process stubs; the tests drive the real DOM.
@@ -24,7 +24,7 @@ let userDataDir: string
 const DICT_WORD = 'zqwlux'
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-spellcheck-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-spellcheck-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'note.md'), '# Note\n\nThis is a clean document.\n')
   fs.writeFileSync(
     path.join(testFolder, 'misspelled.md'),
@@ -37,8 +37,8 @@ test.beforeAll(async () => {
 })
 
 test.beforeEach(async () => {
-  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-spellcheck-cfg-'))
-  userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-spellcheck-ud-'))
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-spellcheck-cfg-'))
+  userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-spellcheck-ud-'))
   ;({ app, window } = await launchApp(configDir, testFolder, userDataDir))
 })
 
@@ -54,12 +54,12 @@ test.afterAll(async () => {
 
 /** The misspelled words currently marked in the visible editor. */
 async function markedWords(page: Page): Promise<string[]> {
-  return page.locator('.ProseMirror:visible .ame-spelling-error').allTextContents()
+  return page.locator('.ProseMirror:visible .mm-spelling-error').allTextContents()
 }
 
 /** Right-click the exact marked word; true if a marked word matched. */
 async function rightClickMarked(page: Page, word: string): Promise<boolean> {
-  const target = page.locator('.ProseMirror:visible .ame-spelling-error', { hasText: word }).first()
+  const target = page.locator('.ProseMirror:visible .mm-spelling-error', { hasText: word }).first()
   const count = await target.count()
   if (count === 0) return false
   const box = await target.boundingBox()

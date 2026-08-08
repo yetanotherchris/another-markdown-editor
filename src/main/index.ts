@@ -10,13 +10,13 @@ import { registerSpellcheckContextMenu } from './contextMenu'
 import { resolveLaunchBounds, trackWindowState, flushWindowState } from './windowState'
 import { reconcileExplorerClosedWithoutWorkspace } from './workspaceExplorerState'
 
-// Spec 020 test seam (research R6): `AME_USER_DATA_DIR` relocates the Chromium
+// Spec 020 test seam (research R6): `MM_USER_DATA_DIR` relocates the Chromium
 // profile — the home of the native spellcheck dictionary — so the e2e suite can
 // isolate its profile per test and never pollute the developer's real
 // dictionary. Must run before the app is ready (the session is created during
 // window setup). Production never sets it.
-if (process.env.AME_USER_DATA_DIR) {
-  app.setPath('userData', process.env.AME_USER_DATA_DIR)
+if (process.env.MM_USER_DATA_DIR) {
+  app.setPath('userData', process.env.MM_USER_DATA_DIR)
 }
 
 let mainWindow: BrowserWindow | null = null

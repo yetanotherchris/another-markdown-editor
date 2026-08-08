@@ -21,12 +21,12 @@ let configDir: string
 let testFolder: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-winstate-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-winstate-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
 
 test.beforeEach(async () => {
-  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-winstate-config-'))
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-winstate-config-'))
   ;({ app, window } = await launchApp(configDir, testFolder))
 })
 
