@@ -44,6 +44,28 @@
   background: var(--mm-header);
 }
 
+/* Spec 014 (FR-001/002/003/005/006): the "View source" action is the LAST
+   top-bar-item inside .top-bar-inner (the custom 'view' group is appended by
+   buildTopBar — see CrepeHost.tsx and toolbarLabels.ts). Crepe gives every
+   top-bar button the same outline-coloured icon, so the source action is easy
+   to miss. Make it prominent: the icon is rendered in the app accent token and
+   the button sits on a translucent accent background, while keeping Crepe's
+   button size/alignment and the muted styling of the surrounding controls
+   (contracts/renderer.md R1-R3). */
+.milkdown .milkdown-top-bar .top-bar-inner > .top-bar-item:last-child {
+  background: color-mix(in srgb, var(--mm-accent) 14%, transparent);
+  border-radius: 6px;
+}
+
+.milkdown .milkdown-top-bar .top-bar-inner > .top-bar-item:last-child svg {
+  color: var(--mm-accent);
+  fill: var(--mm-accent);
+}
+
+.milkdown .milkdown-top-bar .top-bar-inner > .top-bar-item:last-child:hover {
+  background: color-mix(in srgb, var(--mm-accent) 24%, transparent);
+}
+
 /* GitHub-style block spacing (2026-08-07): Crepe's reset.css collapses block
    rhythm to `padding: 4px 0` on paragraphs and no bottom margins anywhere,
    which renders documents visually squashed. GitHub's rendered markdown
