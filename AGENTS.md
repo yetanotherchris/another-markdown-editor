@@ -251,9 +251,8 @@ AGENTS.md                         This file
 - **Archive the spec as part of the implementation PR.** When a spec's feature
   is fully implemented and its PR is opened, move the spec directory from
   `specs/<n>-<name>/` to `specs/archive/<n>-<name>/` in the same change (use
-  `git mv`), set the spec's `**Status**` to `Archived`, and update its row in
-  the Current implementation status table below. Do not leave implemented specs
-  in the active `specs/` directory.
+  `git mv`), set the spec's `**Status**` to `Archived`. Do not leave implemented
+  specs in the active `specs/` directory.
 - PR title format: `feat(phase-N): <description>` with the AI usage line at
   the end of the description.
 - Use bullet points for the changes in the PR description.
