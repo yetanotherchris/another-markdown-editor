@@ -88,7 +88,9 @@ export function useSourceViewToggle(opts: {
       }
       const read = await window.api.readFile(path)
       if (!read.ok) return null
-      dispatch({ type: 'OPEN_EXISTING', payload: { ...read.value, view: 'source' } })
+      // Spec 024: View source is not a browsing open (FR-008 scope) — it keeps
+      // the current behaviour (activate existing / new tab), so no mode.
+      dispatch({ type: 'OPEN_EXISTING', payload: { value: { ...read.value, view: 'source' } } })
       // The freshly opened tab's editor registers on mount, so it is the newest
       // LRU entry and cannot be evicted here. sessionRef.current.activeId is
       // still the pre-dispatch document — passing it only protects the tab that

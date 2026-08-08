@@ -81,7 +81,9 @@ test('US1 the editor toolbar is a shade darker than the active tab pill', async 
 
 test('FR-003/004 the active and inactive tab appearances are unchanged', async () => {
   await openFile(window, 'alpha.md')
-  await openFile(window, 'beta.md')
+  // Second tab via the explicit new-tab action (spec 024 FR-005) so the clean
+  // active tab is not replaced.
+  await window.getByRole('treeitem').getByText('beta.md').click({ button: 'middle' })
   await expect(window.getByRole('tab')).toHaveCount(2)
 
   // The active pill keeps its exact #EAEAEA background (FR-003).
