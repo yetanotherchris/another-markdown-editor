@@ -26,20 +26,16 @@ export const initialWorkspaceState: WorkspaceState = {
   error: null
 }
 
-export interface WorkspaceAction {
-  type:
-    | 'REPLACE'
-    | 'EXPAND_START'
-    | 'EXPAND_SUCCESS'
-    | 'EXPAND_ERROR'
-    | 'SELECT'
-    | 'APPLY_WATCH_EVENT'
-    | 'INSERT_ENTRY'
-    | 'REMOVE_ENTRY'
-    | 'MOVE_ENTRY'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any
-}
+export type WorkspaceAction =
+  | { type: 'REPLACE'; payload: { name: string | null; root: string | null; entries: DirEntry[] } }
+  | { type: 'EXPAND_START'; payload: { id: string } }
+  | { type: 'EXPAND_SUCCESS'; payload: { id: string; entries: DirEntry[] } }
+  | { type: 'EXPAND_ERROR'; payload: { id: string; error: string } }
+  | { type: 'SELECT'; payload: { id: string | null } }
+  | { type: 'APPLY_WATCH_EVENT'; payload: WatchEvent }
+  | { type: 'INSERT_ENTRY'; payload: { parentPath: string; entry: DirEntry } }
+  | { type: 'REMOVE_ENTRY'; payload: { id: string } }
+  | { type: 'MOVE_ENTRY'; payload: { fromPath: string; toPath: string; entry: DirEntry } }
 
 export function entryToNode(entry: DirEntry): TreeNode {
   return {
@@ -320,23 +316,23 @@ export function handleMoveEntry(state: WorkspaceState, payload: { fromPath: stri
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
     case 'REPLACE':
-      return handleReplace(state, action.payload as { name: string | null; root: string | null; entries: DirEntry[] })
+      return handleReplace(state, action.payload)
     case 'EXPAND_START':
-      return handleExpandStart(state, action.payload as { id: string })
+      return handleExpandStart(state, action.payload)
     case 'EXPAND_SUCCESS':
-      return handleExpandSuccess(state, action.payload as { id: string; entries: DirEntry[] })
+      return handleExpandSuccess(state, action.payload)
     case 'EXPAND_ERROR':
-      return handleExpandError(state, action.payload as { id: string; error: string })
+      return handleExpandError(state, action.payload)
     case 'SELECT':
-      return handleSelect(state, action.payload as { id: string | null })
+      return handleSelect(state, action.payload)
     case 'APPLY_WATCH_EVENT':
-      return handleApplyWatchEvent(state, action.payload as WatchEvent)
+      return handleApplyWatchEvent(state, action.payload)
     case 'INSERT_ENTRY':
-      return handleInsertEntry(state, action.payload as { parentPath: string; entry: DirEntry })
+      return handleInsertEntry(state, action.payload)
     case 'REMOVE_ENTRY':
-      return handleRemoveEntry(state, action.payload as { id: string })
+      return handleRemoveEntry(state, action.payload)
     case 'MOVE_ENTRY':
-      return handleMoveEntry(state, action.payload as { fromPath: string; toPath: string; entry: DirEntry })
+      return handleMoveEntry(state, action.payload)
     default:
       return state
   }
