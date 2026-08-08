@@ -205,9 +205,9 @@ AGENTS.md                         This file
   - **Behavioral changes**: adding or modifying actual functionality.
   This separation makes code reviews easier, reduces bugs, and creates clearer
   git history.
-- Report honestly. If something is stubbed, partly done, or unverified, say so
-  plainly. A confident wrong summary is worse than an uncertain accurate one.
-- Do not commit, push, or open PRs unless asked.
+- Report honestly. If something is stubbed, partly done, or unverified, say so plainly. A confident wrong summary is worse than an uncertain accurate one.
+- **Do not hard-wrap lines in Markdown files to ~80 columns.** Write prose as flowing paragraphs with a single newline between blocks; let the renderer wrap. This keeps diffs clean (same rule as PR bodies below).
+- **Source code lines: aim for 100–120 columns, never over 120.** Match the surrounding file's existing width rather than imposing a strict style, but hard-limit at 120.
 - **Write Playwright e2e tests for every spec implementation, and run them.**
   Each phase that adds user-visible behaviour gets a spec in
   `tests/e2e/` covering its acceptance scenarios against the real built app
@@ -236,6 +236,9 @@ AGENTS.md                         This file
 
 ## Branching and PR workflow
 
+- **Whenever asked to make changes, work on a new branch** — never implement
+  on `main`. Create the branch before any work begins, then commit to the
+  branch after finishing each to-do item.
 - There is **no persistent feature branch**. Each phase gets its own branch
   created from `main` and is merged straight back into `main`.
 - **The phase branch MUST be created before any implementation work begins** —

@@ -34,6 +34,10 @@ test.beforeAll(async () => {
     path.join(testFolder, 'mixed.md'),
     '# Mixed\n\nThis has behaviour and color spellings.\n'
   )
+  fs.writeFileSync(
+    path.join(testFolder, 'supplemental.md'),
+    '# Supplemental\n\nLacanian and Kleinian psychodynamic theory, JSON and hominem.\n\nMaladaptive behaviour and teh.\n'
+  )
 })
 
 test.beforeEach(async () => {
@@ -177,6 +181,40 @@ test('US3 a learned word survives an app restart', async () => {
 })
 
 // ---------- US4: toggle and language ----------
+
+// ---------- Spec 025: dictionary coverage ----------
+
+test('US1 a common word missing from the old dictionary is not flagged', async () => {
+  await openWorkspaceFile(window, 'supplemental.md')
+  // "maladaptive" exists in the size-70 dictionaries, so it is not flagged.
+  // Case-insensitive: the fixture writes sentence-initial "Maladaptive".
+  await expect.poll(async () => (await markedWords(window)).map((w) => w.toLowerCase())).not.toContain('maladaptive')
+})
+
+test('US2 domain and technical terms are accepted (JSON, Lacanian, hominem)', async () => {
+  await openWorkspaceFile(window, 'supplemental.md')
+  for (const word of ['Lacanian', 'Kleinian', 'psychodynamic', 'JSON', 'hominem']) {
+    await expect.poll(() => markedWords(window)).not.toContain(word)
+  }
+  // The curated list does not mask genuine typos elsewhere in the document.
+  await expect.poll(() => markedWords(window)).toContain('teh')
+})
+
+test('US2 a supplemental word is accepted in both en-GB and en-US', async () => {
+  await openWorkspaceFile(window, 'supplemental.md')
+  await expect.poll(() => markedWords(window)).not.toContain('Lacanian')
+  // The fixture's British "behaviour" is accepted under en-GB.
+  expect(await markedWords(window)).not.toContain('behaviour')
+
+  await openSettingsDialog(window)
+  await window.getByTestId('spellcheck-language').selectOption('en-US')
+  await window.getByRole('button', { name: 'Close settings' }).click()
+  // The switch took effect: en-US now flags the British spelling, while the
+  // supplemental words are still accepted.
+  await expect.poll(() => markedWords(window)).toContain('behaviour')
+  await expect.poll(() => markedWords(window)).not.toContain('Lacanian')
+  await expect.poll(() => markedWords(window)).not.toContain('JSON')
+})
 
 test('US4 the settings toggle clears and restores the underlines', async () => {
   await openWorkspaceFile(window, 'misspelled.md')

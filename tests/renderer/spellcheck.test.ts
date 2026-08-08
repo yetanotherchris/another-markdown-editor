@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type NSpell from 'nspell'
-import { findMisspellings, getChecker, resolveLanguage } from '../../src/renderer/domain/spellcheck'
+import { findMisspellings, getChecker, resolveLanguage, SUPPLEMENTAL_WORDS } from '../../src/renderer/domain/spellcheck'
 
 /**
  * Spec 020 (2026-08-07): the JS whole-document spellchecker. The bundled
@@ -91,5 +91,53 @@ describe('findMisspellings', () => {
     // itself just checks whatever text it is given.
     const miss = findMisspellings('const teh = 1;', gb, new Set())
     expect(miss.map((m) => m.word)).toEqual(['const', 'teh'])
+  })
+})
+
+describe('supplemental word list (spec 025)', () => {
+  // The report words (and the curated additions) must never be flagged in
+  // either language, even though no general English dictionary contains them.
+  const words = [
+    'json',
+    'lacanian',
+    'kleinian',
+    'psychodynamic',
+    'hominem',
+    'reproduceable',
+    'experimentations',
+    'maladaptive',
+    'yaml',
+    'frontend',
+    'countertransference'
+  ]
+
+  for (const language of ['en-GB', 'en-US'] as const) {
+    describe(language, () => {
+      it.each(words)('accepts "%s"', (word) => {
+        const checker = getChecker(language)
+        expect(findMisspellings(word, checker, new Set())).toEqual([])
+      })
+    })
+  }
+
+  it('accepts case variants of a supplemental word (JSON / Json / json)', () => {
+    const text = 'JSON Json json'
+    const miss = findMisspellings(text, getChecker('en-US'), new Set())
+    expect(miss).toEqual([])
+  })
+
+  it('still flags a real typo next to a supplemental word', () => {
+    const text = 'The Lacanian recieve reading.'
+    const miss = findMisspellings(text, getChecker('en-GB'), new Set())
+    expect(miss.map((m) => m.word)).toEqual(['recieve'])
+  })
+
+  it('a supplemental word is accepted via the list, not via the dictionary or the user set', () => {
+    // Acceptance must come from SUPPLEMENTAL_WORDS: neither the nspell checker
+    // nor an empty custom dictionary contains "json".
+    const checker = getChecker('en-GB')
+    expect(SUPPLEMENTAL_WORDS.has('json')).toBe(true)
+    expect(checker.correct('json')).toBe(false)
+    expect(findMisspellings('json', checker, new Set())).toEqual([])
   })
 })
