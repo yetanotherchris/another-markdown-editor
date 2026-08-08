@@ -7,7 +7,7 @@ import { spellcheckRuntime, updateSpellcheckRuntime, onSpellcheckRuntimeChange }
 
 /**
  * Spec 020 (2026-08-07): the JS whole-document spellchecker as a ProseMirror
- * plugin. Marks misspelled ranges with the `ame-spelling-error` inline
+ * plugin. Marks misspelled ranges with the `mm-spelling-error` inline
  * decoration (wavy-red underline in CSS) and owns the right-click correction
  * menu (suggestions from nspell + add-to-dictionary).
  *
@@ -30,7 +30,7 @@ interface SpellcheckPluginState {
   decos: DecorationSet
 }
 
-export const spellcheckKey = new PluginKey<SpellcheckPluginState>('ame-spellcheck')
+export const spellcheckKey = new PluginKey<SpellcheckPluginState>('mm-spellcheck')
 
 const RECOMPUTE_DEBOUNCE_MS = 120
 const MAX_SUGGESTIONS = 5
@@ -75,7 +75,7 @@ export function computeSpellcheckDecorations(view: EditorView): DecorationSet {
     for (const misspelling of findMisspellings(segment.text, runtime.checker, runtime.customWords)) {
       decorations.push(
         Decoration.inline(segment.from + misspelling.start, segment.from + misspelling.end, {
-          class: 'ame-spelling-error'
+          class: 'mm-spelling-error'
         })
       )
     }
@@ -167,7 +167,7 @@ function handleContextMenu(
 
   const target = event.target as HTMLElement | null
   if (!target || !(target instanceof Element)) return false
-  const span = target.closest('.ame-spelling-error') as HTMLElement | null
+  const span = target.closest('.mm-spelling-error') as HTMLElement | null
   if (!span) {
     // Not on a misspelled word: dismiss any open menu, let the default pass.
     onMenu(null)

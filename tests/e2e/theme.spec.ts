@@ -30,12 +30,12 @@ let testFolder: string
 let configDir: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-theme-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-theme-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
 
 test.beforeEach(async () => {
-  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-theme-config-'))
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-theme-config-'))
   ;({ app, window } = await launchApp(configDir, testFolder))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
@@ -49,7 +49,7 @@ test.afterAll(async () => {
   fs.rmSync(testFolder, { recursive: true, force: true })
 })
 
-/** The header bar's resolved background — the chrome's `--ame-surface` token. */
+/** The header bar's resolved background — the chrome's `--mm-surface` token. */
 async function headerBackground(): Promise<string> {
   return window.locator('.header-bar').evaluate((el) => getComputedStyle(el).backgroundColor)
 }
@@ -84,7 +84,7 @@ test('US1 choosing Light applies the light chrome palette', async () => {
   await dialog.getByRole('radio', { name: 'Light', exact: true }).check()
 
   await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'light')
-  // The header bar resolves the light --ame-surface (#f9f9fb).
+  // The header bar resolves the light --mm-surface (#f9f9fb).
   await expect.poll(headerBackground).toBe('rgb(249, 249, 251)')
 })
 
@@ -95,7 +95,7 @@ test('US2 choosing Dark applies the dark chrome palette and persists it', async 
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).check()
 
   await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark')
-  // The header bar resolves the dark --ame-surface (#1F1F1F, Main Editor Background).
+  // The header bar resolves the dark --mm-surface (#1F1F1F, Main Editor Background).
   await expect.poll(headerBackground).toBe('rgb(31, 31, 31)')
 
   // The choice is persisted to the shared config.json (FR-006).
@@ -162,7 +162,7 @@ test('FR-010 the default Rustic canvas keeps its palette in dark mode; Monotone 
   await window.getByRole('button', { name: 'View source' }).click()
   await expect(window.getByTestId('source-view')).toBeVisible()
   expect(await window.locator('.source-return').evaluate((el) => getComputedStyle(el).color))
-    .toBe('rgb(140, 140, 140)') // inherits --ame-text #8C8C8C
+    .toBe('rgb(140, 140, 140)') // inherits --mm-text #8C8C8C
 })
 
 test('FR-007 the Theme group is keyboard-reachable and arrow-key navigable', async () => {
@@ -181,7 +181,7 @@ test('FR-007 the Theme group is keyboard-reachable and arrow-key navigable', asy
 })
 
 test('FR-009 a missing config opens with System default and a change writes a valid config', async () => {
-  // No config.json exists yet (fresh AME_CONFIG_DIR).
+  // No config.json exists yet (fresh MM_CONFIG_DIR).
   await openFile(window, 'alpha.md')
   const dialog = await openSettingsDialog(window)
   await expect(dialog.getByRole('radio', { name: 'System default', exact: true })).toBeChecked()

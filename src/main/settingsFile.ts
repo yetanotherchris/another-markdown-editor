@@ -10,7 +10,7 @@ import { atomicWrite } from './fs/atomicWrite'
  * (settings.ts) and pass it in; this module never touches `app`.
  *
  * Spec 012 FR-002: settings live in the SAME per-user configuration file as the
- * recent-items list — `config.json` at `appData/ame` (or the `AME_CONFIG_DIR`
+ * recent-items list — `config.json` at `appData/markdownmeister` (or the `MM_CONFIG_DIR`
  * test seam). The file shape is `{ recentItems?, settings? }`, and every write
  * is a read-modify-write so saving settings never clobbers the recent-items
  * list (and vice versa).

@@ -24,12 +24,12 @@ let testFolder: string
 let configDir: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-settings-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-settings-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
 
 test.beforeEach(async () => {
-  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-settings-config-'))
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-settings-config-'))
   ;({ app, window } = await launchApp(configDir, testFolder))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
 })
@@ -198,7 +198,7 @@ test('FR-007 the dialog is keyboard-accessible (open, navigate, close)', async (
 })
 
 test('FR-006 a missing config opens with Rustic default and a change writes a valid config', async () => {
-  // No config.json exists yet (fresh AME_CONFIG_DIR).
+  // No config.json exists yet (fresh MM_CONFIG_DIR).
   await openFile()
   const dialog = await openSettingsDialog(window)
   await expect(dialog.getByRole('radio', { name: 'Rustic', exact: true })).toBeChecked()

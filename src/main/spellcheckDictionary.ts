@@ -7,7 +7,7 @@ import { atomicWrite } from './fs/atomicWrite'
  * words the user has taught the JS spellchecker so they are never flagged.
  *
  * Lives as a top-level `spellcheckDictionary` array in the SAME per-user config
- * file as recent-items/settings (`appData/ame/config.json`), read-modify-write
+ * file as recent-items/settings (`appData/markdownmeister/config.json`), read-modify-write
  * so saving it never clobbers the siblings (spec 012 FR-002 pattern). Callers
  * resolve the file path (recentItemsPath); this module never touches `app`.
  *

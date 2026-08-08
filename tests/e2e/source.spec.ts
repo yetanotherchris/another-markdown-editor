@@ -9,7 +9,7 @@ let window: Page
 let testFolder: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-source-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-source-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
   fs.mkdirSync(path.join(testFolder, 'nested'))
@@ -121,13 +121,13 @@ test('the source textarea focus ring is a subtle theme-neutral colour, not the l
   const outlineColor = await window
     .getByTestId('source-textarea')
     .evaluate((el) => getComputedStyle(el).outlineColor)
-  // The ring resolves to the same rgb as --ame-muted (a neutral focus colour),
+  // The ring resolves to the same rgb as --mm-muted (a neutral focus colour),
   // never the loud accent (orange in light) or the old hardcoded #4a90d9
   // (rgb(74, 144, 217)) which read as a window border around the source view.
   const mutedToRgb = await window.evaluate(() => {
     const probe = document.createElement('div')
     probe.style.color = getComputedStyle(document.documentElement)
-      .getPropertyValue('--ame-muted')
+      .getPropertyValue('--mm-muted')
       .trim()
     document.body.appendChild(probe)
     const rgb = getComputedStyle(probe).color

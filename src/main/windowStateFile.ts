@@ -10,8 +10,8 @@ import { atomicWrite } from './fs/atomicWrite'
  * pass it in; this module never touches `app` or `screen`.
  *
  * Spec 011 FR-003: the window state lives in the SAME per-user configuration
- * file as the recent-items list and settings — `config.json` at `appData/ame`
- * (or the `AME_CONFIG_DIR` test seam). The file shape is
+ * file as the recent-items list and settings — `config.json` at `appData/markdownmeister`
+ * (or the `MM_CONFIG_DIR` test seam). The file shape is
  * `{ recentItems?, settings?, windowState? }`, and every write is a
  * read-modify-write so saving window state never clobbers the other sections
  * (and vice versa).

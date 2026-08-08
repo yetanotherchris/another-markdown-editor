@@ -24,7 +24,7 @@
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--ame-text-secondary);
+  color: var(--mm-text-secondary);
   cursor: pointer;
   user-select: none;
   font-size: 13px;
@@ -33,12 +33,12 @@
 }
 
 .tab:hover {
-  background: var(--ame-surface-secondary);
+  background: var(--mm-surface-secondary);
 }
 
 .tab.active {
-  background: var(--ame-active-tab);
-  color: var(--ame-text);
+  background: var(--mm-active-tab);
+  color: var(--mm-text);
 }
 
 .tab-title {
@@ -52,11 +52,11 @@
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  color: var(--ame-muted-secondary);
+  color: var(--mm-muted-secondary);
 }
 
 .tab-dirty {
-  color: var(--ame-accent);
+  color: var(--mm-accent);
   font-weight: 700;
 }
 
@@ -74,7 +74,7 @@
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--ame-muted);
+  color: var(--mm-muted);
   padding: 2px;
   border-radius: 999px;
   flex-shrink: 0;
@@ -86,13 +86,13 @@
 }
 
 .tab-close:hover {
-  background: var(--ame-border);
-  color: var(--ame-text);
+  background: var(--mm-border);
+  color: var(--mm-text);
 }
 
 .tab-close:focus-visible,
 .tab-new:focus-visible {
-  outline: 2px solid var(--ame-accent);
+  outline: 2px solid var(--mm-accent);
   outline-offset: 1px;
 }
 
@@ -110,14 +110,14 @@
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--ame-text-secondary);
+  color: var(--mm-text-secondary);
   cursor: pointer;
   flex-shrink: 0;
   margin-left: 2px;
 }
 
 .tab-new:hover {
-  background: var(--ame-active-tab);
+  background: var(--mm-active-tab);
 }
 
 .tab-new-icon {

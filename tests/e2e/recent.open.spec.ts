@@ -71,9 +71,9 @@ test('US1 opening a folder records it and it can be reopened as the workspace', 
   await expect(ctx.window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
 
   const items = await recentItemsState(ctx)
-  expect(items.some((i) => i.label.includes('ame-recent-e2e'))).toBe(true)
+  expect(items.some((i) => i.label.includes('mm-recent-e2e'))).toBe(true)
 
-  await clickRecentItem(ctx, 'ame-recent-e2e')
+  await clickRecentItem(ctx, 'mm-recent-e2e')
   await expect(ctx.window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
 })
 
@@ -96,7 +96,7 @@ test('US1 reopening an entry moves it to the front without a duplicate', async (
   await expect(ctx.window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
 
   const items = await recentItemsState(ctx)
-  expect(items[0].label).toContain('ame-recent-e2e')
+  expect(items[0].label).toContain('mm-recent-e2e')
   expect(items).toHaveLength(3)
 
   // Reopen the older file — it stays a single entry and moves to the FRONT of
@@ -151,7 +151,7 @@ test('US2 recent file and folder entries are distinguishable by grouping and ope
   // group and the file entry below it, and a file name ends in `.md`.
   const items = await recentItemsState(ctx)
   expect(items).toHaveLength(2)
-  expect(items[0].label).toContain('ame-recent-e2e')
+  expect(items[0].label).toContain('mm-recent-e2e')
   expect(items[0].label.endsWith('.md')).toBe(false)
   expect(items[1].label).toContain('external.md')
 

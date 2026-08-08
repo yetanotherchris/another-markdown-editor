@@ -33,7 +33,7 @@ const FILE_MENU_LABELS = { 'Open File': 'Open File…', 'Open Folder': 'Open Fol
 
 export function recentHooks(ctx: RecentContext): void {
   test.beforeAll(async () => {
-    ctx.testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-recent-e2e-'))
+    ctx.testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-recent-e2e-'))
     fs.writeFileSync(path.join(ctx.testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
     fs.writeFileSync(path.join(ctx.testFolder, 'beta.md'), '# Beta')
     fs.mkdirSync(path.join(ctx.testFolder, 'sub'))
@@ -48,8 +48,8 @@ export function recentHooks(ctx: RecentContext): void {
 
   test.beforeEach(async () => {
     // A per-test config directory so tests never read or write the developer's
-    // real ~/.config/ame (research R1, AME_CONFIG_DIR seam).
-    ctx.configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-recent-config-'))
+    // real ~/.config/markdownmeister (research R1, MM_CONFIG_DIR seam).
+    ctx.configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-recent-config-'))
     // externalFile is a shared fixture that the deleted-file tests remove;
     // recreate it so any later test that opens it has a real target.
     fs.writeFileSync(ctx.externalFile, '# External')

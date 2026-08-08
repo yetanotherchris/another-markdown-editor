@@ -10,8 +10,8 @@
   align-items: center;
   gap: 4px;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--ame-border);
-  background: var(--ame-surface);
+  border-bottom: 1px solid var(--mm-border);
+  background: var(--mm-surface);
   flex-shrink: 0;
   /* The header forms its own stacking context (position + z-index) so the
      hamburger dropdown — an absolutely-positioned descendant that hangs below
@@ -42,23 +42,23 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--ame-text-secondary);
+  color: var(--mm-text-secondary);
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
 }
 
 .chrome-icon-button:hover:not(:disabled) {
-  background: var(--ame-active-tab);
+  background: var(--mm-active-tab);
 }
 
 .chrome-icon-button:focus-visible {
-  outline: 2px solid var(--ame-accent);
+  outline: 2px solid var(--mm-accent);
   outline-offset: 1px;
 }
 
 .chrome-icon-button:disabled {
-  color: var(--ame-muted-secondary);
+  color: var(--mm-muted-secondary);
   cursor: default;
   opacity: 0.6;
 }
@@ -80,8 +80,8 @@
   z-index: 100;
   min-width: 240px;
   padding: 6px;
-  background: var(--ame-bg);
-  border: 1px solid var(--ame-border);
+  background: var(--mm-bg);
+  border: 1px solid var(--mm-border);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   display: flex;
@@ -109,7 +109,7 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: var(--ame-muted);
+  color: var(--mm-muted);
 }
 
 .menu-group-label {
@@ -118,7 +118,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ame-muted);
+  color: var(--mm-muted);
   user-select: none;
 }
 
@@ -132,7 +132,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--ame-text);
+  color: var(--mm-text);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
@@ -140,16 +140,16 @@
 }
 
 .menu-item:hover:not(:disabled) {
-  background: var(--ame-surface-secondary);
+  background: var(--mm-surface-secondary);
 }
 
 .menu-item:focus-visible {
-  outline: 2px solid var(--ame-accent);
+  outline: 2px solid var(--mm-accent);
   outline-offset: -2px;
 }
 
 .menu-item:disabled {
-  color: var(--ame-muted-secondary);
+  color: var(--mm-muted-secondary);
   cursor: default;
 }
 
@@ -161,13 +161,13 @@
 
 .menu-item-accelerator {
   flex-shrink: 0;
-  color: var(--ame-muted);
+  color: var(--mm-muted);
   font-size: 12px;
 }
 
 .menu-separator {
   height: 1px;
   margin: 5px 8px;
-  background: var(--ame-border-secondary);
+  background: var(--mm-border-secondary);
   flex-shrink: 0;
 }

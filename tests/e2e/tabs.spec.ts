@@ -9,7 +9,7 @@ let window: Page
 let testFolder: string
 
 test.beforeAll(async () => {
-  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'ame-tabs-e2e-'))
+  testFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-tabs-e2e-'))
   fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nHello world.')
   fs.writeFileSync(path.join(testFolder, 'beta.md'), '# Beta\n\nSecond file.')
   // Extra files to drive the 8-instance LRU eviction cap (T035/R2).

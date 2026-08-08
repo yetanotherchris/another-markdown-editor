@@ -18,7 +18,7 @@ import type { Rect } from './windowStateFit'
  * all rules live in the pure `windowStateFile`/`windowStateFit` modules.
  *
  * FR-003: the path is the SAME per-user config file as the recent-items list
- * (`recentItemsConfigPath()`, honouring `AME_CONFIG_DIR`).
+ * (`recentItemsConfigPath()`, honouring `MM_CONFIG_DIR`).
  */
 
 function windowStatePath(): string {
