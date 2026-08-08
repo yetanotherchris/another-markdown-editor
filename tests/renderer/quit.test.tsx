@@ -14,7 +14,7 @@ function createSession(): EditingSession {
 function openFile(path: string, content: string, mtimeMs: number): DocumentState {
   const state = documentsReducer(createSession(), {
     type: 'OPEN_EXISTING',
-    payload: { path, name: path, content, mtimeMs, size: content.length }
+    payload: { value: { path, name: path, content, mtimeMs, size: content.length } }
   })
   return state.documents[0]
 }

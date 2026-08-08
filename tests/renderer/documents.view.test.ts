@@ -12,7 +12,7 @@ describe('documents reducer', () => {
       it('opened files default to formatted view', () => {
         const state = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         expect(state.documents[0].view).toBe('formatted')
       })
@@ -20,7 +20,7 @@ describe('documents reducer', () => {
       it('OPEN_EXISTING with view source opens the file in source view', () => {
         const state = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1, view: 'source' }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1, view: 'source' } }
         })
         expect(state.documents[0].view).toBe('source')
       })
@@ -28,12 +28,12 @@ describe('documents reducer', () => {
       it('OPEN_EXISTING with view source switches an already-open formatted tab without duplicating', () => {
         const s1 = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         const id = s1.documents[0].id
         const s2 = documentsReducer(s1, {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1, view: 'source' }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1, view: 'source' } }
         })
         expect(s2.documents).toHaveLength(1)
         expect(s2.activeId).toBe(id)
@@ -43,12 +43,12 @@ describe('documents reducer', () => {
       it('OPEN_EXISTING without view leaves an existing tab untouched (dedupe unchanged)', () => {
         const s1 = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         const id = s1.documents[0].id
         const s2 = documentsReducer(s1, {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         expect(s2.documents).toHaveLength(1)
         expect(s2.documents[0].view).toBe('formatted')
@@ -58,7 +58,7 @@ describe('documents reducer', () => {
       it('SET_VIEW flips the view and leaves content and dirty untouched', () => {
         let state = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         const id = state.documents[0].id
         state = documentsReducer(state, { type: 'UPDATE_CONTENT', payload: { id, content: 'y' } })
@@ -71,7 +71,7 @@ describe('documents reducer', () => {
       it('SET_VIEW with the same view is a no-op (same state reference, no re-render)', () => {
         const state = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         const id = state.documents[0].id
         const after = documentsReducer(state, { type: 'SET_VIEW', payload: { id, view: 'formatted' } })
@@ -83,11 +83,11 @@ describe('documents reducer', () => {
       it('SET_VIEW does not affect other documents', () => {
         const s1 = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'a.md', name: 'a.md', content: 'a', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'a.md', name: 'a.md', content: 'a', mtimeMs: 1, size: 1 } }
         })
         const s2 = documentsReducer(s1, {
           type: 'OPEN_EXISTING',
-          payload: { path: 'b.md', name: 'b.md', content: 'b', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'b.md', name: 'b.md', content: 'b', mtimeMs: 1, size: 1 } }
         })
         const aId = s2.documents[0].id
         const bId = s2.documents[1].id
@@ -100,7 +100,7 @@ describe('documents reducer', () => {
       it('REFRESH_FROM_SOURCE replaces content, resets cursor/scroll, bumps version, keeps dirty', () => {
         let state = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         const id = state.documents[0].id
         state = documentsReducer(state, { type: 'UPDATE_CONTENT', payload: { id, content: 'raw [ ] text' } })
@@ -125,7 +125,7 @@ describe('documents reducer', () => {
       it('REFRESH_FROM_SOURCE keeps baseline so a clean doc stays clean when text unchanged', () => {
         const state = documentsReducer(createSession(), {
           type: 'OPEN_EXISTING',
-          payload: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 }
+          payload: { value: { path: 'f.md', name: 'f.md', content: 'x', mtimeMs: 1, size: 1 } }
         })
         const id = state.documents[0].id
         const after = documentsReducer(state, {

@@ -34,6 +34,9 @@ interface TreeProps {
   /** Spec 015: "Reveal in Explorer/Finder" — open the item's location in the
    *  OS file manager (FR-001/002/003). */
   onReveal: (node: TreeNode) => void
+  /** Spec 024 (FR-005): explicitly open a file in a NEW tab (middle-click),
+   *  bypassing the replace-clean-tab behaviour. */
+  onOpenNewTab: (node: TreeNode) => void
   /** Spec 002 (US004): imperative handle the app uses to open parents and
    *  scroll a node into view (explorer active-file highlight). */
   apiRef?: React.MutableRefObject<TreeApi<TreeNode> | null> | null
@@ -170,6 +173,8 @@ interface TreeRowProps extends RowRendererProps<TreeNode> {
   onKeyboardMenu: (node: TreeNode, x: number, y: number) => void
   onRenameKey: (node: TreeNode) => void
   onDeleteKey: (node: TreeNode) => void
+  /** Spec 024: middle-click opens the file in a new tab. */
+  onOpenNewTab: (node: TreeNode) => void
 }
 
 /**
@@ -178,7 +183,7 @@ interface TreeRowProps extends RowRendererProps<TreeNode> {
  * Row would be a new component type per render, remounting all rows' DOM and
  * dropping the inline-rename caret).
  */
-function TreeRow({ node, attrs, innerRef, children, onKeyboardMenu, onRenameKey, onDeleteKey }: TreeRowProps) {
+function TreeRow({ node, attrs, innerRef, children, onKeyboardMenu, onRenameKey, onDeleteKey, onOpenNewTab }: TreeRowProps) {
   const isDir = node.data.kind === 'directory'
 
   // Keyboard access to the row operations (WCAG 2.1.1): F2 renames, Delete
@@ -210,6 +215,14 @@ function TreeRow({ node, attrs, innerRef, children, onKeyboardMenu, onRenameKey,
       aria-expanded={isDir ? node.isOpen : undefined}
       onClick={node.handleClick}
       onKeyDown={onKeyDown}
+      onAuxClick={(e) => {
+        // Spec 024 FR-005: middle-click opens the file in a new tab, bypassing
+        // the replace-clean-tab behaviour.
+        if (e.button === 1) {
+          e.preventDefault()
+          onOpenNewTab(node.data)
+        }
+      }}
     >
       {children}
     </div>
@@ -231,6 +244,7 @@ export default function Tree({
   onOpen,
   onViewSource,
   onReveal,
+  onOpenNewTab,
   apiRef
 }: TreeProps) {
   const [containerRef, size] = useElementSize<HTMLDivElement>()
@@ -390,8 +404,9 @@ export default function Tree({
       onKeyboardMenu={handleKeyboardMenu}
       onRenameKey={handleRenameKey}
       onDeleteKey={handleDeleteKey}
+      onOpenNewTab={onOpenNewTab}
     />
-  ), [handleKeyboardMenu, handleRenameKey, handleDeleteKey])
+  ), [handleKeyboardMenu, handleRenameKey, handleDeleteKey, onOpenNewTab])
 
   const disableDrop = useCallback(({ parentNode, dragNodes }: {
     parentNode: NodeApi<TreeNode>

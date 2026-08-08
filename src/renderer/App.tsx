@@ -178,6 +178,14 @@ export default function App() {
       })
   }, [])
 
+  // Spec 024 (FR-005): middle-click opens the file in a NEW tab, bypassing the
+  // replace-clean-tab behaviour.
+  const handleOpenNewTab = useCallback((node: TreeNode) => {
+    window.api.readFile(node.id).then((result) => {
+      if (result.ok) sessionApi.openFileFromTree(result.value, true)
+    })
+  }, [sessionApi])
+
   useEffect(() => {
     const unsubMenu = window.api.onMenuCommand(handleMenuCommand)
 
@@ -302,6 +310,7 @@ export default function App() {
                     onOpen={source.handleOpen}
                     onViewSource={source.handleViewSource}
                     onReveal={handleReveal}
+                    onOpenNewTab={handleOpenNewTab}
                   />
                 </div>
               </Panel>

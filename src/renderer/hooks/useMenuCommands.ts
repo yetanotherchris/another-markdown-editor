@@ -19,7 +19,7 @@ export interface MenuCommandsApi {
 export function useMenuCommands(opts: {
   sessionRef: React.MutableRefObject<EditingSession>
   dialog: DialogQueue
-  session: Pick<DocumentSessionApi, 'saveDocument' | 'handleCloseRequest' | 'handleNew'>
+  session: Pick<DocumentSessionApi, 'saveDocument' | 'handleCloseRequest' | 'handleNew' | 'openFileFromTree'>
   folder: Pick<WorkspaceFolderApi, 'runFolderOpenFlow'>
   dispatch: React.Dispatch<DocumentsAction>
   enforcePoolCap: (activeId: string | null) => void
@@ -37,8 +37,9 @@ export function useMenuCommands(opts: {
         if (command.kind === 'file') {
           window.api.openRecentFile(command.path).then((result) => {
             if (result.ok) {
-              dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-              enforcePoolCap(sessionRef.current.activeId)
+              // Spec 024: route through the session gate so a clean active tab
+              // is replaced (FR-001/008).
+              session.openFileFromTree(result.value)
             } else {
               void showOperationError(result.message)
             }
@@ -55,8 +56,7 @@ export function useMenuCommands(opts: {
       case 'open-file': {
         window.api.openFileDialog().then((result) => {
           if (result.ok && result.value) {
-            dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-            enforcePoolCap(sessionRef.current.activeId)
+            session.openFileFromTree(result.value)
           } else if (!result.ok) {
             void showOperationError(result.message)
           }

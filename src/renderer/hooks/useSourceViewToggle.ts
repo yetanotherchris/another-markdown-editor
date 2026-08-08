@@ -22,11 +22,11 @@ export interface SourceViewToggleApi {
 export function useSourceViewToggle(opts: {
   dispatch: React.Dispatch<DocumentsAction>
   sessionRef: React.MutableRefObject<EditingSession>
-  session: Pick<DocumentSessionApi, 'flushLiveContent' | 'getLiveContent' | 'isDirtyLive' | 'handleActivate' | 'handleNew'>
+  session: Pick<DocumentSessionApi, 'flushLiveContent' | 'getLiveContent' | 'isDirtyLive' | 'handleActivate' | 'handleNew' | 'openFileFromTree'>
   enforcePoolCap: (activeId: string | null) => void
 }): SourceViewToggleApi {
   const { dispatch, sessionRef, session, enforcePoolCap } = opts
-  const { flushLiveContent, getLiveContent } = session
+  const { flushLiveContent, getLiveContent, openFileFromTree } = session
 
   // Spec 002, US1: the formatted→source transition syncs the live editor text
   // into the store first so the raw source reflects every keystroke, then
@@ -126,12 +126,13 @@ export function useSourceViewToggle(opts: {
       }
       const read = await window.api.readFile(path)
       if (!read.ok) return
-      // view:'formatted' also flips a reopened evicted tab that had been in
-      // source view back to visual editing (OPEN_EXISTING applies the view).
-      dispatch({ type: 'OPEN_EXISTING', payload: { ...read.value, view: 'formatted' } })
-      enforcePoolCap(sessionRef.current.activeId)
+      // Spec 024 (FR-008): context-menu "Open" routes through the session gate
+      // so a clean active tab is replaced. view:'formatted' also flips a
+      // reopened evicted tab that had been in source view back to visual
+      // editing (OPEN_EXISTING applies the view).
+      session.openFileFromTree(read.value)
     },
-    [dispatch, enforcePoolCap, handleReturnToFormatted, sessionRef, session]
+    [openFileFromTree, sessionRef, session]
   )
 
   const handleOpen = useCallback(

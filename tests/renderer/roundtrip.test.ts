@@ -42,11 +42,13 @@ describe('roundtrip characterization', () => {
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
         payload: {
-          path: fixture,
-          name: fixture,
-          content,
-          mtimeMs: Date.now(),
-          size: Buffer.byteLength(content)
+          value: {
+            path: fixture,
+            name: fixture,
+            content,
+            mtimeMs: Date.now(),
+            size: Buffer.byteLength(content)
+          }
         }
       })
 

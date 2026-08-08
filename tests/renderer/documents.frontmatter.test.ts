@@ -18,7 +18,7 @@ function sessionWithFile(extra?: Partial<Record<'view' | 'path' | 'name', string
     size: FRONTMATTER_FILE.length,
     ...(extra?.view ? { view: extra.view } : {})
   }
-  const state = documentsReducer(createSession(), { type: 'OPEN_EXISTING', payload })
+  const state = documentsReducer(createSession(), { type: 'OPEN_EXISTING', payload: { value: payload } })
   return { state, doc: state.documents[0] }
 }
 
@@ -124,7 +124,7 @@ describe('documents reducer — save with frontmatter (spec 021)', () => {
   it('getContentToSave returns the body unchanged when frontmatter is empty (FR-010)', () => {
     const state = documentsReducer(createSession(), {
       type: 'OPEN_EXISTING',
-      payload: { path: 'plain.md', name: 'plain.md', content: '# Plain\n', mtimeMs: 1, size: 8 }
+      payload: { value: { path: 'plain.md', name: 'plain.md', content: '# Plain\n', mtimeMs: 1, size: 8 } }
     })
     expect(getContentToSave(state.documents[0], markdownReturning(null))).toBe('# Plain\n')
   })
@@ -135,7 +135,7 @@ describe('documents reducer — save with frontmatter (spec 021)', () => {
     // write the raw body bytes — the editor's appended newline is not adopted.
     const state = documentsReducer(createSession(), {
       type: 'OPEN_EXISTING',
-      payload: { path: 'f.md', name: 'f.md', content: '---\ntitle: a\n---\nbody', mtimeMs: 1, size: 17, view: 'source' }
+      payload: { value: { path: 'f.md', name: 'f.md', content: '---\ntitle: a\n---\nbody', mtimeMs: 1, size: 17, view: 'source' } }
     })
     const doc = state.documents[0]
     const edited = documentsReducer(state, {
@@ -154,7 +154,7 @@ describe('documents reducer — save with frontmatter (spec 021)', () => {
     // the frontmatter from the written bytes).
     const state = documentsReducer(createSession(), {
       type: 'OPEN_EXISTING',
-      payload: { path: 'p.md', name: 'p.md', content: 'paragraph', mtimeMs: 1, size: 9 }
+      payload: { value: { path: 'p.md', name: 'p.md', content: 'paragraph', mtimeMs: 1, size: 9 } }
     })
     const doc = state.documents[0]
     const pasted = documentsReducer(state, {
@@ -189,7 +189,7 @@ describe('documents reducer — source view with frontmatter (spec 021)', () => 
   it('UPDATE_CONTENT in source view re-extracts when frontmatter is added', () => {
     const state = documentsReducer(createSession(), {
       type: 'OPEN_EXISTING',
-      payload: { path: 'plain.md', name: 'plain.md', content: '# Plain\n', mtimeMs: 1, size: 8, view: 'source' }
+      payload: { value: { path: 'plain.md', name: 'plain.md', content: '# Plain\n', mtimeMs: 1, size: 8, view: 'source' } }
     })
     const doc = state.documents[0]
     const edited = documentsReducer(state, {

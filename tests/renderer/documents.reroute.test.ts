@@ -8,7 +8,7 @@ describe('documents reducer', () => {
       const s1 = openTwoFiles()
       const s2 = documentsReducer(s1, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 }
+        payload: { value: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 } }
       })
       expect(s2.documents).toHaveLength(2)
       expect(s2.activeId).toBe(s1.documents[0].id)
@@ -23,7 +23,7 @@ describe('documents reducer', () => {
 
       state = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 }
+        payload: { value: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 } }
       })
       expect(state.documents).toHaveLength(2)
       expect(state.activeId).toBe(doc.id)
@@ -159,7 +159,7 @@ describe('documents reducer', () => {
       for (const [path, name] of [['notes/a.md', 'a.md'], ['notes/sub/b.md', 'b.md'], ['other/c.md', 'c.md']] as const) {
         state = documentsReducer(state, {
           type: 'OPEN_EXISTING',
-          payload: { path, name, content: name, mtimeMs: 1, size: 1 }
+          payload: { value: { path, name, content: name, mtimeMs: 1, size: 1 } }
         })
       }
       state = documentsReducer(state, {
