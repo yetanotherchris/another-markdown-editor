@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import type { Result } from '../../../shared/ipc-contract'
-import { err, ok, ctx } from './context'
+import { err, ok, ctx, validateShape } from './context'
 
 /**
  * App lifecycle channels (US1/FR-005): the quit/close guard and the devtools
@@ -19,10 +19,7 @@ export function registerAppHandlers(window: BrowserWindow, _ctx: typeof ctx): vo
   // `tryCloseWindow()`, which is the only path allowed to set `allowClose`.
   ipcMain.handle('app:requestQuit', (event): Result<null> => {
     if (event.sender !== window.webContents) return err('IO', 'Unauthorized renderer')
-    const windows = BrowserWindow.getAllWindows()
-    if (windows.length > 0) {
-      windows[0].close()
-    }
+    window.close()
     return ok(null)
   })
 
@@ -34,7 +31,9 @@ export function registerAppHandlers(window: BrowserWindow, _ctx: typeof ctx): vo
 
   ipcMain.handle('quit:respond', (event, args: unknown): Result<null> => {
     if (event.sender !== window.webContents) return err('IO', 'Unauthorized renderer')
-    if (!args || typeof args !== 'object' || !('decision' in args)) {
+    try {
+      validateShape(args, ['decision'])
+    } catch {
       return err('IO', 'Invalid quit response')
     }
     const decision = (args as { decision: unknown }).decision
@@ -45,17 +44,14 @@ export function registerAppHandlers(window: BrowserWindow, _ctx: typeof ctx): vo
       return err('IO', 'No quit request is pending')
     }
     ctx.quitRequestPending = false
-    if (decision === 'quit') tryCloseWindow()
+    if (decision === 'quit') tryCloseWindow(window)
     return ok(null)
   })
 }
 
-function tryCloseWindow(): void {
+function tryCloseWindow(window: BrowserWindow): void {
   ctx.allowClose = true
-  const windows = BrowserWindow.getAllWindows()
-  if (windows.length > 0) {
-    windows[0].close()
-  }
+  window.close()
 }
 
 function setupWindowCloseHandler(window: BrowserWindow): void {

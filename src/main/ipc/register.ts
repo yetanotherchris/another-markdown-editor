@@ -8,7 +8,7 @@ import { registerSettingsHandlers } from './handlers/settings'
 import { registerRecentHandlers } from './handlers/recent'
 import { registerSpellcheckHandlers } from './handlers/spellcheck'
 
-export function registerIpcHandlers(window: BrowserWindow): void {
+export function registerIpcHandlers(window: BrowserWindow, approvedRendererUrl: string): void {
   // Electron keeps handlers process-wide while macOS can recreate windows.
   // Remove the previous registrations before binding the current window so no
   // command closes over a destroyed BrowserWindow.
@@ -42,6 +42,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   }
   ctx.allowClose = false
   ctx.quitRequestPending = false
+  ctx.approvedRendererUrl = approvedRendererUrl
   // app first — it owns the window-close handler and the allowClose flag.
   registerAppHandlers(window, ctx)
   registerFileHandlers(window, ctx)

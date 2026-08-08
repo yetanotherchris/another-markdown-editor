@@ -79,7 +79,12 @@ function createWindow(): void {
   // Spec 020 FR-002/FR-004: the native right-click correction menu for the
   // editor area (spelling suggestions + add-to-dictionary).
   registerSpellcheckContextMenu(mainWindow)
-  registerIpcHandlers(mainWindow)
+  registerIpcHandlers(
+    mainWindow,
+    process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL
+      ? developmentUrl
+      : productionUrl
+  )
 
   if (process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(developmentUrl)

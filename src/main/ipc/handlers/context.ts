@@ -34,7 +34,8 @@ export const ctx = {
   workspaceState: null as WorkspaceState | null,
   workspaceRoot: null as string | null,
   allowClose: false,
-  quitRequestPending: false
+  quitRequestPending: false,
+  approvedRendererUrl: null as string | null
 }
 
 export function ok<T>(value: T): Result<T> {
@@ -49,7 +50,15 @@ export function err(
 }
 
 export function isAuthorizedRenderer(event: IpcMainInvokeEvent, window: BrowserWindow): boolean {
-  return event.sender === window.webContents
+  if (event.sender !== window.webContents || !ctx.approvedRendererUrl) return false
+  const senderUrl = event.senderFrame?.url
+  if (!senderUrl) return false
+  if (ctx.approvedRendererUrl.startsWith('file:')) return senderUrl === ctx.approvedRendererUrl
+  try {
+    return new URL(senderUrl).origin === new URL(ctx.approvedRendererUrl).origin
+  } catch {
+    return false
+  }
 }
 
 export function sanitizeError(e: unknown, workspaceRootPath: string | null): string {
@@ -77,9 +86,14 @@ export function toAppError(e: unknown): { code: ErrorCode; message: string } {
     return { code: 'PERMISSION', message: 'Permission denied' }
   if (errno === 'EEXIST') return { code: 'CONFLICT', message: 'Already exists' }
   const appCode = (e as { code?: ErrorCode }).code
-  if (appCode) return { code: appCode, message: e.message }
+  if (appCode && ERROR_CODES.has(appCode)) return { code: appCode, message: e.message }
   return { code: 'IO', message: e.message }
 }
+
+const ERROR_CODES = new Set<ErrorCode>([
+  'OUTSIDE_WORKSPACE', 'NOT_FOUND', 'CONFLICT', 'PERMISSION', 'LOCKED',
+  'TOO_LARGE', 'NOT_TEXT', 'TRASH_UNAVAILABLE', 'NO_WORKSPACE', 'IO'
+])
 
 export function ensureString(val: unknown, name: string): asserts val is string {
   if (typeof val !== 'string') {
