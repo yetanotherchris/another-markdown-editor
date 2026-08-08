@@ -1,13 +1,13 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
-import { resolveWithinRoot } from '../../fs/paths'
+import { resolveWithinRoot, resolveFile, resolveDirectory } from '../../fs/paths'
 import { readFile, describeEntry } from '../../fs/read'
 import { writeFile } from '../../fs/write'
 import { atomicWrite } from '../../fs/atomicWrite'
 import { mkdir, createFile, moveEntry, trashEntry } from '../../fs/mutate'
 import type {
-  Result, OpenedFile, WriteReceipt, DirEntry, TrashReceipt, EntryInfo
+  Result, OpenedFile, WriteReceipt, DirEntry, TrashReceipt, EntryInfo, EntryKind
 } from '../../../shared/ipc-contract'
 import {
   ctx, ok, err, ensureString, validateKind, validateShape, sanitizeError, toAppError,
@@ -204,6 +204,42 @@ export function registerFileHandlers(_window: Electron.BrowserWindow, _ctx: type
       const { path: p } = args as { path: string }
       ensureString(p, 'path')
       return withWorkspace(() => describeEntry(ctx.workspaceRoot!, p))
+    } catch (e: unknown) {
+      const appErr = toAppError(e)
+      return err(appErr.code, sanitizeError(e, ctx.workspaceRoot))
+    }
+  })
+
+  // Spec 015 (US1/US2, FR-001/002/005): reveal a workspace item in the OS file
+  // manager. The relative path is resolved and containment-validated in main
+  // (resolveFile/resolveDirectory — the same helpers as every other entry
+  // operation, Principle II) BEFORE any OS call, so a missing or escaping path
+  // fails closed and the session is untouched (FR-006).
+  ipcMain.handle('entry:reveal', async (_e, args: unknown): Promise<Result<null>> => {
+    try {
+      validateShape(args, ['path', 'kind'])
+      const { path: p, kind } = args as { path: string; kind: EntryKind }
+      ensureString(p, 'path')
+      validateKind(kind)
+      const resolved = withWorkspace(() => {
+        if (kind === 'file') {
+          return resolveFile(ctx.workspaceRoot!, p).resolved
+        }
+        return resolveDirectory(ctx.workspaceRoot!, p).resolved
+      })
+      if (!resolved.ok) return resolved
+      if (kind === 'file') {
+        // Opens the parent folder with the file selected/highlighted (FR-004).
+        shell.showItemInFolder(resolved.value)
+        return ok(null)
+      }
+      // Opens the folder itself (FR-002). openPath resolves to an error string
+      // on failure (FR-006).
+      const openError = await shell.openPath(resolved.value)
+      if (openError) {
+        throw Object.assign(new Error(openError), { code: 'IO' as const })
+      }
+      return ok(null)
     } catch (e: unknown) {
       const appErr = toAppError(e)
       return err(appErr.code, sanitizeError(e, ctx.workspaceRoot))

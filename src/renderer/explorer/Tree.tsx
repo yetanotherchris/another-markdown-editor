@@ -31,6 +31,9 @@ interface TreeProps {
   onOpen: (path: string) => void
   /** Spec 002: "View source" in a file's context menu (FR-004). */
   onViewSource: (path: string) => void
+  /** Spec 015: "Reveal in Explorer/Finder" — open the item's location in the
+   *  OS file manager (FR-001/002/003). */
+  onReveal: (node: TreeNode) => void
   /** Spec 002 (US004): imperative handle the app uses to open parents and
    *  scroll a node into view (explorer active-file highlight). */
   apiRef?: React.MutableRefObject<TreeApi<TreeNode> | null> | null
@@ -227,6 +230,7 @@ export default function Tree({
   onMove,
   onOpen,
   onViewSource,
+  onReveal,
   apiRef
 }: TreeProps) {
   const [containerRef, size] = useElementSize<HTMLDivElement>()
@@ -421,6 +425,14 @@ export default function Tree({
     </button>
   )
 
+  // Spec 015 FR-003: the reveal action is named after the OS file manager.
+  const revealLabel =
+    window.api.platform === 'darwin'
+      ? 'Reveal in Finder'
+      : window.api.platform === 'win32'
+        ? 'Reveal in Explorer'
+        : 'Reveal in file manager'
+
   const menu = contextMenu && (
     <div
       className="context-menu"
@@ -449,6 +461,7 @@ export default function Tree({
               <div className="context-menu-separator" />
             </>
           )}
+          {menuItem(revealLabel, () => onReveal(contextMenu.node!))}
           {menuItem('Rename', () => startEditing(contextMenu.node!.id))}
           {menuItem('Delete', () => onDeleteRequest(contextMenu.node!))}
         </>

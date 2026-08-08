@@ -7,6 +7,7 @@ import type {
 } from '../shared/ipc-contract'
 
 const api: DesktopApi = {
+  platform: process.platform,
   prepareFolderOpen: (path?: string) =>
     ipcRenderer.invoke('workspace:prepareFolderOpen', path === undefined ? undefined : { path }) as Promise<Result<WorkspaceInfo | null>>,
   commitFolderOpen: () => ipcRenderer.invoke('workspace:commitFolderOpen') as Promise<Result<WorkspaceInfo>>,
@@ -21,6 +22,7 @@ const api: DesktopApi = {
   moveEntry: (fromRelativePath: string, toRelativePath: string) => ipcRenderer.invoke('entry:move', { fromPath: fromRelativePath, toPath: toRelativePath }) as Promise<Result<DirEntry>>,
   trashEntry: (relativePath: string, permanent?: boolean) => ipcRenderer.invoke('entry:trash', { path: relativePath, permanent }) as Promise<Result<TrashReceipt>>,
   describeEntry: (relativePath: string) => ipcRenderer.invoke('entry:describe', { path: relativePath }) as Promise<Result<EntryInfo>>,
+  revealEntry: (relativePath: string, kind: EntryKind) => ipcRenderer.invoke('entry:reveal', { path: relativePath, kind }) as Promise<Result<null>>,
   getSettings: () => ipcRenderer.invoke('settings:get') as Promise<Result<Settings>>,
   updateSettings: (patch: Partial<Settings>) => ipcRenderer.invoke('settings:update', patch) as Promise<Result<Settings>>,
 

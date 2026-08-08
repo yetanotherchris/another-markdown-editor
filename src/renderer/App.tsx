@@ -142,6 +142,22 @@ export default function App() {
   const { handleQuitRequest } = sessionApi
   const { handleExternalChange } = external
 
+  // Spec 015 (US1/US2, FR-006): reveal a workspace item in the OS file manager.
+  // Read-only — a failure surfaces as a quiet footer note and the session is
+  // untouched. The relative path + kind are validated in main (FR-005).
+  const handleReveal = useCallback((node: TreeNode) => {
+    window.api
+      .revealEntry(node.id, node.kind)
+      .then((res) => {
+        // FR-006: a failure surfaces as a quiet footer note; a success clears a
+        // stale note from a previous failed reveal.
+        setFooterNote(res.ok ? null : res.message)
+      })
+      .catch(() => {
+        setFooterNote('Could not open the item in the file manager')
+      })
+  }, [])
+
   useEffect(() => {
     const unsubMenu = window.api.onMenuCommand(handleMenuCommand)
 
@@ -265,6 +281,7 @@ export default function App() {
                     onMove={tree.handleTreeMove}
                     onOpen={source.handleOpen}
                     onViewSource={source.handleViewSource}
+                    onReveal={handleReveal}
                   />
                 </div>
               </Panel>
