@@ -288,5 +288,6 @@ AGENTS.md                         This file
 | 016-editor-theme | Archived | Complete |
 | 017-codebase-refactor | Archived | Complete |
 | 018-header-bar-shade | Archived | Complete |
+| 019-rename-to-markdownmeister | Archived | Complete |
 | 020-editor-spellcheck | Archived | Complete |
 | 021-frontmatter-handling | Archived | Complete |

@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-06
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "The application name should be renamed to 'markdownmeister'. This includes the binary name ('markdownmeister.exe' etc.), the title of the window, and namespaces for types and folders. All references to 'ameditor' and 'another markdown editor', and 'another-markdown-editor' should be renamed to 'markdownmeister'. The title of the application will be Pascal case: MarkdownMeister, binaries lowercase and typescript/css/react should follow the convention of the language (pascal case, snake-case, kebab-case, camelCase etc.)"
 
