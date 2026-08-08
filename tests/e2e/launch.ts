@@ -226,10 +226,16 @@ export interface LaunchResult {
  * `MM_USER_DATA_DIR` seam (spec 020 research R6) so the native spellcheck
  * dictionary never leaks into — or out of — a test.
  */
-export async function launchApp(configDir?: string, openFolderPath?: string, userDataDir?: string): Promise<LaunchResult> {
+export async function launchApp(
+  configDir?: string,
+  openFolderPath?: string,
+  userDataDir?: string,
+  extraEnv?: Record<string, string>
+): Promise<LaunchResult> {
   const env: Record<string, string> = { ...process.env } as Record<string, string>
   if (configDir) env.MM_CONFIG_DIR = configDir
   if (userDataDir) env.MM_USER_DATA_DIR = userDataDir
+  if (extraEnv) Object.assign(env, extraEnv)
   const instance = await electron.launch({
     args: electronLaunchArgs,
     env

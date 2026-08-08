@@ -291,3 +291,4 @@ AGENTS.md                         This file
 | 019-rename-to-markdownmeister | Archived | Complete |
 | 020-editor-spellcheck | Archived | Complete |
 | 021-frontmatter-handling | Archived | Complete |
+| 022-universal-config-path | Archived | Complete |

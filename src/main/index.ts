@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu } from 'electron'
-import { join } from 'path'
+import * as path from 'path'
 import { registerIpcHandlers } from './ipc/register'
 import { createApplicationMenu } from './menu'
 import { registerShortcuts } from './shortcuts'
@@ -9,6 +9,8 @@ import { applySpellcheckSetting } from './spellcheck'
 import { registerSpellcheckContextMenu } from './contextMenu'
 import { resolveLaunchBounds, trackWindowState, flushWindowState } from './windowState'
 import { reconcileExplorerClosedWithoutWorkspace } from './workspaceExplorerState'
+import { legacyConfigPath, universalConfigPath, migrateConfigFile } from './configPath'
+import * as os from 'os'
 
 // Spec 020 test seam (research R6): `MM_USER_DATA_DIR` relocates the Chromium
 // profile — the home of the native spellcheck dictionary — so the e2e suite can
@@ -35,7 +37,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      preload: join(__dirname, '../preload/index.js')
+      preload: path.join(__dirname, '../preload/index.js')
     }
   })
   // Spec 011 FR-005 (review #30 M1): maximize after the window is ready to be
@@ -66,7 +68,7 @@ function createWindow(): void {
     const url = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
     mainWindow.loadURL(url)
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
   mainWindow.on('closed', () => {
@@ -75,6 +77,38 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Spec 022 FR-004: move an existing config from the legacy appData location
+  // to the universal ~/.config location BEFORE anything reads it. Skipped under
+  // the MM_CONFIG_DIR test seam (tests must never move the developer's real
+  // config, US4/FR-010), when the home directory is unavailable (FR-011), and
+  // when the legacy and universal paths coincide (Linux without XDG — FR-005).
+  // As a final guard the migration only runs when appData resolves under the
+  // home directory, which is true in production on every platform but false
+  // when an e2e test redirects HOME/USERPROFILE — Electron resolves appData via
+  // the OS user record on macOS, so a redirected home would otherwise point the
+  // legacy path at the developer's real config and a rename would move (and a
+  // test teardown delete) it (review finding 2026-08-08).
+  if (!process.env.MM_CONFIG_DIR) {
+    const homeDir = os.homedir()
+    if (homeDir) {
+      const appDataDir = app.getPath('appData')
+      const underHome = path.relative(homeDir, appDataDir)
+      if (!underHome || (!underHome.startsWith('..') && !path.isAbsolute(underHome))) {
+        const legacy = legacyConfigPath({ homeDir, platform: process.platform, appDataDir })
+        const universal = universalConfigPath({
+          homeDir,
+          platform: process.platform,
+          xdgConfigHome: process.env.XDG_CONFIG_HOME
+        })
+        if (legacy !== universal) {
+          const outcome = migrateConfigFile(legacy, universal)
+          if (outcome === 'failed') {
+            console.warn('[config] could not migrate config to universal location')
+          }
+        }
+      }
+    }
+  }
   // Spec 011 FR-013: with no folder open the explorer is closed and that
   // closed state is persisted. Runs before the window is created so the config
   // is already honest when the renderer loads it.
