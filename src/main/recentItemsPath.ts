@@ -24,5 +24,5 @@ export function recentItemsConfigPath(): string {
   if (override && override.length > 0) {
     return path.join(override, 'config.json')
   }
-  return path.join(app.getPath('appData'), 'ame', 'config.json')
+  return path.join(app.getPath('appData'), 'markdownmeister', 'config.json')
 }
