@@ -32,4 +32,4 @@ jobs:
       - name: Unit tests
         run: npm test
       - name: End-to-end tests
-        run: npm run test:e2e
+        run: xvfb-run -a env MM_E2E_HEADED=1 npm run test:e2e
