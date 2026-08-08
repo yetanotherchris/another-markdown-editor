@@ -2,7 +2,12 @@ import { useReducer, useEffect, useCallback, useRef, useState } from 'react'
 import { Panel, Group, Separator, usePanelRef } from 'react-resizable-panels'
 import type { TreeApi } from 'react-arborist'
 import { Squares2X2Icon } from '@heroicons/react/24/outline'
-import { EditingSession, documentsReducer, getActiveDocument, DocumentState } from './state/documents'
+import {
+  EditingSession,
+  documentsReducer,
+  getActiveDocument,
+  DocumentState
+} from './state/documents'
 import { initialWorkspaceState, workspaceReducer, TreeNode } from './state/workspace'
 import { getSettings } from './state/settings'
 import { instancePool } from './editor/instancePool'
@@ -54,31 +59,45 @@ export default function App() {
   // Spec 012/013/016: the settings-dialog state — open flag, editor theme, app
   // theme choice, and the effective data-theme mode (useSettingsState owns them).
   const {
-    settingsOpen, setSettingsOpen,
-    editorTheme, handleEditorThemeChange,
-    editorFont, editorColors,
-    spellcheckEnabled, handleSpellcheckChange,
-    spellcheckLanguage, handleSpellcheckLanguageChange,
-    themeChoice, handleThemeChange, themeMode
+    settingsOpen,
+    setSettingsOpen,
+    editorTheme,
+    handleEditorThemeChange,
+    editorFont,
+    editorColors,
+    spellcheckEnabled,
+    handleSpellcheckChange,
+    spellcheckLanguage,
+    handleSpellcheckLanguageChange,
+    themeChoice,
+    handleThemeChange,
+    themeMode
   } = useSettingsState()
 
   // Spec 023 (FR-003/004/007): the effective editor theme is the stored preset,
   // or Custom when the stored colours + font match no preset. The container's
   // data-editor-theme carries the preset name (driving themes.css) or 'custom';
   // a custom theme applies its six colour tokens + font stack inline.
-  const resolvedEditorTheme = resolveEditorTheme({ editorTheme, editorFont, editorColors, appMode: themeMode })
-  const dataEditorTheme = resolvedEditorTheme.kind === 'preset' ? resolvedEditorTheme.name : 'custom'
-  const editorThemeStyle = resolvedEditorTheme.kind === 'custom' && editorColors
-    ? {
-        '--mm-custom-background': editorColors.background,
-        '--mm-custom-foreground': editorColors.foreground,
-        '--mm-custom-accent': editorColors.accent,
-        '--mm-custom-surface': editorColors.surface,
-        '--mm-custom-outline': editorColors.outline,
-        '--mm-custom-code': editorColors.code,
-        '--mm-custom-font': fontStackFor(editorFont)
-      } as React.CSSProperties
-    : undefined
+  const resolvedEditorTheme = resolveEditorTheme({
+    editorTheme,
+    editorFont,
+    editorColors,
+    appMode: themeMode
+  })
+  const dataEditorTheme =
+    resolvedEditorTheme.kind === 'preset' ? resolvedEditorTheme.name : 'custom'
+  const editorThemeStyle =
+    resolvedEditorTheme.kind === 'custom' && editorColors
+      ? ({
+          '--mm-custom-background': editorColors.background,
+          '--mm-custom-foreground': editorColors.foreground,
+          '--mm-custom-accent': editorColors.accent,
+          '--mm-custom-surface': editorColors.surface,
+          '--mm-custom-outline': editorColors.outline,
+          '--mm-custom-code': editorColors.code,
+          '--mm-custom-font': fontStackFor(editorFont)
+        } as React.CSSProperties)
+      : undefined
 
   // Spec 020 (JS spellchecker): keep the shared runtime in sync with the
   // persisted settings, and load the user dictionary once on startup.
@@ -87,16 +106,23 @@ export default function App() {
   }, [spellcheckEnabled, spellcheckLanguage])
   useEffect(() => {
     let alive = true
-    window.api.getSpellcheckWords().then((res) => {
-      if (res.ok && alive) {
-        // Merge, don't replace: a word added in-session before this resolves
-        // must survive in the runtime set.
-        const merged = new Set(spellcheckRuntime.customWords)
-        res.value.forEach((word) => merged.add(word))
-        updateSpellcheckRuntime({ customWords: merged })
-      }
-    }).catch(() => { /* non-critical */ })
-    return () => { alive = false }
+    window.api
+      .getSpellcheckWords()
+      .then((res) => {
+        if (res.ok && alive) {
+          // Merge, don't replace: a word added in-session before this resolves
+          // must survive in the runtime set.
+          const merged = new Set(spellcheckRuntime.customWords)
+          res.value.forEach((word) => merged.add(word))
+          updateSpellcheckRuntime({ customWords: merged })
+        }
+      })
+      .catch(() => {
+        /* non-critical */
+      })
+    return () => {
+      alive = false
+    }
   }, [])
   const sidebarPanelRef = usePanelRef()
   // Spec 010, US2 (FR-007): set once the initial restore has run, so resize
@@ -120,7 +146,12 @@ export default function App() {
   )
   const dialog = useDialogQueue(sessionRef)
   const pool = useEditorPool({ dispatch, sessionRef, isDirtyLive })
-  const sessionApi = useDocumentSession({ dispatch, sessionRef, dialog, enforcePoolCap: pool.enforcePoolCap })
+  const sessionApi = useDocumentSession({
+    dispatch,
+    sessionRef,
+    dialog,
+    enforcePoolCap: pool.enforcePoolCap
+  })
   const source = useSourceViewToggle({
     dispatch,
     sessionRef,
@@ -147,7 +178,11 @@ export default function App() {
     session: sessionApi,
     sidebarPanelRef
   })
-  const sidebar = useSidebarLayout({ sidebarPanelRef, explorerRestoreDoneRef, setExplorerCollapsed })
+  const sidebar = useSidebarLayout({
+    sidebarPanelRef,
+    explorerRestoreDoneRef,
+    setExplorerCollapsed
+  })
   const menu = useMenuCommands({
     sessionRef,
     dialog,
@@ -179,22 +214,28 @@ export default function App() {
 
   // Spec 024 (FR-005): middle-click opens the file in a NEW tab, bypassing the
   // replace-clean-tab behaviour.
-  const handleOpenNewTab = useCallback((node: TreeNode) => {
-    window.api.readFile(node.id).then((result) => {
-      if (result.ok) sessionApi.openFileFromTree(result.value, true)
-    })
-  }, [sessionApi])
+  const handleOpenNewTab = useCallback(
+    (node: TreeNode) => {
+      window.api.readFile(node.id).then((result) => {
+        if (result.ok) sessionApi.openFileFromTree(result.value, true)
+      })
+    },
+    [sessionApi]
+  )
 
   useEffect(() => {
     const unsubMenu = window.api.onMenuCommand(handleMenuCommand)
 
     const unsubDocument = window.api.onDocumentChanged((e) => {
-      const doc = sessionRef.current.documents.find(d => d.path === e.path)
+      const doc = sessionRef.current.documents.find((d) => d.path === e.path)
       if (!doc) return
       dispatch({ type: 'EXTERNAL_CHANGE', payload: { path: e.path, kind: e.kind } })
       // One prompt at a time: DEFER, don't drop — re-surfaced on release.
       if (dialog.dialogInFlightRef.current) {
-        dialog.pendingExternalPromptRef.current = { path: e.path, kind: e.kind }
+        const pending = dialog.pendingExternalPromptRef.current
+        if (!pending.some((item) => item.path === e.path && item.kind === e.kind)) {
+          pending.push({ path: e.path, kind: e.kind })
+        }
         return
       }
       handleExternalChange(doc, e.kind)
@@ -224,7 +265,15 @@ export default function App() {
       unsubRecentOk()
       unsubQuit()
     }
-  }, [dispatch, dispatchWorkspace, dialog, handleExternalChange, handleMenuCommand, handleQuitRequest, sessionRef])
+  }, [
+    dispatch,
+    dispatchWorkspace,
+    dialog,
+    handleExternalChange,
+    handleMenuCommand,
+    handleQuitRequest,
+    sessionRef
+  ])
 
   useEffect(() => {
     return () => {
@@ -237,7 +286,7 @@ export default function App() {
   const workspaceActiveId = session.activeId
   useEffect(() => {
     if (!workspace.name) return
-    const active = sessionRef.current.documents.find(d => d.id === workspaceActiveId)
+    const active = sessionRef.current.documents.find((d) => d.id === workspaceActiveId)
     const path = active?.path
     if (!path || !isWorkspaceRelative(path)) {
       dispatchWorkspace({ type: 'SELECT', payload: { id: null } })
@@ -249,17 +298,32 @@ export default function App() {
       api.openParents(path)
       api.scrollTo(path)
     }
-  }, [workspaceActiveId, workspace.name, workspace.nodes, dispatchWorkspace, sessionRef, treeApiRef])
+  }, [
+    workspaceActiveId,
+    workspace.name,
+    workspace.nodes,
+    dispatchWorkspace,
+    sessionRef,
+    treeApiRef
+  ])
 
   const sidebarWidth = getSettings().sidebarWidth
   const hasWorkspace = workspace.name !== null
 
   return (
-    <div className="app-container" data-editor-theme={dataEditorTheme} data-theme={themeMode} style={editorThemeStyle}>
+    <div
+      className="app-container"
+      data-editor-theme={dataEditorTheme}
+      data-theme={themeMode}
+      style={editorThemeStyle}
+    >
       {/* Spec 010 (2026-08-05): one header row — chrome buttons + tabs. */}
       <div className="header-bar">
         <div className="chrome-bar">
-          <HamburgerMenu onCommand={handleMenuCommand} onOpenSettings={() => setSettingsOpen(true)} />
+          <HamburgerMenu
+            onCommand={handleMenuCommand}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
           <button
             type="button"
             className="chrome-icon-button"
@@ -310,6 +374,7 @@ export default function App() {
                     onViewSource={source.handleViewSource}
                     onReveal={handleReveal}
                     onOpenNewTab={handleOpenNewTab}
+                    apiRef={treeApiRef}
                   />
                 </div>
               </Panel>
@@ -346,11 +411,7 @@ export default function App() {
         </Group>
       </div>
 
-      <StatusFooter
-        activeDoc={activeDoc}
-        workspaceRoot={workspace.root}
-        note={footerNote}
-      />
+      <StatusFooter activeDoc={activeDoc} workspaceRoot={workspace.root} note={footerNote} />
 
       {settingsOpen && (
         <SettingsDialog

@@ -89,7 +89,15 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { value: { path: 'f.md', name: 'f.md', content: '# Title\r\n\r\nbody', mtimeMs: 1, size: 16 } }
+        payload: {
+          value: {
+            path: 'f.md',
+            name: 'f.md',
+            content: '# Title\r\n\r\nbody',
+            mtimeMs: 1,
+            size: 16
+          }
+        }
       })
       const docId = s1.documents[0].id
       // Mounted editor normalized EOLs; its baseline serialization is LF-only.
@@ -108,7 +116,16 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { value: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5, view: 'source' } }
+        payload: {
+          value: {
+            path: 'f.md',
+            name: 'f.md',
+            content: 'hello',
+            mtimeMs: 1,
+            size: 5,
+            view: 'source'
+          }
+        }
       })
       const docId = s1.documents[0].id
       // Source view reports raw text — a newline the user typed is an edit,
@@ -119,6 +136,25 @@ describe('documents reducer', () => {
       })
       expect(s2.documents[0].dirty).toBe(true)
     })
+  })
+
+  it('ignores a stale save completion after a newer edit', () => {
+    const state = createSession()
+    const opened = documentsReducer(state, {
+      type: 'OPEN_EXISTING',
+      payload: { value: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 } }
+    })
+    const id = opened.documents[0].id
+    const edited = documentsReducer(opened, {
+      type: 'UPDATE_CONTENT',
+      payload: { id, content: 'new' }
+    })
+    const stale = documentsReducer(edited, {
+      type: 'SAVE_SUCCESS',
+      payload: { id, path: 'f.md', content: 'new', revision: 0 }
+    })
+    expect(stale).toBe(edited)
+    expect(stale.documents[0].dirty).toBe(true)
   })
   describe('CAPTURE_BASELINE', () => {
     it('does not adopt editor normalization into a raw document', () => {

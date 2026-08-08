@@ -7,11 +7,28 @@ import { writeFile } from '../../fs/write'
 import { atomicWrite } from '../../fs/atomicWrite'
 import { mkdir, createFile, moveEntry, trashEntry } from '../../fs/mutate'
 import type {
-  Result, OpenedFile, WriteReceipt, DirEntry, TrashReceipt, EntryInfo, EntryKind
+  Result,
+  OpenedFile,
+  WriteReceipt,
+  DirEntry,
+  TrashReceipt,
+  EntryInfo,
+  EntryKind
 } from '../../../shared/ipc-contract'
 import {
-  ctx, ok, err, ensureString, validateKind, validateShape, sanitizeError, toAppError,
-  withWorkspace, resolveAbsolutePath, recordRecent, canonicalPath, openFileFromPath
+  ctx,
+  ok,
+  err,
+  ensureString,
+  validateKind,
+  validateShape,
+  sanitizeError,
+  toAppError,
+  withWorkspace,
+  resolveAbsolutePath,
+  recordRecent,
+  canonicalPath,
+  openFileFromPath
 } from './context'
 
 /**
@@ -36,7 +53,9 @@ export function registerFileHandlers(_window: Electron.BrowserWindow, _ctx: type
       // The stored path is realpath-canonical so a symlink/case spelling of an
       // already-recorded file does not duplicate the entry (FR-006).
       recordRecent(
-        canonicalPath(opened.path ? path.resolve(ctx.workspaceRoot!, opened.path) : result.filePaths[0]),
+        canonicalPath(
+          opened.path ? path.resolve(ctx.workspaceRoot!, opened.path) : result.filePaths[0]
+        ),
         'file',
         opened.name
       )
@@ -76,7 +95,11 @@ export function registerFileHandlers(_window: Electron.BrowserWindow, _ctx: type
       const resolved = resolveWithinRoot(ctx.workspaceRoot, (args as { path: string }).path)
       ctx.workspaceState?.suppressWatch(resolved.resolved)
 
-      const receipt = writeFile(ctx.workspaceRoot, (args as { path: string }).path, (args as { content: string }).content)
+      const receipt = writeFile(
+        ctx.workspaceRoot,
+        (args as { path: string }).path,
+        (args as { content: string }).content
+      )
       return ok(receipt)
     } catch (e: unknown) {
       const appErr = toAppError(e)
@@ -84,39 +107,44 @@ export function registerFileHandlers(_window: Electron.BrowserWindow, _ctx: type
     }
   })
 
-  ipcMain.handle('file:saveDialog', async (_e, args: unknown): Promise<Result<OpenedFile | null>> => {
-    try {
-      validateShape(args, ['suggestedName', 'content'])
-      const { suggestedName, content } = args as { suggestedName: string; content: string }
+  ipcMain.handle(
+    'file:saveDialog',
+    async (_e, args: unknown): Promise<Result<OpenedFile | null>> => {
+      try {
+        validateShape(args, ['suggestedName', 'content'])
+        const { suggestedName, content } = args as { suggestedName: unknown; content: unknown }
+        ensureString(suggestedName, 'suggestedName')
+        ensureString(content, 'content')
 
-      const result = await dialog.showSaveDialog({
-        defaultPath: suggestedName,
-        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
-      })
+        const result = await dialog.showSaveDialog({
+          defaultPath: suggestedName,
+          filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
+        })
 
-      if (result.canceled || !result.filePath) {
-        return ok(null)
+        if (result.canceled || !result.filePath) {
+          return ok(null)
+        }
+
+        atomicWrite(result.filePath, content)
+        const stat = fs.statSync(result.filePath)
+
+        let relPath: string | null = null
+        if (ctx.workspaceRoot) {
+          relPath = resolveAbsolutePath(ctx.workspaceRoot, result.filePath)
+        }
+
+        return ok({
+          path: relPath,
+          name: path.basename(result.filePath),
+          content,
+          mtimeMs: stat.mtimeMs,
+          size: stat.size
+        })
+      } catch (e: unknown) {
+        return err('IO', sanitizeError(e, ctx.workspaceRoot))
       }
-
-      atomicWrite(result.filePath, content)
-      const stat = fs.statSync(result.filePath)
-
-      let relPath: string | null = null
-      if (ctx.workspaceRoot) {
-        relPath = resolveAbsolutePath(ctx.workspaceRoot, result.filePath)
-      }
-
-      return ok({
-        path: relPath,
-        name: path.basename(result.filePath),
-        content,
-        mtimeMs: stat.mtimeMs,
-        size: stat.size
-      })
-    } catch (e: unknown) {
-      return err('IO', sanitizeError(e, ctx.workspaceRoot))
     }
-  })
+  )
 
   // ---- entry:* channels (create/move/trash/describe) ----
 
@@ -128,14 +156,21 @@ export function registerFileHandlers(_window: Electron.BrowserWindow, _ctx: type
       ensureString(name, 'name')
       validateKind(kind)
 
-      if (name.length === 0 || name.includes('/') || name.includes('\\') || name === '..' || name === '.') {
+      if (
+        name.length === 0 ||
+        name.includes('/') ||
+        name.includes('\\') ||
+        name === '..' ||
+        name === '.'
+      ) {
         return err('IO', 'Invalid entry name')
       }
 
       return withWorkspace(() => {
-        const entry = kind === 'directory'
-          ? mkdir(ctx.workspaceRoot!, parentPath, name)
-          : createFile(ctx.workspaceRoot!, parentPath, name)
+        const entry =
+          kind === 'directory'
+            ? mkdir(ctx.workspaceRoot!, parentPath, name)
+            : createFile(ctx.workspaceRoot!, parentPath, name)
         // FR-037: the creation is ours — suppress the watcher so the tree is
         // not double-fed the event (the renderer applies it directly).
         const resolved = resolveWithinRoot(ctx.workspaceRoot!, entry.path)
@@ -175,8 +210,9 @@ export function registerFileHandlers(_window: Electron.BrowserWindow, _ctx: type
 
   ipcMain.handle('entry:trash', async (_e, args: unknown): Promise<Result<TrashReceipt>> => {
     try {
-      validateShape(args, ['path'])
+      validateShape(args, ['path'], ['path', 'permanent'])
       const { path: p, permanent } = args as { path: string; permanent?: unknown }
+      ensureString(p, 'path')
 
       // The contract is `permanent?: boolean`. Any other value must be
       // rejected: a truthy non-boolean (e.g. `{}` or `1`) would otherwise

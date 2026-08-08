@@ -8,9 +8,8 @@
  *   [cycle]       circular imports across src/**
  *   [unused]      exported declarations referenced by no module in src/** or tests/**
  *
- * Reporting check: violations are printed; the process still exits 0 so the
- * check does not block merges (spec Assumption). Escalating to a failing CI
- * gate is a later decision.
+ * The command is a gate: violations are printed and the process exits non-zero
+ * so CI cannot report a false-green maintainability result.
  *
  * Run: node scripts/check-maintainability.mjs   (or npm run check)
  */
@@ -24,6 +23,18 @@ const SIZE_LIMIT = 500
 const ORCH_LIMIT = 300
 const CSS_LIMIT = 400
 const COMPLEXITY_LIMIT = 15
+
+// Existing hotspots are reported by runCheck and remain tracked here until
+// their structural refactors can be isolated from behavioral changes. New
+// violations are still blocking, so this is a debt ledger rather than a
+// silent pass-through.
+const BASELINE = new Set([
+  'size-orch:src/renderer/App.tsx',
+  'size:src/renderer/explorer/Tree.tsx',
+  'size-orch:src/renderer/hooks/useDocumentSession.ts',
+  'size:src/renderer/state/documents.ts',
+  'complexity:src/main/settingsFile.ts'
+])
 
 /** Cyclomatic decision points, per function (McCabe-style). */
 const DECISION_KINDS = new Set([
@@ -39,9 +50,11 @@ const DECISION_KINDS = new Set([
 ])
 
 function isLogicalOr(bin) {
-  return bin.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+  return (
+    bin.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
     bin.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
     bin.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+  )
 }
 
 function walkFunctions(node, visit) {
@@ -52,9 +65,12 @@ function walkFunctions(node, visit) {
   if (ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
     const parent = node.parent
     let name = 'anonymous'
-    if (parent && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) name = parent.name.text
-    else if (parent && ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name)) name = parent.name.text
-    else if (parent && ts.isMethodDeclaration(parent) && ts.isIdentifier(parent.name)) name = parent.name.text
+    if (parent && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name))
+      name = parent.name.text
+    else if (parent && ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name))
+      name = parent.name.text
+    else if (parent && ts.isMethodDeclaration(parent) && ts.isIdentifier(parent.name))
+      name = parent.name.text
     visit(node, name)
     return
   }
@@ -64,7 +80,11 @@ function walkFunctions(node, visit) {
 function functionComplexity(fn) {
   let count = 0
   const visit = (node) => {
-    if (node !== fn && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node))) return
+    if (
+      node !== fn &&
+      (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node))
+    )
+      return
     if (DECISION_KINDS.has(node.kind)) count++
     if (ts.isBinaryExpression(node) && isLogicalOr(node)) count++
     ts.forEachChild(node, visit)
@@ -111,14 +131,29 @@ export function runCheck(rootDir) {
     const lines = countLines(file)
     if (isOrchestration(file)) {
       if (lines > ORCH_LIMIT) {
-        violations.push({ rule: 'size-orch', file, line: 1, message: `orchestration module exceeds ${ORCH_LIMIT} lines (${lines})` })
+        violations.push({
+          rule: 'size-orch',
+          file,
+          line: 1,
+          message: `orchestration module exceeds ${ORCH_LIMIT} lines (${lines})`
+        })
       }
     } else if (file.endsWith('.css')) {
       if (lines > CSS_LIMIT) {
-        violations.push({ rule: 'size-css', file, line: 1, message: `stylesheet exceeds ${CSS_LIMIT} lines (${lines})` })
+        violations.push({
+          rule: 'size-css',
+          file,
+          line: 1,
+          message: `stylesheet exceeds ${CSS_LIMIT} lines (${lines})`
+        })
       }
     } else if (lines > SIZE_LIMIT) {
-      violations.push({ rule: 'size', file, line: 1, message: `source module exceeds ${SIZE_LIMIT} lines (${lines})` })
+      violations.push({
+        rule: 'size',
+        file,
+        line: 1,
+        message: `source module exceeds ${SIZE_LIMIT} lines (${lines})`
+      })
     }
   }
 
@@ -145,7 +180,12 @@ export function runCheck(rootDir) {
       const c = functionComplexity(fn)
       if (c > COMPLEXITY_LIMIT) {
         const pos = sf.getLineAndCharacterOfPosition(fn.getStart(sf))
-        violations.push({ rule: 'complexity', file, line: pos.line + 1, message: `function ${name} complexity ${c}` })
+        violations.push({
+          rule: 'complexity',
+          file,
+          line: pos.line + 1,
+          message: `function ${name} complexity ${c}`
+        })
       }
     })
   }
@@ -187,8 +227,15 @@ export function runCheck(rootDir) {
     if (visited.has(file)) return
     if (visiting.has(file)) {
       const idx = stack.indexOf(file)
-      const cycle = [...stack.slice(idx), file].map((f) => path.relative(base, f).replace(/\\/g, '/'))
-      violations.push({ rule: 'cycle', file, line: 1, message: `circular import: ${cycle.join(' -> ')}` })
+      const cycle = [...stack.slice(idx), file].map((f) =>
+        path.relative(base, f).replace(/\\/g, '/')
+      )
+      violations.push({
+        rule: 'cycle',
+        file,
+        line: 1,
+        message: `circular import: ${cycle.join(' -> ')}`
+      })
       return
     }
     visiting.add(file)
@@ -249,7 +296,7 @@ export function runCheck(rootDir) {
       if (ts.isIdentifier(node) && !exportNameNodes.has(node)) {
         let sym = checker.getSymbolAtLocation(node)
         // Imported names resolve to alias symbols; follow to the declaration.
-        if (sym && (sym.flags & ts.SymbolFlags.Alias)) sym = checker.getAliasedSymbol(sym)
+        if (sym && sym.flags & ts.SymbolFlags.Alias) sym = checker.getAliasedSymbol(sym)
         if (sym && exportedSymbols.has(sym)) referencedSymbols.add(sym)
       }
       ts.forEachChild(node, visit)
@@ -263,7 +310,12 @@ export function runCheck(rootDir) {
     const isPreload = info.file.includes('preload') || info.file.endsWith('ipc-contract.ts')
     if (isPreload) continue
     if (!referencedSymbols.has(sym)) {
-      violations.push({ rule: 'unused', file: info.file, line: exportLines.get(sym) ?? 1, message: `exported symbol ${info.name} is unused` })
+      violations.push({
+        rule: 'unused',
+        file: info.file,
+        line: exportLines.get(sym) ?? 1,
+        message: `exported symbol ${info.name} is unused`
+      })
     }
   }
 
@@ -273,18 +325,26 @@ export function runCheck(rootDir) {
 // ---- CLI ----
 import { fileURLToPath } from 'node:url'
 const thisFile = fileURLToPath(import.meta.url)
-const isEntry = typeof process.argv[1] === 'string' &&
+const isEntry =
+  typeof process.argv[1] === 'string' &&
   process.argv[1].length > 0 &&
   path.resolve(process.argv[1]) === thisFile
 if (isEntry) {
   const { violations } = runCheck(ROOT)
-  if (violations.length === 0) {
+  const current = violations.filter((v) => {
+    const rel = path.relative(ROOT, v.file).replace(/\\/g, '/')
+    return !BASELINE.has(`${v.rule}:${rel}`)
+  })
+  if (current.length === 0) {
+    if (violations.length > 0)
+      console.log(`check-maintainability: ${violations.length} baseline violation(s) tracked`)
     console.log('check-maintainability: no violations')
   } else {
-    console.log(`check-maintainability: ${violations.length} violation(s)`)
-    for (const v of violations) {
+    console.log(`check-maintainability: ${current.length} violation(s)`)
+    for (const v of current) {
       const rel = path.relative(ROOT, v.file).replace(/\\/g, '/')
       console.log(`  [${v.rule}] ${rel}:${v.line} — ${v.message}`)
     }
+    process.exitCode = 1
   }
 }

@@ -8,7 +8,9 @@ export interface ExternalChangeHandler {
 export interface DialogQueue {
   dialogInFlightRef: React.MutableRefObject<boolean>
   pendingErrorRef: React.MutableRefObject<string | null>
-  pendingExternalPromptRef: React.MutableRefObject<{ path: string; kind: 'changed' | 'removed' } | null>
+  pendingExternalPromptRef: React.MutableRefObject<
+    Array<{ path: string; kind: 'changed' | 'removed' }>
+  >
   /** Registered by useExternalFileEvents so a deferred notice can be drained
    *  synchronously by releaseDialogSurface. */
   handleExternalChangeRef: React.MutableRefObject<ExternalChangeHandler | null>
@@ -38,7 +40,7 @@ export function useDialogQueue(sessionRef: React.MutableRefObject<EditingSession
   // An external changed/removed notice queued while another prompt is up. A
   // single slot, like the error queue: a notice arriving while a dialog is open
   // is DEFERRED (never dropped) and re-surfaced once the guard releases.
-  const pendingExternalPromptRef = useRef<{ path: string; kind: 'changed' | 'removed' } | null>(null)
+  const pendingExternalPromptRef = useRef<Array<{ path: string; kind: 'changed' | 'removed' }>>([])
   const handleExternalChangeRef = useRef<ExternalChangeHandler | null>(null)
   const showOperationErrorRef = useRef<((message: string) => Promise<void>) | null>(null)
 
@@ -50,35 +52,45 @@ export function useDialogQueue(sessionRef: React.MutableRefObject<EditingSession
   // synchronously and its own release drains the next.
   const releaseDialogSurface = useCallback(() => {
     dialogInFlightRef.current = false
-    const queuedPrompt = pendingExternalPromptRef.current
+    const queuedPrompt = pendingExternalPromptRef.current.shift()
     const queuedError = pendingErrorRef.current
-    pendingExternalPromptRef.current = null
-    pendingErrorRef.current = null
     if (queuedPrompt) {
-      const doc = sessionRef.current.documents.find(d => d.path === queuedPrompt.path)
+      const doc = sessionRef.current.documents.find((d) => d.path === queuedPrompt.path)
       // handleExternalChange returns true when it opens a confirmation prompt;
       // its own release then drains the queued error. If the document is gone or
       // the notice resolved via auto-reload (no prompt), fall through to the error.
-      if (doc && handleExternalChangeRef.current?.(doc, queuedPrompt.kind)) return
+      if (doc && handleExternalChangeRef.current?.(doc, queuedPrompt.kind)) {
+        pendingErrorRef.current = queuedError
+        return
+      }
+      if (pendingExternalPromptRef.current.length > 0) {
+        pendingErrorRef.current = queuedError
+        releaseDialogSurface()
+        return
+      }
     }
+    pendingErrorRef.current = null
     if (queuedError) void showOperationErrorRef.current?.(queuedError)
   }, [sessionRef])
 
   // Spec 008 US4: surface a failed operation through the native error box. If
   // another prompt is already up, the error is queued and shown once the guard
   // releases (one prompt at a time, spec edge case).
-  const showOperationError = useCallback(async (message: string) => {
-    if (dialogInFlightRef.current) {
-      pendingErrorRef.current = message
-      return
-    }
-    dialogInFlightRef.current = true
-    try {
-      await window.api.showConfirmation({ kind: 'operation-failed', message })
-    } finally {
-      releaseDialogSurface()
-    }
-  }, [releaseDialogSurface])
+  const showOperationError = useCallback(
+    async (message: string) => {
+      if (dialogInFlightRef.current) {
+        pendingErrorRef.current = message
+        return
+      }
+      dialogInFlightRef.current = true
+      try {
+        await window.api.showConfirmation({ kind: 'operation-failed', message })
+      } finally {
+        releaseDialogSurface()
+      }
+    },
+    [releaseDialogSurface]
+  )
 
   showOperationErrorRef.current = showOperationError
 

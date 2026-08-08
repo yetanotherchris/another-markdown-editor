@@ -21,13 +21,25 @@ afterEach(() => {
   container = null
 })
 
-function tabDoc(id: string, title: string, overrides: Partial<ReturnType<typeof createEmpty>> = {}) {
+function tabDoc(
+  id: string,
+  title: string,
+  overrides: Partial<ReturnType<typeof createEmpty>> = {}
+) {
   return { ...createEmpty(1), id, title, ...overrides }
 }
 
 describe('TabBar (spec 010 FR-003/004)', () => {
   it('renders the "+" new-file button even with no documents (spec edge)', () => {
-    render(<TabBar documents={[]} activeId={null} onActivate={() => {}} onClose={() => {}} onNew={() => {}} />)
+    render(
+      <TabBar
+        documents={[]}
+        activeId={null}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onNew={() => {}}
+      />
+    )
     const button = container!.querySelector<HTMLButtonElement>('button.tab-new')
     expect(button).not.toBeNull()
     expect(button!.getAttribute('aria-label')).toBe('New file')
@@ -78,13 +90,7 @@ describe('TabBar (spec 010 FR-003/004)', () => {
     const onNew = vi.fn()
     const a = tabDoc('a', 'alpha.md')
     render(
-      <TabBar
-        documents={[a]}
-        activeId="a"
-        onActivate={() => {}}
-        onClose={() => {}}
-        onNew={onNew}
-      />
+      <TabBar documents={[a]} activeId="a" onActivate={() => {}} onClose={() => {}} onNew={onNew} />
     )
     act(() => container!.querySelector<HTMLButtonElement>('button.tab-new')!.click())
     expect(onNew).toHaveBeenCalledTimes(1)
@@ -124,6 +130,28 @@ describe('TabBar (spec 010 FR-003/004)', () => {
     )
     const tabs = container!.querySelectorAll<HTMLElement>('[role="tab"]')
     expect(tabs[0].querySelector('.tab-dirty')!.getAttribute('aria-label')).toBe('unsaved changes')
-    expect(tabs[1].querySelector('.tab-warning')!.getAttribute('aria-label')).toBe('deleted on disk')
+    expect(tabs[1].querySelector('.tab-warning')!.getAttribute('aria-label')).toBe(
+      'deleted on disk'
+    )
+  })
+
+  it('activates a focused tab with Enter and Space', () => {
+    const onActivate = vi.fn()
+    render(
+      <TabBar
+        documents={[tabDoc('a', 'alpha.md')]}
+        activeId={null}
+        onActivate={onActivate}
+        onClose={() => {}}
+        onNew={() => {}}
+      />
+    )
+    const tab = container!.querySelector<HTMLElement>('[role="tab"]')!
+    act(() => {
+      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      tab.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }))
+    })
+    expect(onActivate).toHaveBeenCalledTimes(2)
+    expect(tab.tabIndex).toBe(0)
   })
 })
