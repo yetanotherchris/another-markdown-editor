@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-07
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Store the theme colours and font type (serif/sans) in the config.json. If these don't match a theme, then 'custom' is displayed in settings dialog. Changing to a known theme in the settings will override the custom colours."
 

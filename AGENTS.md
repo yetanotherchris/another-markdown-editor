@@ -292,3 +292,4 @@ AGENTS.md                         This file
 | 020-editor-spellcheck | Archived | Complete |
 | 021-frontmatter-handling | Archived | Complete |
 | 022-universal-config-path | Archived | Complete |
+| 023-custom-editor-theme | Archived | Complete |
