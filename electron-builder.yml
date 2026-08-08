@@ -1,8 +1,9 @@
-appId: com.yetanotherchris.another-markdown-editor
-productName: Another Markdown Editor
-# The packaged launcher binary is `ameditor` (ameditor.exe on Windows) on every
-# platform (spec 009 FR-008); productName keeps the human-facing app identity.
-executableName: ameditor
+appId: com.yetanotherchris.markdownmeister
+productName: MarkdownMeister
+# The packaged launcher binary is `markdownmeister` (markdownmeister.exe on
+# Windows) on every platform (spec 019); productName keeps the human-facing app
+# identity.
+executableName: markdownmeister
 directories:
   output: dist
 
@@ -23,7 +24,7 @@ files:
   - "!{.gitignore,AGENTS.md,CLAUDE.md,LICENSE}"
   - "!update{scoop,brew}.ps1"
   - "!Formula/**"
-  - "!another-markdown-editor.json"
+  - "!markdownmeister.json"
   - "!.github/**"
   - "!.specify/**"
   - "!test-results/**"
@@ -32,9 +33,9 @@ files:
 # Every asset name carries product-version-os-arch (FR-005). The os token is
 # literal per platform so names read windows/macos/linux rather than electron-
 # builder's win/mac/linux abbreviations (contracts/release.md §2). The product
-# token is the short prefix `ameditor` (spec 009).
+# token is the short prefix `markdownmeister` (spec 019).
 win:
-  artifactName: ameditor-${version}-windows-${arch}.${ext}
+  artifactName: markdownmeister-${version}-windows-${arch}.${ext}
   target:
     - target: nsis
       arch: [x64]
@@ -42,7 +43,7 @@ win:
       arch: [x64]
 
 mac:
-  artifactName: ameditor-${version}-macos-${arch}.${ext}
+  artifactName: markdownmeister-${version}-macos-${arch}.${ext}
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -53,7 +54,7 @@ linux:
   # Hard-code x64 rather than using ${arch}: electron-builder's ${arch} macro
   # resolves to "x86_64" for Linux, but the release contract names every asset
   # with os-arch tokens (linux-x64.AppImage, contracts/release.md §2).
-  artifactName: ameditor-${version}-linux-x64.${ext}
+  artifactName: markdownmeister-${version}-linux-x64.${ext}
   target:
     - target: AppImage
       arch: [x64]
