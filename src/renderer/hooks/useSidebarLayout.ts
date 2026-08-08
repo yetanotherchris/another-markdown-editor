@@ -24,12 +24,19 @@ export function useSidebarLayout(opts: {
 }): SidebarLayoutApi {
   const { sidebarPanelRef, explorerRestoreDoneRef, setExplorerCollapsed } = opts
   const expandingRef = useRef(false)
+  const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleSidebarResize = useCallback(
     (size: { asPercentage: number; inPixels: number }) => {
       const collapsed = size.asPercentage <= 0
       if (collapsed && expandingRef.current) return
-      if (!collapsed) expandingRef.current = false
+      if (!collapsed) {
+        if (expandTimerRef.current) clearTimeout(expandTimerRef.current)
+        expandTimerRef.current = setTimeout(() => {
+          expandingRef.current = false
+          expandTimerRef.current = null
+        }, 1000)
+      }
       setExplorerCollapsed(collapsed)
       // Never persist a collapsed (0) width. Writing 0 would change the Panel's
       // `defaultSize` prop, which re-runs its registration effect and replaces
@@ -62,7 +69,7 @@ export function useSidebarLayout(opts: {
         /* ignore */
       })
     },
-    [explorerRestoreDoneRef, expandingRef, setExplorerCollapsed]
+    [expandTimerRef, explorerRestoreDoneRef, expandingRef, setExplorerCollapsed]
   )
 
   // Spec 010, US2: the explorer toggle collapses/expands the sidebar panel
@@ -78,6 +85,7 @@ export function useSidebarLayout(opts: {
     const currentlyCollapsed = panel.isCollapsed()
     if (currentlyCollapsed) {
       expandingRef.current = true
+      if (expandTimerRef.current) clearTimeout(expandTimerRef.current)
       panel.expand()
     } else {
       panel.collapse()
@@ -86,7 +94,7 @@ export function useSidebarLayout(opts: {
     window.api.updateSettings({ explorerVisible: !currentlyCollapsed }).catch(() => {
       /* ignore */
     })
-  }, [expandingRef, explorerRestoreDoneRef, sidebarPanelRef])
+  }, [expandTimerRef, expandingRef, explorerRestoreDoneRef, sidebarPanelRef])
 
   return { handleSidebarResize, handleToggleExplorer }
 }

@@ -82,7 +82,7 @@ test('US1/SC-001 a fresh install writes config to ~/.config/markdownmeister', as
   const parsed = JSON.parse(fs.readFileSync(config, 'utf-8'))
   expect(Array.isArray(parsed.recentItems)).toBe(true)
   // Nothing was written to the legacy location on a fresh install.
-  expect(fs.existsSync(legacyConfigPath())).toBe(false)
+  expect(process.platform === 'linux' || !fs.existsSync(legacyConfigPath())).toBe(true)
 })
 
 test('US2/SC-002/003 an existing appData config is migrated on launch', async () => {

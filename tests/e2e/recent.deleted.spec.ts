@@ -161,7 +161,9 @@ test('US3 cancelling an unsaved-work confirmation keeps the session and the rece
   // The prepared folder was genuinely abandoned: a late commit must fail
   // closed (a stale-pending bug would commit the old 'other' folder here).
   const probe = await ctx.window.evaluate(async () => {
-    const api = (window as unknown as { api: { commitFolderOpen(): Promise<{ ok: boolean; code?: string }> } }).api
+    const api = (
+      window as unknown as { api: { commitFolderOpen(): Promise<{ ok: boolean; code?: string }> } }
+    ).api
     return api.commitFolderOpen()
   })
   expect(probe).toMatchObject({ ok: false, code: 'NO_WORKSPACE' })
@@ -210,10 +212,12 @@ test('US3 a failing Save All keeps the confirmation open and does not commit', a
   await expect(ctx.window.locator('.document-title')).toContainText('alpha.md')
   await typeInEditor(ctx, ' UNSAVED')
 
-  // Make the save fail (read-only). On Windows this is the read-only attribute;
-  // on POSIX the mode bits. Either way the write throws.
+  // Make the save fail at temp-file creation. A read-only destination alone is
+  // insufficient on POSIX because rename permission belongs to the directory.
   const alphaPath = path.join(ctx.testFolder, 'alpha.md')
-  fs.chmodSync(alphaPath, 0o444)
+  const folderMode = process.platform === 'win32' ? undefined : fs.statSync(ctx.testFolder).mode
+  if (process.platform === 'win32') fs.chmodSync(alphaPath, 0o444)
+  else fs.chmodSync(ctx.testFolder, 0o555)
   try {
     // First prompt answers "Save All" (fails), the re-prompt then cancels. The
     // native re-prompt is proven by the stub receiving a second call.
@@ -232,8 +236,8 @@ test('US3 a failing Save All keeps the confirmation open and does not commit', a
     await expect(ctx.window.getByRole('treeitem').getByText('delta.md')).toHaveCount(0)
     await expect(ctx.window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
   } finally {
-    // Restore so the shared fixture and afterAll cleanup can delete the file.
-    fs.chmodSync(alphaPath, 0o666)
+    if (process.platform === 'win32') fs.chmodSync(alphaPath, 0o666)
+    else fs.chmodSync(ctx.testFolder, folderMode ?? 0o755)
   }
 })
 

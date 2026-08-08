@@ -128,6 +128,10 @@ test('US2/FR-002 the last state survives a fast quit (flush on close)', async ()
 })
 
 test('US3/FR-005 a saved maximized window restores maximized', async () => {
+  test.skip(
+    process.platform === 'linux',
+    'Xvfb does not provide a window manager for maximize state'
+  )
   await app.close()
   prewriteWindowState({ x: 40, y: 50, width: 500, height: 400, isMaximized: true })
   ;({ app, window } = await launchApp(configDir, testFolder))

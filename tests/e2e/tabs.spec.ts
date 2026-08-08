@@ -2,7 +2,15 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { launchApp, closeAppSafely, stubMessageBox, messageBoxCallCount, lastMessageBoxOptions, clickHamburgerItem, openHamburger } from './launch'
+import {
+  launchApp,
+  closeAppSafely,
+  stubMessageBox,
+  messageBoxCallCount,
+  lastMessageBoxOptions,
+  clickHamburgerItem,
+  openHamburger
+} from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -165,10 +173,12 @@ test('closing a dirty tab with a failing save re-prompts and keeps the tab open 
   await openFolderAndFile('alpha.md')
   await typeInEditor(' EXTRA')
 
-  // Make the save fail (read-only): the first "Save" fails, the native box
-  // re-prompts (US2 scenario 4), and the second response cancels.
+  // Make the save fail at temp-file creation. A read-only destination alone is
+  // insufficient on POSIX because rename permission belongs to the directory.
   const alphaPath = path.join(testFolder, 'alpha.md')
-  fs.chmodSync(alphaPath, 0o444)
+  const folderMode = process.platform === 'win32' ? undefined : fs.statSync(testFolder).mode
+  if (process.platform === 'win32') fs.chmodSync(alphaPath, 0o444)
+  else fs.chmodSync(testFolder, 0o555)
   try {
     await stubMessageBox(app, ['Save', 'cancel'])
     await window.getByRole('button', { name: 'Close alpha.md' }).click()
@@ -184,7 +194,8 @@ test('closing a dirty tab with a failing save re-prompts and keeps the tab open 
     await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toBeVisible()
     expect(fs.readFileSync(alphaPath, 'utf-8')).not.toContain('EXTRA')
   } finally {
-    fs.chmodSync(alphaPath, 0o666)
+    if (process.platform === 'win32') fs.chmodSync(alphaPath, 0o666)
+    else fs.chmodSync(testFolder, folderMode ?? 0o755)
   }
 })
 
@@ -265,10 +276,7 @@ test('external change to a clean document auto-reloads it', async () => {
   await openFolderAndFile('alpha.md')
   await expect(window.locator('.ProseMirror')).toContainText('Hello world.')
 
-  fs.writeFileSync(
-    path.join(testFolder, 'alpha.md'),
-    '# Alpha\n\nChanged by another program.'
-  )
+  fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nChanged by another program.')
 
   await expect(window.locator('.ProseMirror')).toContainText('Changed by another program.', {
     timeout: 15_000
@@ -283,10 +291,7 @@ test('external change to a dirty document: Keep My Version keeps the edit', asyn
 
   // The native keep-or-reload box is stubbed to the safe choice (Keep).
   await stubMessageBox(app, 'Keep My Version')
-  fs.writeFileSync(
-    path.join(testFolder, 'alpha.md'),
-    '# Alpha\n\nChanged by another program.'
-  )
+  fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nChanged by another program.')
 
   await expect(window.locator('.ProseMirror:visible')).toContainText('MYEDIT', { timeout: 15_000 })
   await expect(window.getByRole('tab', { name: /alpha\.md/ }).locator('.tab-dirty')).toBeVisible()
@@ -297,10 +302,7 @@ test('external change to a dirty document: Reload from Disk replaces the edit', 
   await typeInEditor(' MYEDIT')
 
   await stubMessageBox(app, 'Reload from Disk')
-  fs.writeFileSync(
-    path.join(testFolder, 'alpha.md'),
-    '# Alpha\n\nChanged by another program.'
-  )
+  fs.writeFileSync(path.join(testFolder, 'alpha.md'), '# Alpha\n\nChanged by another program.')
 
   await expect(window.locator('.ProseMirror:visible')).toContainText(
     'Changed by another program.',
@@ -349,7 +351,10 @@ test('switching to the oldest tab at the instance cap keeps its editor alive', a
   // Fill the pool to the 8-instance cap. Middle-click (spec 024 FR-005) so each
   // file opens in a new tab rather than replacing the clean active tab.
   for (let i = 1; i <= 8; i++) {
-    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click({ button: 'middle' })
+    await window
+      .getByRole('treeitem')
+      .getByText(`f${String(i).padStart(2, '0')}.md`)
+      .click({ button: 'middle' })
   }
   // Activate the oldest tab; eviction must not take the just-activated editor.
   await window.getByRole('tab', { name: /f01\.md/ }).click()
@@ -364,7 +369,10 @@ test('reopening an evicted document from the tree brings its editor back', async
   // Open nine files so the oldest (f01) is evicted by the LRU cap. Middle-click
   // (spec 024 FR-005) so every file opens in a new tab.
   for (let i = 1; i <= 9; i++) {
-    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click({ button: 'middle' })
+    await window
+      .getByRole('treeitem')
+      .getByText(`f${String(i).padStart(2, '0')}.md`)
+      .click({ button: 'middle' })
   }
   // Re-open the evicted file from the tree: the active tab must not be dead.
   await window.getByRole('treeitem').getByText('f01.md').click()
@@ -383,9 +391,7 @@ test('top-bar clip-path groups are neutralised so icons paint on any tab', async
   await openFolderAndFile('alpha.md')
   await openSecondFile('beta.md')
 
-  const clipped = window.locator(
-    '.editor-host:visible .milkdown-top-bar svg g[clip-path]'
-  )
+  const clipped = window.locator('.editor-host:visible .milkdown-top-bar svg g[clip-path]')
   await expect(clipped).toHaveCount(7)
   const clipValues = await clipped.evaluateAll((els) =>
     els.map((el) => getComputedStyle(el).clipPath)
