@@ -251,6 +251,7 @@ AGENTS.md                         This file
 - After the PR is created, **before merging**, launch code review subagents to
   review the changes for correctness, security, and spec compliance.
 - Code review results are reported in the PR as a comment.
+- Every PR description and every PR comment MUST end with an `AI usage:` line that names the actual model(s) or agent(s) that contributed. Use model names, never tool names.
 - **Archive the spec as part of the implementation PR.** When a spec's feature
   is fully implemented and its PR is opened, move the spec directory from
   `specs/<n>-<name>/` to `specs/archive/<n>-<name>/` in the same change (use

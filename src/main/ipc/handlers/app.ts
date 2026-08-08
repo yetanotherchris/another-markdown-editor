@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import type { Result } from '../../../shared/ipc-contract'
-import { err, ok, ctx, validateShape } from './context'
+import { err, ok, ctx, isAuthorizedRenderer, validateShape } from './context'
 
 /**
  * App lifecycle channels (US1/FR-005): the quit/close guard and the devtools
@@ -18,19 +18,19 @@ export function registerAppHandlers(window: BrowserWindow, _ctx: typeof ctx): vo
   // silently — `quit:respond` (the renderer's confirmation) re-enters
   // `tryCloseWindow()`, which is the only path allowed to set `allowClose`.
   ipcMain.handle('app:requestQuit', (event): Result<null> => {
-    if (event.sender !== window.webContents) return err('IO', 'Unauthorized renderer')
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     window.close()
     return ok(null)
   })
 
   ipcMain.handle('devtools:toggle', (event): Result<null> => {
-    if (event.sender !== window.webContents) return err('IO', 'Unauthorized renderer')
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     window.webContents.toggleDevTools()
     return ok(null)
   })
 
   ipcMain.handle('quit:respond', (event, args: unknown): Result<null> => {
-    if (event.sender !== window.webContents) return err('IO', 'Unauthorized renderer')
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     try {
       validateShape(args, ['decision'])
     } catch {

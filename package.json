@@ -1,7 +1,7 @@
 {
   "name": "markdownmeister",
   "productName": "MarkdownMeister",
-  "version": "0.0.96",
+  "version": "0.0.97",
   "private": true,
   "engines": {
     "node": ">=22 <23",
