@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-07
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Store config in .config universally, a subfolder of .config maybe called markdownmeister"
 
