@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-08
 
-**Status**: Active
+**Status**: Archived
 
 **Input**: User report: "The default dictionary for the app seems to be missing many words, e.g. Lacanian, Kleinian, Psychodynamic, reproduceable, JSON, hominem, Experimentations, maladaptive."
 
