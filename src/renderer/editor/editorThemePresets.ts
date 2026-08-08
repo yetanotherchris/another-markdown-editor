@@ -125,3 +125,9 @@ const SERIF_STACK = "Georgia, 'Times New Roman', 'Noto Serif', serif"
 export function fontStackFor(font: EditorFont): string {
   return font === 'serif' ? SERIF_STACK : SANS_STACK
 }
+
+/** The font a preset implies — written to `editorFont` when it is selected
+ *  (FR-005/FR-008). */
+export function presetFontFor(name: EditorThemeName): EditorFont {
+  return name === 'rustic-serif' || name === 'monotone-serif' ? 'serif' : 'sans-serif'
+}

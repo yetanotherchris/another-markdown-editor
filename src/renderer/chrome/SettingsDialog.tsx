@@ -21,11 +21,13 @@ export const SPELLCHECK_LANGUAGE_CHOICES: { value: SpellcheckLanguage; label: st
 ]
 
 interface SettingsDialogProps {
-  /** The currently selected editor theme (the last value committed via Save). */
-  editorTheme: EditorThemeName
+  /** The effective editor theme — a preset name, or `'custom'` when the stored
+   *  colours + font match no preset (spec 023 FR-003/004). */
+  editorTheme: EditorThemeName | 'custom'
   /** Spec 016, FR-003/US1 S4: called by the Save button with the staged
    *  selection, then the dialog closes. Closing without Save leaves the canvas
-   *  at the committed value. */
+   *  at the committed value. Spec 023 FR-005: committing a preset clears any
+   *  custom colour overrides. */
   onEditorThemeSave: (theme: EditorThemeName) => void
   /** The currently selected app theme (from persisted settings). */
   theme: ThemeChoice
@@ -55,8 +57,12 @@ interface SettingsDialogProps {
 export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, onThemeChange, spellcheckEnabled, onSpellcheckChange, spellcheckLanguage, onSpellcheckLanguageChange, onClose }: SettingsDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   // Spec 016: the staged editor-theme selection, seeded from the last committed
-  // value. Not applied on click — only the Save button commits it (US1 S4).
-  const [draftEditorTheme, setDraftEditorTheme] = useState<EditorThemeName>(editorTheme)
+  // preset. Not applied on click — only the Save button commits it (US1 S4).
+  // Spec 023: while the effective theme is Custom (a preset is not staged),
+  // the draft is `null` and the display-only Custom radio is shown.
+  const [draftEditorTheme, setDraftEditorTheme] = useState<EditorThemeName | null>(
+    editorTheme === 'custom' ? null : editorTheme
+  )
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   // The element that had focus when the dialog opened; focus returns to it on
@@ -163,6 +169,14 @@ export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, 
                 <span>{option.label}</span>
               </label>
             ))}
+            {/* Spec 023 FR-003: a display-only Custom option when the stored
+                colours + font match no preset. Not selectable (Assumptions). */}
+            {editorTheme === 'custom' && (
+              <label className="settings-radio">
+                <input type="radio" name="editor-theme" value="custom" checked disabled />
+                <span>Custom</span>
+              </label>
+            )}
           </fieldset>
           <fieldset className="settings-fieldset">
             <legend className="settings-legend">Spellcheck</legend>
@@ -200,7 +214,9 @@ export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, 
             type="button"
             className="settings-dialog-save"
             onClick={() => {
-              onEditorThemeSave(draftEditorTheme)
+              // Spec 023: with a Custom theme no preset is staged — Save just
+              // closes (the app-theme choices apply immediately).
+              if (draftEditorTheme !== null) onEditorThemeSave(draftEditorTheme)
               onClose()
             }}
           >

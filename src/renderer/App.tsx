@@ -31,6 +31,7 @@ import './App.css'
 import './chrome/chrome.css'
 import './editor/editor.css'
 import './editor/themes.css'
+import { resolveEditorTheme, fontStackFor } from './editor/editorThemePresets'
 
 const initialSession: EditingSession = {
   documents: [],
@@ -55,10 +56,30 @@ export default function App() {
   const {
     settingsOpen, setSettingsOpen,
     editorTheme, handleEditorThemeChange,
+    editorFont, editorColors,
     spellcheckEnabled, handleSpellcheckChange,
     spellcheckLanguage, handleSpellcheckLanguageChange,
     themeChoice, handleThemeChange, themeMode
   } = useSettingsState()
+
+  // Spec 023 (FR-003/004/007): the effective editor theme is the stored preset,
+  // or Custom when the stored colours + font match no preset. The container's
+  // data-editor-theme carries the preset name (driving themes.css) or 'custom';
+  // a custom theme applies its six colour tokens + font stack inline.
+  const resolvedEditorTheme = resolveEditorTheme({ editorTheme, editorFont, editorColors, appMode: themeMode })
+  const dataEditorTheme = resolvedEditorTheme.kind === 'preset' ? resolvedEditorTheme.name : 'custom'
+  const editorThemeStyle = resolvedEditorTheme.kind === 'custom' && editorColors
+    ? {
+        '--crepe-color-background': editorColors.background,
+        '--crepe-color-on-background': editorColors.foreground,
+        '--crepe-color-primary': editorColors.accent,
+        '--crepe-color-surface': editorColors.surface,
+        '--crepe-color-outline': editorColors.outline,
+        '--crepe-color-inline-code': editorColors.code,
+        '--crepe-font-default': fontStackFor(editorFont),
+        '--crepe-font-title': fontStackFor(editorFont)
+      } as React.CSSProperties
+    : undefined
 
   // Spec 020 (JS spellchecker): keep the shared runtime in sync with the
   // persisted settings, and load the user dictionary once on startup.
@@ -228,7 +249,7 @@ export default function App() {
   const hasWorkspace = workspace.name !== null
 
   return (
-    <div className="app-container" data-editor-theme={editorTheme} data-theme={themeMode}>
+    <div className="app-container" data-editor-theme={dataEditorTheme} data-theme={themeMode} style={editorThemeStyle}>
       {/* Spec 010 (2026-08-05): one header row — chrome buttons + tabs. */}
       <div className="header-bar">
         <div className="chrome-bar">
@@ -328,7 +349,7 @@ export default function App() {
         <SettingsDialog
           theme={themeChoice}
           onThemeChange={handleThemeChange}
-          editorTheme={editorTheme}
+          editorTheme={dataEditorTheme}
           onEditorThemeSave={handleEditorThemeChange}
           spellcheckEnabled={spellcheckEnabled}
           onSpellcheckChange={handleSpellcheckChange}
