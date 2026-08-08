@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type NSpell from 'nspell'
-import { findMisspellings, getChecker, resolveLanguage } from '../../src/renderer/domain/spellcheck'
+import { findMisspellings, getChecker, resolveLanguage, SUPPLEMENTAL_WORDS } from '../../src/renderer/domain/spellcheck'
 
 /**
  * Spec 020 (2026-08-07): the JS whole-document spellchecker. The bundled
@@ -132,7 +132,12 @@ describe('supplemental word list (spec 025)', () => {
     expect(miss.map((m) => m.word)).toEqual(['recieve'])
   })
 
-  it('a supplemental word is not written into the custom dictionary set', () => {
-    expect(getChecker('en-GB').correct('json')).toBe(false)
+  it('a supplemental word is accepted via the list, not via the dictionary or the user set', () => {
+    // Acceptance must come from SUPPLEMENTAL_WORDS: neither the nspell checker
+    // nor an empty custom dictionary contains "json".
+    const checker = getChecker('en-GB')
+    expect(SUPPLEMENTAL_WORDS.has('json')).toBe(true)
+    expect(checker.correct('json')).toBe(false)
+    expect(findMisspellings('json', checker, new Set())).toEqual([])
   })
 })

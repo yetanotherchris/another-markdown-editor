@@ -187,7 +187,8 @@ test('US3 a learned word survives an app restart', async () => {
 test('US1 a common word missing from the old dictionary is not flagged', async () => {
   await openWorkspaceFile(window, 'supplemental.md')
   // "maladaptive" exists in the size-70 dictionaries, so it is not flagged.
-  await expect.poll(() => markedWords(window)).not.toContain('maladaptive')
+  // Case-insensitive: the fixture writes sentence-initial "Maladaptive".
+  await expect.poll(async () => (await markedWords(window)).map((w) => w.toLowerCase())).not.toContain('maladaptive')
 })
 
 test('US2 domain and technical terms are accepted (JSON, Lacanian, hominem)', async () => {
@@ -202,10 +203,15 @@ test('US2 domain and technical terms are accepted (JSON, Lacanian, hominem)', as
 test('US2 a supplemental word is accepted in both en-GB and en-US', async () => {
   await openWorkspaceFile(window, 'supplemental.md')
   await expect.poll(() => markedWords(window)).not.toContain('Lacanian')
+  // The fixture's British "behaviour" is accepted under en-GB.
+  expect(await markedWords(window)).not.toContain('behaviour')
 
   await openSettingsDialog(window)
   await window.getByTestId('spellcheck-language').selectOption('en-US')
   await window.getByRole('button', { name: 'Close settings' }).click()
+  // The switch took effect: en-US now flags the British spelling, while the
+  // supplemental words are still accepted.
+  await expect.poll(() => markedWords(window)).toContain('behaviour')
   await expect.poll(() => markedWords(window)).not.toContain('Lacanian')
   await expect.poll(() => markedWords(window)).not.toContain('JSON')
 })
