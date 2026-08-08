@@ -3,6 +3,11 @@
   "productName": "MarkdownMeister",
   "version": "0.0.97",
   "private": true,
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10"
+  },
+  "packageManager": "npm@10",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -13,9 +18,10 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "check": "node scripts/check-maintainability.mjs",
+    "format:check": "prettier --check src/main/fs/atomicWrite.ts src/main/fs/write.ts src/main/index.ts src/main/ipc/register.ts src/main/ipc/handlers/app.ts src/main/ipc/handlers/context.ts src/main/ipc/handlers/workspace.ts src/main/ipc/handlers/files.ts src/renderer/App.tsx src/renderer/editor/CrepeHost.tsx src/renderer/hooks/useDialogQueue.ts src/renderer/hooks/useDocumentSession.ts src/renderer/state/documents.ts src/renderer/tabs/TabBar.tsx scripts/check-maintainability.mjs tests/renderer/TabBar.test.tsx tests/renderer/documents.dirty.test.ts package.json",
     "dist": "npm run build && electron-builder",
     "dist:dir": "npm run build && electron-builder --dir",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint . --ext .ts,.tsx,.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.preload.json && tsc --noEmit -p tsconfig.renderer.json"
   },
   "dependencies": {
@@ -24,7 +30,6 @@
     "@milkdown/crepe": "^7.21.3",
     "@milkdown/kit": "^7.21.3",
     "chokidar": "^5.0.0",
-    "jsdom": "^29.1.1",
     "lucide-react": "^1.28.0",
     "nspell": "^2.1.5",
     "react": "^19.2.8",
@@ -47,6 +52,7 @@
     "prettier": "^3.0.0",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.65.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "jsdom": "^29.1.1"
   }
 }

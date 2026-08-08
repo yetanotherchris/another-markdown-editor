@@ -3,14 +3,15 @@ import { loadSettings, updateSettings } from '../../settings'
 import { applyThemeOverride } from '../../theme'
 import { applySpellcheckSetting } from '../../spellcheck'
 import type { Result, Settings } from '../../../shared/ipc-contract'
-import { ctx, ok, err, sanitizeError } from './context'
+import { ctx, ok, err, sanitizeError, isAuthorizedRenderer } from './context'
 
 /**
  * Settings channels (US1/FR-005): `settings:get`/`settings:update`, both
  * routing through the authoritative in-memory settings store (review #27).
  */
-export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: typeof ctx): void {
-  ipcMain.handle('settings:get', (): Result<Settings> => {
+export function registerSettingsHandlers(window: Electron.BrowserWindow, _ctx: typeof ctx): void {
+  ipcMain.handle('settings:get', (event): Result<Settings> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     try {
       return ok(loadSettings())
     } catch {
@@ -18,7 +19,8 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
     }
   })
 
-  ipcMain.handle('settings:update', (_e, patch: unknown): Result<Settings> => {
+  ipcMain.handle('settings:update', (event, patch: unknown): Result<Settings> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     try {
       if (!patch || typeof patch !== 'object') {
         return err('IO', 'Settings must be an object')

@@ -4,11 +4,25 @@ import * as fs from 'fs'
 import { readDir } from '../../fs/read'
 import { WorkspaceState } from '../../workspace'
 import type {
-  Result, WorkspaceInfo, DirEntry, WatchEvent, DocumentChangeEvent
+  Result,
+  WorkspaceInfo,
+  DirEntry,
+  WatchEvent,
+  DocumentChangeEvent
 } from '../../../shared/ipc-contract'
 import {
-  ctx, ok, err, ensureString, validateShape, sanitizeError, toAppError,
-  withWorkspace, isRecentEntry, recordRecent, removeRecent
+  ctx,
+  ok,
+  err,
+  ensureString,
+  validateShape,
+  sanitizeError,
+  toAppError,
+  withWorkspace,
+  isRecentEntry,
+  recordRecent,
+  removeRecent,
+  isAuthorizedRenderer
 } from './context'
 
 /**
@@ -25,64 +39,82 @@ export function registerWorkspaceHandlers(window: Electron.BrowserWindow, _ctx: 
   // the target cannot be opened) and FR-010 (the renderer's unsaved-work
   // confirmation cancels cleanly) actually hold: main never destroys the live
   // workspace unless and until the renderer commits.
-  let pendingFolderOpen: { root: string; name: string; entries: DirEntry[] } | null = null
+  let pendingFolderOpen: {
+    root: string
+    name: string
+    entries: DirEntry[]
+    identity: { dev: number; ino: number }
+  } | null = null
 
-  ipcMain.handle('workspace:prepareFolderOpen', async (_e, args: unknown): Promise<Result<WorkspaceInfo | null>> => {
-    let requestedPath: string | null = null
-    let isRecentRequest = false
-    try {
-      // Single in-flight guard: while a prepared folder awaits the renderer's
-      // confirm, a second prepare (toolbar button, native menu, or a
-      // double-clicked recent folder) must NOT overwrite the slot — the first
-      // flow's commit would otherwise swap to the second flow's folder, or the
-      // second flow would error with "No folder open is pending". Reject the
-      // new flow instead; the renderer surfaces the error in context.
-      if (pendingFolderOpen) {
-        return err('IO', 'A folder open is already in progress')
-      }
-      if (args !== undefined && args !== null) {
-        validateShape(args, ['path'])
-        ensureString((args as { path: unknown }).path, 'path')
-        requestedPath = (args as { path: string }).path
-        isRecentRequest = true
-        // Research R4: only open a path main itself recorded.
-        if (!isRecentEntry(requestedPath, 'folder')) {
-          return err('OUTSIDE_WORKSPACE', 'Path is not a recorded recent folder')
+  ipcMain.handle(
+    'workspace:prepareFolderOpen',
+    async (event, args: unknown): Promise<Result<WorkspaceInfo | null>> => {
+      if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
+      let requestedPath: string | null = null
+      let isRecentRequest = false
+      try {
+        // Single in-flight guard: while a prepared folder awaits the renderer's
+        // confirm, a second prepare (toolbar button, native menu, or a
+        // double-clicked recent folder) must NOT overwrite the slot — the first
+        // flow's commit would otherwise swap to the second flow's folder, or the
+        // second flow would error with "No folder open is pending". Reject the
+        // new flow instead; the renderer surfaces the error in context.
+        if (pendingFolderOpen) {
+          return err('IO', 'A folder open is already in progress')
         }
-      } else {
-        const result = await dialog.showOpenDialog({
-          properties: ['openDirectory']
-        })
-        if (result.canceled || result.filePaths.length === 0) {
-          return ok(null)
+        if (args !== undefined && args !== null) {
+          validateShape(args, ['path'])
+          ensureString((args as { path: unknown }).path, 'path')
+          requestedPath = (args as { path: string }).path
+          isRecentRequest = true
+          // Research R4: only open a path main itself recorded.
+          if (!isRecentEntry(requestedPath, 'folder')) {
+            return err('OUTSIDE_WORKSPACE', 'Path is not a recorded recent folder')
+          }
+        } else {
+          const result = await dialog.showOpenDialog({
+            properties: ['openDirectory']
+          })
+          if (result.canceled || result.filePaths.length === 0) {
+            return ok(null)
+          }
+          requestedPath = result.filePaths[0]
         }
-        requestedPath = result.filePaths[0]
-      }
 
-      // Validate the target without committing it. readDir (not
-      // WorkspaceState.getEntries, which swallows errors) is used so an
-      // unreadable root throws here instead of masquerading as an empty
-      // workspace (FR-009).
-      const realRootPath = fs.realpathSync(requestedPath)
-      if (!fs.statSync(realRootPath).isDirectory()) {
-        throw Object.assign(new Error('Target is not a directory'), { code: 'NOT_FOUND' as const })
+        // Validate the target without committing it. readDir (not
+        // WorkspaceState.getEntries, which swallows errors) is used so an
+        // unreadable root throws here instead of masquerading as an empty
+        // workspace (FR-009).
+        const realRootPath = fs.realpathSync(requestedPath)
+        const stat = fs.statSync(realRootPath)
+        if (!stat.isDirectory()) {
+          throw Object.assign(new Error('Target is not a directory'), {
+            code: 'NOT_FOUND' as const
+          })
+        }
+        const entries = readDir(realRootPath, '.')
+        const name = path.basename(realRootPath) || realRootPath
+        pendingFolderOpen = {
+          root: realRootPath,
+          name,
+          entries,
+          identity: { dev: stat.dev, ino: stat.ino }
+        }
+        return ok({ path: realRootPath, name, entries })
+      } catch (e: unknown) {
+        pendingFolderOpen = null
+        // FR-009: a recent folder that cannot be opened drops the dead entry.
+        if (isRecentRequest && requestedPath !== null) {
+          removeRecent(requestedPath, 'folder')
+        }
+        const appErr = toAppError(e)
+        return err(appErr.code, sanitizeError(e, ctx.workspaceRoot))
       }
-      const entries = readDir(realRootPath, '.')
-      const name = path.basename(realRootPath) || realRootPath
-      pendingFolderOpen = { root: realRootPath, name, entries }
-      return ok({ path: realRootPath, name, entries })
-    } catch (e: unknown) {
-      pendingFolderOpen = null
-      // FR-009: a recent folder that cannot be opened drops the dead entry.
-      if (isRecentRequest && requestedPath !== null) {
-        removeRecent(requestedPath, 'folder')
-      }
-      const appErr = toAppError(e)
-      return err(appErr.code, sanitizeError(e, ctx.workspaceRoot))
     }
-  })
+  )
 
-  ipcMain.handle('workspace:commitFolderOpen', (): Result<WorkspaceInfo> => {
+  ipcMain.handle('workspace:commitFolderOpen', (event): Result<WorkspaceInfo> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     const pending = pendingFolderOpen
     if (!pending) {
       return err('NO_WORKSPACE', 'No folder open is pending')
@@ -96,8 +128,19 @@ export function registerWorkspaceHandlers(window: Electron.BrowserWindow, _ctx: 
     // failure PROVES the target unavailable, so the entry is dropped (FR-009).
     try {
       const real = fs.realpathSync(pending.root)
-      if (!fs.statSync(real).isDirectory()) {
+      if (real !== pending.root) {
+        throw Object.assign(new Error('Workspace folder changed while opening'), {
+          code: 'OUTSIDE_WORKSPACE' as const
+        })
+      }
+      const stat = fs.statSync(real)
+      if (!stat.isDirectory()) {
         throw Object.assign(new Error('Target is not a directory'), { code: 'NOT_FOUND' as const })
+      }
+      if (stat.dev !== pending.identity.dev || stat.ino !== pending.identity.ino) {
+        throw Object.assign(new Error('Workspace folder changed while opening'), {
+          code: 'OUTSIDE_WORKSPACE' as const
+        })
       }
     } catch (e: unknown) {
       pendingFolderOpen = null
@@ -141,12 +184,14 @@ export function registerWorkspaceHandlers(window: Electron.BrowserWindow, _ctx: 
     }
   })
 
-  ipcMain.handle('workspace:cancelFolderOpen', (): Result<null> => {
+  ipcMain.handle('workspace:cancelFolderOpen', (event): Result<null> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     pendingFolderOpen = null
     return ok(null)
   })
 
-  ipcMain.handle('workspace:readDir', (_e, args: unknown): Result<DirEntry[]> => {
+  ipcMain.handle('workspace:readDir', (event, args: unknown): Result<DirEntry[]> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     try {
       validateShape(args, ['path'])
       ensureString((args as { path: unknown }).path, 'path')

@@ -2,13 +2,24 @@ import * as path from 'path'
 import * as fs from 'fs'
 import { resolveWithinRoot } from '../../fs/paths'
 import { readFile } from '../../fs/read'
-import { loadRecentItems, saveRecentItems, recordRecentItem, removeRecentItem } from '../../recentItems'
+import {
+  loadRecentItems,
+  saveRecentItems,
+  recordRecentItem,
+  removeRecentItem
+} from '../../recentItems'
 import { recentItemsConfigPath } from '../../recentItemsPath'
 import { reportRecentItemsWarning, notifyRecentItemsOk } from '../../recentItemsWarning'
 import { scrubAbsolutePaths } from '../../scrubPaths'
 import type { WorkspaceState } from '../../workspace'
+import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import type {
-  Result, DirEntry, OpenedFile, ErrorCode, EntryKind, RecentKind
+  Result,
+  DirEntry,
+  OpenedFile,
+  ErrorCode,
+  EntryKind,
+  RecentKind
 } from '../../../shared/ipc-contract'
 
 /**
@@ -22,15 +33,32 @@ import type {
 export const ctx = {
   workspaceState: null as WorkspaceState | null,
   workspaceRoot: null as string | null,
-  allowClose: false
+  allowClose: false,
+  quitRequestPending: false,
+  approvedRendererUrl: null as string | null
 }
 
 export function ok<T>(value: T): Result<T> {
   return { ok: true, value }
 }
 
-export function err(code: ErrorCode, message: string): { ok: false; code: ErrorCode; message: string } {
+export function err(
+  code: ErrorCode,
+  message: string
+): { ok: false; code: ErrorCode; message: string } {
   return { ok: false, code, message }
+}
+
+export function isAuthorizedRenderer(event: IpcMainInvokeEvent, window: BrowserWindow): boolean {
+  if (event.sender !== window.webContents || !ctx.approvedRendererUrl) return false
+  const senderUrl = event.senderFrame?.url
+  if (!senderUrl) return false
+  if (ctx.approvedRendererUrl.startsWith('file:')) return senderUrl === ctx.approvedRendererUrl
+  try {
+    return new URL(senderUrl).origin === new URL(ctx.approvedRendererUrl).origin
+  } catch {
+    return false
+  }
 }
 
 export function sanitizeError(e: unknown, workspaceRootPath: string | null): string {
@@ -54,12 +82,26 @@ export function toAppError(e: unknown): { code: ErrorCode; message: string } {
   if (!(e instanceof Error)) return { code: 'IO', message: 'Unknown error' }
   const errno = (e as NodeJS.ErrnoException).code
   if (errno === 'ENOENT') return { code: 'NOT_FOUND', message: 'File or directory not found' }
-  if (errno === 'EACCES' || errno === 'EPERM') return { code: 'PERMISSION', message: 'Permission denied' }
+  if (errno === 'EACCES' || errno === 'EPERM')
+    return { code: 'PERMISSION', message: 'Permission denied' }
   if (errno === 'EEXIST') return { code: 'CONFLICT', message: 'Already exists' }
   const appCode = (e as { code?: ErrorCode }).code
-  if (appCode) return { code: appCode, message: e.message }
+  if (appCode && ERROR_CODES.has(appCode)) return { code: appCode, message: e.message }
   return { code: 'IO', message: e.message }
 }
+
+const ERROR_CODES = new Set<ErrorCode>([
+  'OUTSIDE_WORKSPACE',
+  'NOT_FOUND',
+  'CONFLICT',
+  'PERMISSION',
+  'LOCKED',
+  'TOO_LARGE',
+  'NOT_TEXT',
+  'TRASH_UNAVAILABLE',
+  'NO_WORKSPACE',
+  'IO'
+])
 
 export function ensureString(val: unknown, name: string): asserts val is string {
   if (typeof val !== 'string') {
@@ -69,7 +111,9 @@ export function ensureString(val: unknown, name: string): asserts val is string 
 
 export function validateKind(val: unknown): asserts val is EntryKind {
   if (val !== 'file' && val !== 'directory') {
-    throw Object.assign(new Error('kind must be "file" or "directory"'), { code: 'IO' as ErrorCode })
+    throw Object.assign(new Error('kind must be "file" or "directory"'), {
+      code: 'IO' as ErrorCode
+    })
   }
 }
 
@@ -99,13 +143,24 @@ export function resolveAbsolutePath(root: string, absolutePath: string): string 
   }
 }
 
-export function validateShape(obj: unknown, requiredKeys: string[]): void {
+export function validateShape(
+  obj: unknown,
+  requiredKeys: string[],
+  allowedKeys = requiredKeys
+): void {
   if (!obj || typeof obj !== 'object') {
-    throw Object.assign(new Error('Invalid IPC request: expected an object'), { code: 'IO' as ErrorCode })
+    throw Object.assign(new Error('Invalid IPC request: expected an object'), {
+      code: 'IO' as ErrorCode
+    })
   }
   for (const key of requiredKeys) {
     if (!(key in (obj as Record<string, unknown>))) {
       throw Object.assign(new Error(`Missing required field: ${key}`), { code: 'IO' as ErrorCode })
+    }
+  }
+  for (const key of Object.keys(obj)) {
+    if (!allowedKeys.includes(key)) {
+      throw Object.assign(new Error(`Unexpected field: ${key}`), { code: 'IO' as ErrorCode })
     }
   }
 }
@@ -116,9 +171,7 @@ export function validateShape(obj: unknown, requiredKeys: string[]): void {
 // the recent-open handlers re-validate against the persisted list before any
 // filesystem access.
 export function isRecentEntry(path_: string, kind: RecentKind): boolean {
-  return loadRecentItems(recentItemsConfigPath()).some(
-    (i) => i.path === path_ && i.kind === kind
-  )
+  return loadRecentItems(recentItemsConfigPath()).some((i) => i.path === path_ && i.kind === kind)
 }
 
 // FR-011: a persistence failure must NEVER fail the open it follows
@@ -129,9 +182,15 @@ export function recordRecent(path_: string, kind: RecentKind, name: string): voi
   const configPath = recentItemsConfigPath()
   const items = loadRecentItems(configPath)
   try {
-    saveRecentItems(configPath, recordRecentItem(items, {
-      path: path_, kind, name, lastOpenedAt: Date.now()
-    }))
+    saveRecentItems(
+      configPath,
+      recordRecentItem(items, {
+        path: path_,
+        kind,
+        name,
+        lastOpenedAt: Date.now()
+      })
+    )
     notifyRecentItemsOk()
   } catch (e: unknown) {
     reportRecentItemsWarning(e, 'save')
@@ -190,7 +249,9 @@ export function openFileFromPath(filePath: string): OpenedFile {
   try {
     new TextDecoder('utf-8', { fatal: true }).decode(buffer)
   } catch {
-    throw Object.assign(new Error('File is not valid UTF-8 text'), { code: 'NOT_TEXT' as ErrorCode })
+    throw Object.assign(new Error('File is not valid UTF-8 text'), {
+      code: 'NOT_TEXT' as ErrorCode
+    })
   }
 
   return {

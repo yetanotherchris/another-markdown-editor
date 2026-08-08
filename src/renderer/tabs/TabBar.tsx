@@ -28,9 +28,17 @@ export default function TabBar({ documents, activeId, onActivate, onClose, onNew
             key={doc.id}
             role="tab"
             aria-selected={active}
+            tabIndex={0}
             className={active ? 'tab active' : 'tab'}
             title={doc.path ?? doc.title}
             onClick={() => onActivate(doc.id)}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onActivate(doc.id)
+              }
+            }}
           >
             {active && <PencilSquareIcon className="tab-edit-icon" aria-hidden="true" />}
             <span className="tab-title">{doc.title}</span>

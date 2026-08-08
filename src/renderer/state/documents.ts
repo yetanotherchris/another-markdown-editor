@@ -58,6 +58,8 @@ export interface DocumentState {
   lastActiveAt: number
   externalState: 'clean' | 'changedOnDisk' | 'deletedOnDisk'
   contentVersion: number
+  /** Monotonic user-edit revision used to reject stale save completions. */
+  revision?: number
   /** The editing presentation active in this tab (spec 002, data-model.md). */
   view: 'formatted' | 'source'
 }
@@ -91,6 +93,7 @@ export function createEmpty(counter: number): DocumentState {
     lastActiveAt: Date.now(),
     externalState: 'clean',
     contentVersion: 0,
+    revision: 0,
     view: 'formatted'
   }
 }
@@ -126,6 +129,7 @@ export function openFile(opened: {
     lastActiveAt: Date.now(),
     externalState: 'clean',
     contentVersion: 0,
+    revision: 0,
     view: opened.view ?? 'formatted'
   }
 }
@@ -136,31 +140,35 @@ export function openFile(opened: {
  *  `view` is the optional requested view (spec 002: View source). */
 interface OpenExistingPayload {
   value: OpenedFile & { view?: 'formatted' | 'source' }
-  mode?: 'replace'
+  mode?: 'replace' | 'new'
 }
 
-export interface DocumentsAction {
-  type:
-    | 'OPEN_EXISTING'
-    | 'OPEN_NEW'
-    | 'ACTIVATE'
-    | 'UPDATE_CONTENT'
-    | 'CAPTURE_BASELINE'
-    | 'SAVE_SUCCESS'
-    | 'SAVE_FAILED'
-    | 'CLOSE'
-    | 'EVICT'
-    | 'REACTIVATE'
-    | 'CAPTURE_EDITOR_STATE'
-    | 'RELOAD'
-    | 'UPDATE_PATH'
-    | 'REROUTE_PATHS'
-    | 'EXTERNAL_CHANGE'
-    | 'SET_VIEW'
-    | 'REFRESH_FROM_SOURCE'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any
-}
+export type DocumentsAction =
+  | {
+      type: 'OPEN_NEW'
+    }
+  | { type: 'OPEN_EXISTING'; payload: OpenExistingPayload }
+  | { type: 'ACTIVATE'; payload: { id: string } }
+  | { type: 'UPDATE_CONTENT'; payload: { id: string; content: string } }
+  | { type: 'CAPTURE_BASELINE'; payload: { id: string; baseline: string } }
+  | {
+      type: 'SAVE_SUCCESS'
+      payload: { id: string; path: string; content: string; revision?: number }
+    }
+  | { type: 'SAVE_FAILED'; payload: { id: string } }
+  | { type: 'CLOSE'; payload: { id: string } }
+  | { type: 'EVICT'; payload: { id: string } }
+  | { type: 'REACTIVATE'; payload: { id: string; cursorOffset: number; scrollTop: number } }
+  | {
+      type: 'CAPTURE_EDITOR_STATE'
+      payload: { id: string; cursorOffset: number; scrollTop: number }
+    }
+  | { type: 'RELOAD'; payload: { id: string; content: string } }
+  | { type: 'UPDATE_PATH'; payload: { id: string; path: string } }
+  | { type: 'REROUTE_PATHS'; payload: { fromPath: string; toPath: string } }
+  | { type: 'EXTERNAL_CHANGE'; payload: { path: string; kind: 'changed' | 'removed' } }
+  | { type: 'SET_VIEW'; payload: { id: string; view: 'formatted' | 'source' } }
+  | { type: 'REFRESH_FROM_SOURCE'; payload: { id: string; content: string } }
 
 // ---- Per-action-case helpers (FR-019): each case body is a named, exported,
 // pure function so it is short and independently testable. The reducer switch
@@ -179,7 +187,7 @@ export function handleOpenNew(state: EditingSession): EditingSession {
 
 export function handleOpenExisting(state: EditingSession, p: OpenExistingPayload): EditingSession {
   const value = p.value
-  const existing = state.documents.find(d => d.path === value.path && value.path !== null)
+  const existing = state.documents.find((d) => d.path === value.path && value.path !== null)
   if (existing) {
     // Reopening an evicted document must bring its editor back — the
     // active tab would otherwise render the empty evicted container.
@@ -189,9 +197,13 @@ export function handleOpenExisting(state: EditingSession, p: OpenExistingPayload
       return {
         ...state,
         activeId: existing.id,
-        documents: state.documents.map(d =>
+        documents: state.documents.map((d) =>
           d.id === existing.id
-            ? { ...d, view: value.view!, editorState: d.editorState === 'evicted' ? 'live' : d.editorState }
+            ? {
+                ...d,
+                view: value.view!,
+                editorState: d.editorState === 'evicted' ? 'live' : d.editorState
+              }
             : d
         )
       }
@@ -199,10 +211,8 @@ export function handleOpenExisting(state: EditingSession, p: OpenExistingPayload
     return {
       ...state,
       activeId: existing.id,
-      documents: state.documents.map(d =>
-        d.id === existing.id && d.editorState === 'evicted'
-          ? { ...d, editorState: 'live' }
-          : d
+      documents: state.documents.map((d) =>
+        d.id === existing.id && d.editorState === 'evicted' ? { ...d, editorState: 'live' } : d
       )
     }
   }
@@ -211,11 +221,11 @@ export function handleOpenExisting(state: EditingSession, p: OpenExistingPayload
   // swap its slot for the new document — fresh id, clear dirty, fresh undo
   // (FR-006/007) — instead of creating a new tab.
   if (p.mode === 'replace') {
-    const active = state.documents.find(d => d.id === state.activeId)
+    const active = state.documents.find((d) => d.id === state.activeId)
     if (active && !active.dirty) {
       return {
         ...state,
-        documents: state.documents.map(d => (d.id === active.id ? doc : d)),
+        documents: state.documents.map((d) => (d.id === active.id ? doc : d)),
         activeId: doc.id
       }
     }
@@ -228,24 +238,25 @@ export function handleOpenExisting(state: EditingSession, p: OpenExistingPayload
 }
 
 export function handleActivateDoc(state: EditingSession, id: string): EditingSession {
-  const target = state.documents.find(d => d.id === id)
+  const target = state.documents.find((d) => d.id === id)
   if (target) {
     return {
       ...state,
       activeId: id,
-      documents: state.documents.map(d =>
-        d.id === id ? { ...d, lastActiveAt: Date.now() } : d
-      )
+      documents: state.documents.map((d) => (d.id === id ? { ...d, lastActiveAt: Date.now() } : d))
     }
   }
   return state
 }
 
-export function handleUpdateContent(state: EditingSession, payload: { id: string; content: string }): EditingSession {
+export function handleUpdateContent(
+  state: EditingSession,
+  payload: { id: string; content: string }
+): EditingSession {
   const { id, content } = payload
   return {
     ...state,
-    documents: state.documents.map(d =>
+    documents: state.documents.map((d) =>
       d.id === id
         ? d.view === 'source'
           ? // Spec 021 FR-007: the source textarea holds the FULL file, so every
@@ -259,6 +270,7 @@ export function handleUpdateContent(state: EditingSession, payload: { id: string
                 frontmatter,
                 content: body,
                 dirty: joinFrontmatter(frontmatter, body) !== d.baseline,
+                revision: (d.revision ?? 0) + 1,
                 lastActiveAt: Date.now()
               }
             })()
@@ -271,6 +283,7 @@ export function handleUpdateContent(state: EditingSession, payload: { id: string
               // clears dirty. Source-view content is raw text, so the exact byte
               // comparison stays correct there (raw-bytes policy, spec 002).
               dirty: !markdownSame(content, d.editorBaseline),
+              revision: (d.revision ?? 0) + 1,
               lastActiveAt: Date.now()
             }
         : d
@@ -278,7 +291,10 @@ export function handleUpdateContent(state: EditingSession, payload: { id: string
   }
 }
 
-export function handleCaptureBaseline(state: EditingSession, payload: { id: string; baseline: string }): EditingSession {
+export function handleCaptureBaseline(
+  state: EditingSession,
+  payload: { id: string; baseline: string }
+): EditingSession {
   // Raw-bytes policy (spec 002): content/baseline remain the on-disk bytes
   // read by the main process (openFile, RELOAD) or the last saved bytes
   // (SAVE_SUCCESS) — Crepe's serialization must NOT rewrite the raw content
@@ -289,13 +305,14 @@ export function handleCaptureBaseline(state: EditingSession, payload: { id: stri
   const { id, baseline } = payload
   return {
     ...state,
-    documents: state.documents.map(d =>
-      d.id === id ? { ...d, editorBaseline: baseline } : d
-    )
+    documents: state.documents.map((d) => (d.id === id ? { ...d, editorBaseline: baseline } : d))
   }
 }
 
-export function handleSaveSuccess(state: EditingSession, payload: { id: string; path: string; content: string }): EditingSession {
+export function handleSaveSuccess(
+  state: EditingSession,
+  payload: { id: string; path: string; content: string }
+): EditingSession {
   const { id, path, content } = payload
   // Spec 021: the written full text was built by `joinFrontmatter` from the
   // stored parts, so the store's partition is already correct and must NOT be
@@ -307,11 +324,11 @@ export function handleSaveSuccess(state: EditingSession, payload: { id: string; 
   // text against the written text (the original `d.content !== content` guard,
   // level-corrected for the split model — a keystroke during the async write
   // leaves the document dirty).
-  const frontmatter = state.documents.find(d => d.id === id)?.frontmatter ?? ''
+  const frontmatter = state.documents.find((d) => d.id === id)?.frontmatter ?? ''
   const body = content.startsWith(frontmatter) ? content.slice(frontmatter.length) : content
   return {
     ...state,
-    documents: state.documents.map(d =>
+    documents: state.documents.map((d) =>
       d.id === id
         ? {
             ...d,
@@ -332,10 +349,10 @@ export function handleSaveFailed(state: EditingSession): EditingSession {
 }
 
 export function handleCloseDoc(state: EditingSession, id: string): EditingSession {
-  const filtered = state.documents.filter(d => d.id !== id)
+  const filtered = state.documents.filter((d) => d.id !== id)
   let activeId = state.activeId
   if (state.activeId === id) {
-    const idx = state.documents.findIndex(d => d.id === id)
+    const idx = state.documents.findIndex((d) => d.id === id)
     if (filtered.length > 0) {
       activeId = filtered[Math.min(idx, filtered.length - 1)].id
     } else {
@@ -348,42 +365,47 @@ export function handleCloseDoc(state: EditingSession, id: string): EditingSessio
 export function handleEvict(state: EditingSession, id: string): EditingSession {
   return {
     ...state,
-    documents: state.documents.map(d =>
-      d.id === id ? { ...d, editorState: 'evicted' } : d
-    )
+    documents: state.documents.map((d) => (d.id === id ? { ...d, editorState: 'evicted' } : d))
   }
 }
 
-export function handleReactivate(state: EditingSession, payload: { id: string; cursorOffset: number; scrollTop: number }): EditingSession {
+export function handleReactivate(
+  state: EditingSession,
+  payload: { id: string; cursorOffset: number; scrollTop: number }
+): EditingSession {
   const { id, cursorOffset, scrollTop } = payload
   return {
     ...state,
-    documents: state.documents.map(d =>
+    documents: state.documents.map((d) =>
       d.id === id ? { ...d, editorState: 'live', cursorOffset, scrollTop } : d
     )
   }
 }
 
-export function handleCaptureEditorState(state: EditingSession, payload: { id: string; cursorOffset: number; scrollTop: number }): EditingSession {
+export function handleCaptureEditorState(
+  state: EditingSession,
+  payload: { id: string; cursorOffset: number; scrollTop: number }
+): EditingSession {
   const { id, cursorOffset, scrollTop } = payload
   return {
     ...state,
-    documents: state.documents.map(d =>
-      d.id === id
-        ? { ...d, cursorOffset, scrollTop, lastActiveAt: Date.now() }
-        : d
+    documents: state.documents.map((d) =>
+      d.id === id ? { ...d, cursorOffset, scrollTop, lastActiveAt: Date.now() } : d
     )
   }
 }
 
-export function handleReload(state: EditingSession, payload: { id: string; content: string }): EditingSession {
+export function handleReload(
+  state: EditingSession,
+  payload: { id: string; content: string }
+): EditingSession {
   const { id, content } = payload
   // Spec 021: re-split the re-read full file (frontmatter + body) so content
   // stays the body and the frontmatter field tracks the disk bytes (R3).
   const { frontmatter, body } = splitFrontmatter(content)
   return {
     ...state,
-    documents: state.documents.map(d =>
+    documents: state.documents.map((d) =>
       d.id === id
         ? {
             ...d,
@@ -395,33 +417,38 @@ export function handleReload(state: EditingSession, payload: { id: string; conte
             externalState: 'clean',
             cursorOffset: 0,
             scrollTop: 0,
-            contentVersion: d.contentVersion + 1
+            contentVersion: d.contentVersion + 1,
+            revision: (d.revision ?? 0) + 1
           }
         : d
     )
   }
 }
 
-export function handleUpdatePath(state: EditingSession, payload: { id: string; path: string }): EditingSession {
+export function handleUpdatePath(
+  state: EditingSession,
+  payload: { id: string; path: string }
+): EditingSession {
   const { id, path } = payload
   return {
     ...state,
-    documents: state.documents.map(d =>
-      d.id === id
-        ? { ...d, path, title: path.split('/').pop() || d.title }
-        : d
+    documents: state.documents.map((d) =>
+      d.id === id ? { ...d, path, title: path.split('/').pop() || d.title } : d
     )
   }
 }
 
-export function handleReroutePaths(state: EditingSession, payload: { fromPath: string; toPath: string }): EditingSession {
+export function handleReroutePaths(
+  state: EditingSession,
+  payload: { fromPath: string; toPath: string }
+): EditingSession {
   // FR-028: a file or folder was renamed/moved within the app. Every open
   // document whose path sits at or under the old location follows it. The
   // document id is retained so tabs do not close and reopen.
   const { fromPath, toPath } = payload
   return {
     ...state,
-    documents: state.documents.map(d => {
+    documents: state.documents.map((d) => {
       if (!d.path) return d
       if (!isWithinOrEqual(d.path, fromPath)) return d
       const suffix = d.path.slice(fromPath.length)
@@ -431,11 +458,14 @@ export function handleReroutePaths(state: EditingSession, payload: { fromPath: s
   }
 }
 
-export function handleExternalChange(state: EditingSession, payload: { path: string; kind: 'changed' | 'removed' }): EditingSession {
+export function handleExternalChange(
+  state: EditingSession,
+  payload: { path: string; kind: 'changed' | 'removed' }
+): EditingSession {
   const { path, kind } = payload
   return {
     ...state,
-    documents: state.documents.map(d =>
+    documents: state.documents.map((d) =>
       d.path === path
         ? {
             ...d,
@@ -446,21 +476,25 @@ export function handleExternalChange(state: EditingSession, payload: { path: str
   }
 }
 
-export function handleSetView(state: EditingSession, payload: { id: string; view: 'formatted' | 'source' }): EditingSession {
+export function handleSetView(
+  state: EditingSession,
+  payload: { id: string; view: 'formatted' | 'source' }
+): EditingSession {
   // Spec 002: switch this document's editing presentation without touching
   // content or dirty state. Only a real flip re-renders the tab.
   const { id, view } = payload
-  const target = state.documents.find(d => d.id === id)
+  const target = state.documents.find((d) => d.id === id)
   if (!target || target.view === view) return state
   return {
     ...state,
-    documents: state.documents.map(d =>
-      d.id === id ? { ...d, view } : d
-    )
+    documents: state.documents.map((d) => (d.id === id ? { ...d, view } : d))
   }
 }
 
-export function handleRefreshFromSource(state: EditingSession, payload: { id: string; content: string }): EditingSession {
+export function handleRefreshFromSource(
+  state: EditingSession,
+  payload: { id: string; content: string }
+): EditingSession {
   // Spec 002, data-model.md: source→formatted return when the raw text
   // differs from the live editor. The new text takes the content slot and
   // bumps contentVersion so the CrepeHost remounts with the source bytes;
@@ -471,7 +505,7 @@ export function handleRefreshFromSource(state: EditingSession, payload: { id: st
   const { frontmatter, body } = splitFrontmatter(content)
   return {
     ...state,
-    documents: state.documents.map(d =>
+    documents: state.documents.map((d) =>
       d.id === id
         ? {
             ...d,
@@ -492,59 +526,63 @@ export function documentsReducer(state: EditingSession, action: DocumentsAction)
     case 'OPEN_NEW':
       return handleOpenNew(state)
     case 'OPEN_EXISTING':
-      return handleOpenExisting(state, action.payload as OpenExistingPayload)
+      return handleOpenExisting(state, action.payload)
     case 'ACTIVATE':
-      return handleActivateDoc(state, action.payload?.id as string)
+      return handleActivateDoc(state, action.payload.id)
     case 'UPDATE_CONTENT':
-      return handleUpdateContent(state, action.payload as { id: string; content: string })
+      return handleUpdateContent(state, action.payload)
     case 'CAPTURE_BASELINE':
-      return handleCaptureBaseline(state, action.payload as { id: string; baseline: string })
+      return handleCaptureBaseline(state, action.payload)
     case 'SAVE_SUCCESS':
-      return handleSaveSuccess(state, action.payload as { id: string; path: string; content: string })
+      if (action.payload.revision !== undefined) {
+        const document = state.documents.find((d) => d.id === action.payload.id)
+        if (document && document.revision !== action.payload.revision) return state
+      }
+      return handleSaveSuccess(state, action.payload)
     case 'SAVE_FAILED':
       return handleSaveFailed(state)
     case 'CLOSE':
-      return handleCloseDoc(state, action.payload?.id as string)
+      return handleCloseDoc(state, action.payload.id)
     case 'EVICT':
-      return handleEvict(state, action.payload?.id as string)
+      return handleEvict(state, action.payload.id)
     case 'REACTIVATE':
-      return handleReactivate(state, action.payload as { id: string; cursorOffset: number; scrollTop: number })
+      return handleReactivate(state, action.payload)
     case 'CAPTURE_EDITOR_STATE':
-      return handleCaptureEditorState(state, action.payload as { id: string; cursorOffset: number; scrollTop: number })
+      return handleCaptureEditorState(state, action.payload)
     case 'RELOAD':
-      return handleReload(state, action.payload as { id: string; content: string })
+      return handleReload(state, action.payload)
     case 'UPDATE_PATH':
-      return handleUpdatePath(state, action.payload as { id: string; path: string })
+      return handleUpdatePath(state, action.payload)
     case 'REROUTE_PATHS':
-      return handleReroutePaths(state, action.payload as { fromPath: string; toPath: string })
+      return handleReroutePaths(state, action.payload)
     case 'EXTERNAL_CHANGE':
-      return handleExternalChange(state, action.payload as { path: string; kind: 'changed' | 'removed' })
+      return handleExternalChange(state, action.payload)
     case 'SET_VIEW':
-      return handleSetView(state, action.payload as { id: string; view: 'formatted' | 'source' })
+      return handleSetView(state, action.payload)
     case 'REFRESH_FROM_SOURCE':
-      return handleRefreshFromSource(state, action.payload as { id: string; content: string })
+      return handleRefreshFromSource(state, action.payload)
     default:
       return state
   }
 }
 
 export function getActiveDocument(state: EditingSession): DocumentState | null {
-  return state.documents.find(d => d.id === state.activeId) || null
+  return state.documents.find((d) => d.id === state.activeId) || null
 }
 
 export function hasDirtyDocuments(state: EditingSession): boolean {
-  return state.documents.some(d => d.dirty)
+  return state.documents.some((d) => d.dirty)
 }
 
 export function getDirtyDocuments(state: EditingSession): DocumentState[] {
-  return state.documents.filter(d => d.dirty)
+  return state.documents.filter((d) => d.dirty)
 }
 
 export type CloseDecision = 'prompt' | 'close'
 
 /** FR-023: closing a clean document needs no confirmation; a dirty one does. */
 export function planClose(state: EditingSession, id: string): CloseDecision {
-  const doc = state.documents.find(d => d.id === id)
+  const doc = state.documents.find((d) => d.id === id)
   if (!doc) return 'close'
   return doc.dirty ? 'prompt' : 'close'
 }

@@ -11,6 +11,7 @@ import { resolveLaunchBounds, trackWindowState, flushWindowState } from './windo
 import { reconcileExplorerClosedWithoutWorkspace } from './workspaceExplorerState'
 import { legacyConfigPath, universalConfigPath, migrateConfigFile } from './configPath'
 import * as os from 'os'
+import { pathToFileURL } from 'url'
 
 // Spec 020 test seam (research R6): `MM_USER_DATA_DIR` relocates the Chromium
 // profile — the home of the native spellcheck dictionary — so the e2e suite can
@@ -40,6 +41,22 @@ function createWindow(): void {
       preload: path.join(__dirname, '../preload/index.js')
     }
   })
+  const developmentUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
+  const productionUrl = pathToFileURL(path.join(__dirname, '../renderer/index.html')).toString()
+  const isApprovedUrl = (candidate: string): boolean => {
+    if (process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL) {
+      try {
+        return new URL(candidate).origin === new URL(developmentUrl).origin
+      } catch {
+        return false
+      }
+    }
+    return candidate === productionUrl
+  }
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isApprovedUrl(url)) event.preventDefault()
+  })
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   // Spec 011 FR-005 (review #30 M1): maximize after the window is ready to be
   // shown — on Linux/X11 a maximize issued before the window is realized can be
   // a no-op, and showing the maximized window avoids a normal-bounds flash.
@@ -62,11 +79,15 @@ function createWindow(): void {
   // Spec 020 FR-002/FR-004: the native right-click correction menu for the
   // editor area (spelling suggestions + add-to-dictionary).
   registerSpellcheckContextMenu(mainWindow)
-  registerIpcHandlers(mainWindow)
+  registerIpcHandlers(
+    mainWindow,
+    process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL
+      ? developmentUrl
+      : productionUrl
+  )
 
   if (process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL) {
-    const url = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
-    mainWindow.loadURL(url)
+    mainWindow.loadURL(developmentUrl)
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }

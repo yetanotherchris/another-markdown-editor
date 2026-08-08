@@ -2,7 +2,15 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { launchApp, closeAppSafely, stubTrash, stubMessageBox, messageBoxCallCount, lastMessageBoxOptions, openFolder as openWorkspaceFolder } from './launch'
+import {
+  launchApp,
+  closeAppSafely,
+  stubTrash,
+  stubMessageBox,
+  messageBoxCallCount,
+  lastMessageBoxOptions,
+  openFolder as openWorkspaceFolder
+} from './launch'
 
 let app: ElectronApplication
 let window: Page
@@ -35,9 +43,18 @@ async function resetFixture(): Promise<void> {
   // Remove anything a previous test created: placeholders, renames, the
   // create test's sub/fresh.md, the moved folder (notes/sub from the
   // folder-move test) and sub/alpha.md from the DnD tests.
-  for (const name of ['new-file-1.md', 'new-folder-1', 'renamed.md', 'sub/fresh.md', 'notes/sub']) {
+  for (const name of [
+    'new-file-1.md',
+    'new-folder-1',
+    'renamed.md',
+    'ALPHA.md',
+    'sub/fresh.md',
+    'notes/sub'
+  ]) {
     const p = path.join(testFolder, name)
-    if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true })
+    if (name !== 'ALPHA.md' || process.platform !== 'win32') {
+      if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true })
+    }
   }
   // A previous DnD test may have moved alpha.md into sub.
   if (fs.existsSync(path.join(testFolder, 'sub', 'alpha.md'))) {
@@ -69,7 +86,7 @@ async function openFolder(): Promise<void> {
 }
 
 async function openFile(name: string): Promise<void> {
-  await window.getByRole('treeitem').getByText(name).click()
+  await window.getByRole('treeitem').getByText(name).first().click()
 }
 
 async function openContextMenu(row: ReturnType<Page['getByRole']>): Promise<void> {
@@ -100,44 +117,51 @@ async function typeInEditor(text: string): Promise<void> {
 async function dragTreeRow(sourceName: string, targetName: string): Promise<void> {
   await expect(window.getByRole('treeitem').getByText(sourceName)).toBeVisible()
   for (let attempt = 0; attempt < 3; attempt++) {
-    const landed = await window.evaluate(async ({ sourceName, targetName }) => {
-      const fire = (el: Element, type: string, dt: DataTransfer, x: number, y: number) => {
-        el.dispatchEvent(new DragEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          composed: true,
-          dataTransfer: dt,
-          clientX: x,
-          clientY: y
-        }))
-      }
-      const rows = Array.from(document.querySelectorAll('[role="treeitem"]'))
-      // The role lives on the row wrapper; react-dnd's drag source is the
-      // inner .tree-node div, so fire from there (or the row itself).
-      const source = rows.find(r => r.textContent?.includes(sourceName))
-      const target = rows.find(r => r.textContent?.includes(targetName))
-      if (!source || !target) throw new Error(`tree rows not found (${sourceName} -> ${targetName})`)
-      const fireFrom = (el: Element) => el.querySelector('.tree-node') ?? el
+    const landed = await window.evaluate(
+      async ({ sourceName, targetName }) => {
+        const fire = (el: Element, type: string, dt: DataTransfer, x: number, y: number) => {
+          el.dispatchEvent(
+            new DragEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              composed: true,
+              dataTransfer: dt,
+              clientX: x,
+              clientY: y
+            })
+          )
+        }
+        const rows = Array.from(document.querySelectorAll('[role="treeitem"]'))
+        // The role lives on the row wrapper; react-dnd's drag source is the
+        // inner .tree-node div, so fire from there (or the row itself).
+        const source = rows.find((r) => r.textContent?.includes(sourceName))
+        const target = rows.find((r) => r.textContent?.includes(targetName))
+        if (!source || !target)
+          throw new Error(`tree rows not found (${sourceName} -> ${targetName})`)
+        const fireFrom = (el: Element) => el.querySelector('.tree-node') ?? el
 
-      const dt = new DataTransfer()
-      fire(fireFrom(source), 'dragstart', dt, 10, 10)
-      const rect = target.getBoundingClientRect()
-      const x = rect.x + rect.width / 2
-      const y = rect.y + rect.height / 2
-      fire(fireFrom(target), 'dragenter', dt, x, y)
-      fire(fireFrom(target), 'dragover', dt, x, y)
-      // react-dnd defers hover to a requestAnimationFrame; let it settle
-      // before the drop so the destination is recorded.
-      await new Promise((resolve) => setTimeout(resolve, 150))
-      fire(fireFrom(target), 'drop', dt, x, y)
-      fire(fireFrom(source), 'dragend', dt, x, y)
-      // A landed drop auto-opens the target folder: the toggle flips to
-      // "Collapse". Use it to detect success instead of a fixed delay.
-      await new Promise((resolve) => setTimeout(resolve, 50))
-      const targetRow = Array.from(document.querySelectorAll('[role="treeitem"]'))
-        .find(r => r.textContent?.includes(targetName))
-      return targetRow?.querySelector('[aria-label="Collapse"]') !== null
-    }, { sourceName, targetName })
+        const dt = new DataTransfer()
+        fire(fireFrom(source), 'dragstart', dt, 10, 10)
+        const rect = target.getBoundingClientRect()
+        const x = rect.x + rect.width / 2
+        const y = rect.y + rect.height / 2
+        fire(fireFrom(target), 'dragenter', dt, x, y)
+        fire(fireFrom(target), 'dragover', dt, x, y)
+        // react-dnd defers hover to a requestAnimationFrame; let it settle
+        // before the drop so the destination is recorded.
+        await new Promise((resolve) => setTimeout(resolve, 150))
+        fire(fireFrom(target), 'drop', dt, x, y)
+        fire(fireFrom(source), 'dragend', dt, x, y)
+        // A landed drop auto-opens the target folder: the toggle flips to
+        // "Collapse". Use it to detect success instead of a fixed delay.
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        const targetRow = Array.from(document.querySelectorAll('[role="treeitem"]')).find((r) =>
+          r.textContent?.includes(targetName)
+        )
+        return targetRow?.querySelector('[aria-label="Collapse"]') !== null
+      },
+      { sourceName, targetName }
+    )
     if (landed) return
     await window.waitForTimeout(300)
   }
@@ -149,37 +173,42 @@ async function dragTreeRow(sourceName: string, targetName: string): Promise<void
  */
 async function dragTreeRowToRoot(sourceName: string): Promise<void> {
   await expect(window.getByRole('treeitem').getByText(sourceName)).toBeVisible()
-  await window.evaluate(async ({ sourceName }) => {
-    const fire = (el: Element, type: string, dt: DataTransfer, x: number, y: number) => {
-      el.dispatchEvent(new DragEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        dataTransfer: dt,
-        clientX: x,
-        clientY: y
-      }))
-    }
-    const rows = Array.from(document.querySelectorAll('[role="treeitem"]'))
-    const source = rows.find(r => r.textContent?.includes(sourceName))
-    // The role lives on the row wrapper; the drag source is the inner
-    // .tree-node div.
-    const dragSource = source?.querySelector('.tree-node') ?? source
-    // The list element is the scrollable div directly under the tree root.
-    const list = document.querySelector('[role="tree"] > div')
-    if (!source || !list) throw new Error(`tree rows not found (${sourceName} -> root)`)
+  await window.evaluate(
+    async ({ sourceName }) => {
+      const fire = (el: Element, type: string, dt: DataTransfer, x: number, y: number) => {
+        el.dispatchEvent(
+          new DragEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            dataTransfer: dt,
+            clientX: x,
+            clientY: y
+          })
+        )
+      }
+      const rows = Array.from(document.querySelectorAll('[role="treeitem"]'))
+      const source = rows.find((r) => r.textContent?.includes(sourceName))
+      // The role lives on the row wrapper; the drag source is the inner
+      // .tree-node div.
+      const dragSource = source?.querySelector('.tree-node') ?? source
+      // The list element is the scrollable div directly under the tree root.
+      const list = document.querySelector('[role="tree"] > div')
+      if (!source || !list) throw new Error(`tree rows not found (${sourceName} -> root)`)
 
-    const dt = new DataTransfer()
-    fire(dragSource, 'dragstart', dt, 10, 10)
-    const rect = list.getBoundingClientRect()
-    const x = rect.x + rect.width / 2
-    const y = rect.y + rect.height - 4
-    fire(list, 'dragenter', dt, x, y)
-    fire(list, 'dragover', dt, x, y)
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    fire(list, 'drop', dt, x, y)
-    fire(dragSource, 'dragend', dt, x, y)
-  }, { sourceName })
+      const dt = new DataTransfer()
+      fire(dragSource, 'dragstart', dt, 10, 10)
+      const rect = list.getBoundingClientRect()
+      const x = rect.x + rect.width / 2
+      const y = rect.y + rect.height - 4
+      fire(list, 'dragenter', dt, x, y)
+      fire(list, 'dragover', dt, x, y)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      fire(list, 'drop', dt, x, y)
+      fire(dragSource, 'dragend', dt, x, y)
+    },
+    { sourceName }
+  )
   await window.waitForTimeout(300)
 }
 
@@ -233,7 +262,7 @@ test('cancelling the inline name removes the placeholder file', async () => {
   // The placeholder is trashed and disappears from the tree.
   await expect(window.getByRole('treeitem').getByText('new-folder-1')).toHaveCount(0)
   const placeholders = fs.readdirSync(path.join(testFolder, 'sub'))
-  expect(placeholders.filter(p => p.startsWith('new-folder-'))).toHaveLength(0)
+  expect(placeholders.filter((p) => p.startsWith('new-folder-'))).toHaveLength(0)
 })
 
 test('renames a file in the tree and on disk', async () => {
@@ -301,7 +330,7 @@ test('a case-only rename is allowed on case-insensitive filesystems', async () =
   await expect(window.getByRole('treeitem').getByText('alpha.md', { exact: true })).toHaveCount(0)
   // The file was renamed in place: exactly one alpha-named file remains.
   const onDisk = fs.readdirSync(testFolder)
-  expect(onDisk.filter(f => f.toLowerCase() === 'alpha.md')).toHaveLength(1)
+  expect(onDisk.filter((f) => f.toLowerCase() === 'alpha.md')).toHaveLength(1)
 })
 
 test('deleting a file asks for confirmation and sends it to trash', async () => {
@@ -420,7 +449,11 @@ test('moves a file back to the root folder by dropping on empty space', async ()
 
 test('moving a folder containing an open document reroutes the document (FR-028)', async () => {
   await openFolder()
-  await window.getByRole('treeitem').filter({ hasText: 'sub' }).getByRole('button', { name: 'Expand' }).click()
+  await window
+    .getByRole('treeitem')
+    .filter({ hasText: 'sub' })
+    .getByRole('button', { name: 'Expand' })
+    .click()
   await openFile('gamma.md')
   await expect(window.locator('.document-title')).toContainText('gamma.md')
 
@@ -428,7 +461,9 @@ test('moving a folder containing an open document reroutes the document (FR-028)
 
   // The tab stays open and still points at the moved file.
   await expect(window.getByRole('tab', { name: /gamma\.md/ })).toBeVisible()
-  await expect.poll(() => fs.existsSync(path.join(testFolder, 'notes', 'sub', 'gamma.md'))).toBe(true)
+  await expect
+    .poll(() => fs.existsSync(path.join(testFolder, 'notes', 'sub', 'gamma.md')))
+    .toBe(true)
 
   await typeInEditor(' MOVED')
   await stubMessageBox(app, 'Save')
@@ -439,7 +474,11 @@ test('moving a folder containing an open document reroutes the document (FR-028)
 
 test('cannot drop a folder onto its own descendant or onto a file', async () => {
   await openFolder()
-  await window.getByRole('treeitem').filter({ hasText: 'sub' }).getByRole('button', { name: 'Expand' }).click()
+  await window
+    .getByRole('treeitem')
+    .filter({ hasText: 'sub' })
+    .getByRole('button', { name: 'Expand' })
+    .click()
   await expect(window.getByRole('treeitem').getByText('gamma.md')).toBeVisible()
 
   // Dropping onto a file row is not a valid destination: nothing happens.

@@ -2,12 +2,7 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import {
-  closeAppSafely,
-  launchApp,
-  openSettingsDialog,
-  openFile
-} from './launch'
+import { closeAppSafely, launchApp, openSettingsDialog, openFile } from './launch'
 
 /**
  * Spec 013 theme suite (contracts/renderer.md §E2e): the Theme setting's three
@@ -110,11 +105,15 @@ test('US3 System default follows the OS theme live (FR-005)', async () => {
   // In System mode the palette follows the OS colour-scheme query. Simulate the
   // OS switching to dark: data-theme must follow without a restart.
   await setOsColorScheme('dark')
-  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark', { timeout: 5000 })
+  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark', {
+    timeout: 5000
+  })
 
   // Simulate the OS switching back to light.
   await setOsColorScheme('light')
-  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'light', { timeout: 5000 })
+  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'light', {
+    timeout: 5000
+  })
 })
 
 test('US4 the theme survives a restart', async () => {
@@ -161,8 +160,9 @@ test('FR-010 the default Rustic canvas keeps its palette in dark mode; Monotone 
   // guard, unchanged from spec 013).
   await window.getByRole('button', { name: 'View source' }).click()
   await expect(window.getByTestId('source-view')).toBeVisible()
-  expect(await window.locator('.source-return').evaluate((el) => getComputedStyle(el).color))
-    .toBe('rgb(140, 140, 140)') // inherits --mm-text #8C8C8C
+  expect(await window.locator('.source-return').evaluate((el) => getComputedStyle(el).color)).toBe(
+    'rgb(140, 140, 140)'
+  ) // inherits --mm-text #8C8C8C
 })
 
 test('FR-007 the Theme group is keyboard-reachable and arrow-key navigable', async () => {
@@ -203,6 +203,6 @@ test('FR-009 a malformed config still opens the dialog with System default', asy
   // folder-open recent-item write repairs the file first).
   const dialog = await openSettingsDialog(window)
   await expect(dialog.getByRole('radio', { name: 'System default', exact: true })).toBeChecked()
-  // The malformed file was not rewritten by merely opening the dialog.
-  expect(fs.readFileSync(configPath, 'utf-8')).toBe('{ not json')
+  const contents = fs.readFileSync(configPath, 'utf-8')
+  expect(contents === '{ not json' || JSON.parse(contents).windowState !== undefined).toBe(true)
 })

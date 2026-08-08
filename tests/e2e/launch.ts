@@ -8,7 +8,11 @@
  */
 export const electronLaunchArgs: string[] = process.env.MM_E2E_HEADED
   ? ['out/main/index.js']
-  : ['out/main/index.js', '--headless']
+  : [
+      '--headless',
+      ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-gpu'] : []),
+      'out/main/index.js'
+    ]
 
 import { _electron as electron, expect } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
@@ -141,11 +145,17 @@ export async function stubMessageBox(
     ;(globalThis as any).__stubMessageBoxCalls = 0
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(globalThis as any).__stubMessageBoxLast = null
-    dialog.showMessageBox = (async (_window: unknown, options: { message?: string; detail?: string; buttons?: string[]; cancelId?: number }) => {
+    dialog.showMessageBox = (async (
+      _window: unknown,
+      options: { message?: string; detail?: string; buttons?: string[]; cancelId?: number }
+    ) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(globalThis as any).__stubMessageBoxCalls++
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(globalThis as any).__stubMessageBoxLast = { message: options.message, detail: options.detail }
+      ;(globalThis as any).__stubMessageBoxLast = {
+        message: options.message,
+        detail: options.detail
+      }
       const step = steps[Math.min(i, steps.length - 1)]
       i++
       let response: number
@@ -181,7 +191,9 @@ export async function messageBoxCallCount(app: ElectronApplication): Promise<num
 
 /** The message/detail of the most recent stubbed native box (for asserting the
  *  exact text the OS would show, e.g. path-scrubbed error messages). */
-export async function lastMessageBoxOptions(app: ElectronApplication): Promise<{ message?: string; detail?: string }> {
+export async function lastMessageBoxOptions(
+  app: ElectronApplication
+): Promise<{ message?: string; detail?: string }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return app.evaluate(() => (globalThis as any).__stubMessageBoxLast ?? {})
 }
@@ -271,7 +283,8 @@ export async function stubTrash(app: ElectronApplication): Promise<void> {
 }
 
 /** afterEach teardown: close with "Discard and Quit", force-close on failure. */
-export async function closeAppSafely(app: ElectronApplication): Promise<void> {
+export async function closeAppSafely(app: ElectronApplication | undefined): Promise<void> {
+  if (!app) return
   try {
     await closeAppDiscardingQuit(app)
   } catch {
@@ -311,9 +324,12 @@ export async function pressShortcut(
   key: string,
   modifiers: Array<'control' | 'meta' | 'shift'> = []
 ): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, { key: k, modifiers: mods }) => {
-    const win = BrowserWindow.getAllWindows()[0]
-    win.webContents.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: mods })
-    win.webContents.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: mods })
-  }, { key, modifiers })
+  await app.evaluate(
+    ({ BrowserWindow }, { key: k, modifiers: mods }) => {
+      const win = BrowserWindow.getAllWindows()[0]
+      win.webContents.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: mods })
+      win.webContents.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: mods })
+    },
+    { key, modifiers }
+  )
 }

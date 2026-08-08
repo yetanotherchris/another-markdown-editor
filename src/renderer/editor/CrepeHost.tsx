@@ -72,7 +72,8 @@ export default function CrepeHost({
     const onInert = lockedRef.current
     const view = viewRef.current
     if (view) view.dom.toggleAttribute('inert', onInert)
-    containerRef.current?.querySelectorAll('.milkdown-top-bar')
+    containerRef.current
+      ?.querySelectorAll('.milkdown-top-bar')
       .forEach((bar) => bar.toggleAttribute('inert', onInert))
   }
 
@@ -102,8 +103,9 @@ export default function CrepeHost({
 
     async function init() {
       const { Crepe: CrepeClass } = await import('@milkdown/crepe')
+      if (!mounted || !containerRef.current) return
       const crepe = new CrepeClass({
-        root: containerRef.current!,
+        root: containerRef.current,
         defaultValue,
         features: {
           // A persistent menu bar (headings + formatting buttons) replaces the
@@ -119,15 +121,13 @@ export default function CrepeHost({
             // invokes buildTopBar after composing its default groups, so the
             // extra group renders last (research.md R7).
             buildTopBar(builder) {
-              builder
-                .addGroup('view', 'View')
-                .addItem('view-source', {
-                  icon: VIEW_SOURCE_ICON,
-                  active: () => false,
-                  onRun: () => {
-                    onViewSourceRef.current()
-                  }
-                })
+              builder.addGroup('view', 'View').addItem('view-source', {
+                icon: VIEW_SOURCE_ICON,
+                active: () => false,
+                onRun: () => {
+                  onViewSourceRef.current()
+                }
+              })
             }
           }
         }
@@ -157,7 +157,13 @@ export default function CrepeHost({
       // menu. The wrapper reads the latest onSpellingMenu prop via the ref.
       crepe.editor.use($prose(() => spellcheckPlugin((menu) => onSpellingMenuRef.current(menu))))
 
-      await crepe.create()
+      try {
+        await crepe.create()
+      } catch (error) {
+        if (mounted) console.error('Editor initialization failed', error)
+        crepe.destroy()
+        return
+      }
       if (!mounted) {
         crepe.destroy()
         return

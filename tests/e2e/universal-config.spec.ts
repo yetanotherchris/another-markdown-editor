@@ -59,7 +59,10 @@ test.afterAll(async () => {
 
 /** Launch the app with the home redirected to `tempHome` (no config seam). */
 async function launch(): Promise<void> {
-  ;({ app, window } = await launchApp(undefined, testFolder, undefined, { [homeEnvVar]: tempHome }))
+  ;({ app, window } = await launchApp(undefined, testFolder, undefined, {
+    [homeEnvVar]: tempHome,
+    ...(process.platform === 'linux' ? { XDG_CONFIG_HOME: path.join(tempHome, '.config') } : {})
+  }))
 }
 
 /** Open the seeded workspace folder via the hamburger (writes recent items). */
@@ -79,16 +82,20 @@ test('US1/SC-001 a fresh install writes config to ~/.config/markdownmeister', as
   const parsed = JSON.parse(fs.readFileSync(config, 'utf-8'))
   expect(Array.isArray(parsed.recentItems)).toBe(true)
   // Nothing was written to the legacy location on a fresh install.
-  expect(fs.existsSync(legacyConfigPath())).toBe(false)
+  expect(process.platform === 'linux' || !fs.existsSync(legacyConfigPath())).toBe(true)
 })
 
 test('US2/SC-002/003 an existing appData config is migrated on launch', async () => {
+  test.skip(process.platform === 'linux', 'Linux legacy and universal config paths are identical')
   // Seed the legacy location BEFORE launch: the migration runs at startup.
   const legacy = legacyConfigPath()
   fs.mkdirSync(path.dirname(legacy), { recursive: true })
   fs.writeFileSync(
     legacy,
-    JSON.stringify({ recentItems: [{ path: '/old/a.md', kind: 'file', name: 'a.md', lastOpenedAt: 1 }], settings: { themeOverride: 'dark' } })
+    JSON.stringify({
+      recentItems: [{ path: '/old/a.md', kind: 'file', name: 'a.md', lastOpenedAt: 1 }],
+      settings: { themeOverride: 'dark' }
+    })
   )
 
   await launch()
@@ -104,6 +111,7 @@ test('US2/SC-002/003 an existing appData config is migrated on launch', async ()
 })
 
 test('FR-007 when both exist the universal config wins and the legacy is left', async () => {
+  test.skip(process.platform === 'linux', 'Linux legacy and universal config paths are identical')
   const legacy = legacyConfigPath()
   const universal = universalConfigPath()
   fs.mkdirSync(path.dirname(legacy), { recursive: true })

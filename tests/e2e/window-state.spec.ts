@@ -53,24 +53,39 @@ async function primaryWorkArea(): Promise<{ x: number; y: number; width: number;
 }
 
 /** The persisted `windowState` from config.json, or undefined. */
-function persistedWindowState(): { x: number; y: number; width: number; height: number; isMaximized: boolean } | undefined {
+function persistedWindowState():
+  { x: number; y: number; width: number; height: number; isMaximized: boolean } | undefined {
   const configPath = path.join(configDir, 'config.json')
   if (!fs.existsSync(configPath)) return undefined
   return JSON.parse(fs.readFileSync(configPath, 'utf-8')).windowState
 }
 
 /** Pre-write a config.json carrying `windowState` (plus valid siblings). */
-function prewriteWindowState(state: { x: number; y: number; width: number; height: number; isMaximized: boolean }): void {
-  fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify({
-    recentItems: [],
-    settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif' },
-    windowState: state
-  }))
+function prewriteWindowState(state: {
+  x: number
+  y: number
+  width: number
+  height: number
+  isMaximized: boolean
+}): void {
+  fs.writeFileSync(
+    path.join(configDir, 'config.json'),
+    JSON.stringify({
+      recentItems: [],
+      settings: {
+        sidebarWidth: 30,
+        themeOverride: null,
+        explorerVisible: true,
+        editorFont: 'sans-serif'
+      },
+      windowState: state
+    })
+  )
 }
 
 test('US1/FR-001 a saved window state restores position and size on launch', async () => {
-  prewriteWindowState({ x: 40, y: 50, width: 500, height: 400, isMaximized: false })
   await app.close()
+  prewriteWindowState({ x: 40, y: 50, width: 500, height: 400, isMaximized: false })
   ;({ app, window } = await launchApp(configDir, testFolder))
 
   const bounds = await windowBounds()
@@ -85,7 +100,11 @@ test('US2/FR-002 a window move/resize is persisted automatically within 1 s', as
 
   // SC-002: reflected in the config within 1 s of the change completing.
   await expect.poll(persistedWindowState, { timeout: 2000 }).toEqual({
-    x: 10, y: 20, width: 420, height: 320, isMaximized: false
+    x: 10,
+    y: 20,
+    width: 420,
+    height: 320,
+    isMaximized: false
   })
 })
 
@@ -100,13 +119,21 @@ test('US2/FR-002 the last state survives a fast quit (flush on close)', async ()
   await app.waitForEvent('close', { timeout: 8000 })
 
   expect(persistedWindowState()).toEqual({
-    x: 60, y: 70, width: 460, height: 360, isMaximized: false
+    x: 60,
+    y: 70,
+    width: 460,
+    height: 360,
+    isMaximized: false
   })
 })
 
 test('US3/FR-005 a saved maximized window restores maximized', async () => {
-  prewriteWindowState({ x: 40, y: 50, width: 500, height: 400, isMaximized: true })
+  test.skip(
+    process.platform === 'linux',
+    'Xvfb does not provide a window manager for maximize state'
+  )
   await app.close()
+  prewriteWindowState({ x: 40, y: 50, width: 500, height: 400, isMaximized: true })
   ;({ app, window } = await launchApp(configDir, testFolder))
 
   await expect.poll(isMaximized).toBe(true)
@@ -153,19 +180,29 @@ test('FR-007 an off-screen saved rect is restored fully visible', async () => {
 test('FR-013 with no folder open the persisted explorer state records closed', async () => {
   // The shared settings survive; only explorerVisible is reconciled to false.
   const configPath = path.join(configDir, 'config.json')
-  fs.writeFileSync(configPath, JSON.stringify({
-    recentItems: [],
-    settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif' }
-  }))
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      recentItems: [],
+      settings: {
+        sidebarWidth: 30,
+        themeOverride: null,
+        explorerVisible: true,
+        editorFont: 'sans-serif'
+      }
+    })
+  )
 
   // Relaunch so the startup reconcile runs against this config.
   await app.close()
   ;({ app, window } = await launchApp(configDir, testFolder))
 
-  await expect.poll(() => {
-    if (!fs.existsSync(configPath)) return undefined
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.explorerVisible
-  }).toBe(false)
+  await expect
+    .poll(() => {
+      if (!fs.existsSync(configPath)) return undefined
+      return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.explorerVisible
+    })
+    .toBe(false)
 
   // No folder is open, so no explorer panel is rendered.
   await expect(window.getByRole('treeitem')).toHaveCount(0)
@@ -174,10 +211,18 @@ test('FR-013 with no folder open the persisted explorer state records closed', a
 
 test('FR-013/FR-010 opening a folder still reveals the explorer and persists open', async () => {
   const configPath = path.join(configDir, 'config.json')
-  fs.writeFileSync(configPath, JSON.stringify({
-    recentItems: [],
-    settings: { sidebarWidth: 30, themeOverride: null, explorerVisible: false, editorFont: 'sans-serif' }
-  }))
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      recentItems: [],
+      settings: {
+        sidebarWidth: 30,
+        themeOverride: null,
+        explorerVisible: false,
+        editorFont: 'sans-serif'
+      }
+    })
+  )
   await app.close()
   ;({ app, window } = await launchApp(configDir, testFolder))
 
@@ -187,8 +232,10 @@ test('FR-013/FR-010 opening a folder still reveals the explorer and persists ope
   await window.getByRole('menuitem', { name: 'Open Folder…' }).click()
   await expect(window.getByRole('treeitem').getByText('alpha.md')).toBeVisible()
 
-  await expect.poll(() => {
-    if (!fs.existsSync(configPath)) return undefined
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.explorerVisible
-  }).toBe(true)
+  await expect
+    .poll(() => {
+      if (!fs.existsSync(configPath)) return undefined
+      return JSON.parse(fs.readFileSync(configPath, 'utf-8')).settings?.explorerVisible
+    })
+    .toBe(true)
 })

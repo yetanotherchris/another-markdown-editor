@@ -2,7 +2,12 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { launchApp, closeAppSafely, openFile as openWorkspaceFile, openSettingsDialog } from './launch'
+import {
+  launchApp,
+  closeAppSafely,
+  openFile as openWorkspaceFile,
+  openSettingsDialog
+} from './launch'
 
 /**
  * Spec 020 spellcheck suite (JS whole-document engine, 2026-08-07).
@@ -152,16 +157,21 @@ test('US3 adding a word to the dictionary stops it being flagged', async () => {
   await expect.poll(() => markedWords(window)).toContain(DICT_WORD)
 
   expect(await rightClickMarked(window, DICT_WORD)).toBe(true)
-  await window.getByTestId('spelling-menu').getByRole('menuitem', { name: 'Add to dictionary' }).click()
+  await window
+    .getByTestId('spelling-menu')
+    .getByRole('menuitem', { name: 'Add to dictionary' })
+    .click()
 
   // Same session: the word is no longer marked anywhere in the document.
   await expect.poll(() => markedWords(window)).not.toContain(DICT_WORD)
   // It is persisted to the config store.
-  await expect.poll(() => {
-    const configPath = path.join(configDir, 'config.json')
-    if (!fs.existsSync(configPath)) return undefined
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8')).spellcheckDictionary
-  }).toContain(DICT_WORD)
+  await expect
+    .poll(() => {
+      const configPath = path.join(configDir, 'config.json')
+      if (!fs.existsSync(configPath)) return undefined
+      return JSON.parse(fs.readFileSync(configPath, 'utf-8')).spellcheckDictionary
+    })
+    .toContain(DICT_WORD)
 })
 
 test('US3 a learned word survives an app restart', async () => {
@@ -169,7 +179,10 @@ test('US3 a learned word survives an app restart', async () => {
   await typeWord(window, DICT_WORD)
   await expect.poll(() => markedWords(window)).toContain(DICT_WORD)
   expect(await rightClickMarked(window, DICT_WORD)).toBe(true)
-  await window.getByTestId('spelling-menu').getByRole('menuitem', { name: 'Add to dictionary' }).click()
+  await window
+    .getByTestId('spelling-menu')
+    .getByRole('menuitem', { name: 'Add to dictionary' })
+    .click()
   await window.waitForTimeout(800)
 
   await closeAppSafely(app)
@@ -188,7 +201,9 @@ test('US1 a common word missing from the old dictionary is not flagged', async (
   await openWorkspaceFile(window, 'supplemental.md')
   // "maladaptive" exists in the size-70 dictionaries, so it is not flagged.
   // Case-insensitive: the fixture writes sentence-initial "Maladaptive".
-  await expect.poll(async () => (await markedWords(window)).map((w) => w.toLowerCase())).not.toContain('maladaptive')
+  await expect
+    .poll(async () => (await markedWords(window)).map((w) => w.toLowerCase()))
+    .not.toContain('maladaptive')
 })
 
 test('US2 domain and technical terms are accepted (JSON, Lacanian, hominem)', async () => {
@@ -232,9 +247,11 @@ test('US4 the settings toggle clears and restores the underlines', async () => {
 })
 
 test('the language setting switches dictionaries (en-GB vs en-US)', async () => {
+  await openSettingsDialog(window)
+  await window.getByTestId('spellcheck-language').selectOption('en-GB')
+  await window.getByRole('button', { name: 'Close settings' }).click()
   await openWorkspaceFile(window, 'mixed.md')
-  // Default system language (en-GB here): American "color" flagged, British
-  // "behaviour" accepted.
+  // Explicit en-GB: American "color" is flagged, British "behaviour" accepted.
   await expect.poll(() => markedWords(window)).toContain('color')
   expect(await markedWords(window)).not.toContain('behaviour')
 

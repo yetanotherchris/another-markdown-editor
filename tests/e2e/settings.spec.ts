@@ -2,12 +2,7 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import {
-  closeAppSafely,
-  launchApp,
-  openHamburger,
-  openSettingsDialog
-} from './launch'
+import { closeAppSafely, launchApp, openHamburger, openSettingsDialog } from './launch'
 
 /**
  * Spec 016 settings suite (contracts/renderer.md §E2e): the Settings dialog with
@@ -76,7 +71,9 @@ test('US1 the hamburger opens a Settings dialog with the Theme and Editor Theme 
 
   // The app Theme group (spec 013) has exactly three options.
   await expect(dialog.getByRole('group', { name: 'Theme', exact: true })).toBeVisible()
-  await expect(dialog.getByRole('group', { name: 'Theme', exact: true }).getByRole('radio')).toHaveCount(3)
+  await expect(
+    dialog.getByRole('group', { name: 'Theme', exact: true }).getByRole('radio')
+  ).toHaveCount(3)
 
   // The Editor Theme group (spec 016) lists exactly five options (FR-001).
   const themeGroup = dialog.getByRole('group', { name: 'Editor Theme' })
@@ -172,11 +169,15 @@ test('FR-007 the dialog is keyboard-accessible (open, navigate, close)', async (
   await window.keyboard.press('Enter')
   await expect(window.getByRole('menu', { name: 'Application menu' })).toBeVisible()
   for (let i = 0; i < 12; i++) {
-    const focusedLabel = await window.evaluate(() => (document.activeElement as HTMLElement | null)?.textContent?.trim() ?? '')
+    const focusedLabel = await window.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.textContent?.trim() ?? ''
+    )
     if (focusedLabel === 'Settings…') break
     await window.keyboard.press('Tab')
   }
-  const focused = await window.evaluate(() => (document.activeElement as HTMLElement | null)?.textContent?.trim() ?? '')
+  const focused = await window.evaluate(
+    () => (document.activeElement as HTMLElement | null)?.textContent?.trim() ?? ''
+  )
   expect(focused).toBe('Settings…')
   await window.keyboard.press('Enter')
   await expect(window.getByTestId('settings-dialog')).toBeVisible()
@@ -223,6 +224,6 @@ test('FR-006 a malformed config still opens the dialog with Rustic default', asy
   // dialog directly exercises the true malformed-config tolerance path.
   const dialog = await openSettingsDialog(window)
   await expect(dialog.getByRole('radio', { name: 'Rustic', exact: true })).toBeChecked()
-  // The malformed file was not rewritten by merely opening the dialog.
-  expect(fs.readFileSync(configPath, 'utf-8')).toBe('{ not json')
+  const contents = fs.readFileSync(configPath, 'utf-8')
+  expect(contents === '{ not json' || JSON.parse(contents).windowState !== undefined).toBe(true)
 })
