@@ -21,7 +21,8 @@ import {
   withWorkspace,
   isRecentEntry,
   recordRecent,
-  removeRecent
+  removeRecent,
+  isAuthorizedRenderer
 } from './context'
 
 /**
@@ -47,7 +48,8 @@ export function registerWorkspaceHandlers(window: Electron.BrowserWindow, _ctx: 
 
   ipcMain.handle(
     'workspace:prepareFolderOpen',
-    async (_e, args: unknown): Promise<Result<WorkspaceInfo | null>> => {
+    async (event, args: unknown): Promise<Result<WorkspaceInfo | null>> => {
+      if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
       let requestedPath: string | null = null
       let isRecentRequest = false
       try {
@@ -111,7 +113,8 @@ export function registerWorkspaceHandlers(window: Electron.BrowserWindow, _ctx: 
     }
   )
 
-  ipcMain.handle('workspace:commitFolderOpen', (): Result<WorkspaceInfo> => {
+  ipcMain.handle('workspace:commitFolderOpen', (event): Result<WorkspaceInfo> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     const pending = pendingFolderOpen
     if (!pending) {
       return err('NO_WORKSPACE', 'No folder open is pending')
@@ -181,12 +184,14 @@ export function registerWorkspaceHandlers(window: Electron.BrowserWindow, _ctx: 
     }
   })
 
-  ipcMain.handle('workspace:cancelFolderOpen', (): Result<null> => {
+  ipcMain.handle('workspace:cancelFolderOpen', (event): Result<null> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     pendingFolderOpen = null
     return ok(null)
   })
 
-  ipcMain.handle('workspace:readDir', (_e, args: unknown): Result<DirEntry[]> => {
+  ipcMain.handle('workspace:readDir', (event, args: unknown): Result<DirEntry[]> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     try {
       validateShape(args, ['path'])
       ensureString((args as { path: unknown }).path, 'path')

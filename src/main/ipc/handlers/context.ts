@@ -12,6 +12,7 @@ import { recentItemsConfigPath } from '../../recentItemsPath'
 import { reportRecentItemsWarning, notifyRecentItemsOk } from '../../recentItemsWarning'
 import { scrubAbsolutePaths } from '../../scrubPaths'
 import type { WorkspaceState } from '../../workspace'
+import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import type {
   Result,
   DirEntry,
@@ -45,6 +46,10 @@ export function err(
   message: string
 ): { ok: false; code: ErrorCode; message: string } {
   return { ok: false, code, message }
+}
+
+export function isAuthorizedRenderer(event: IpcMainInvokeEvent, window: BrowserWindow): boolean {
+  return event.sender === window.webContents
 }
 
 export function sanitizeError(e: unknown, workspaceRootPath: string | null): string {

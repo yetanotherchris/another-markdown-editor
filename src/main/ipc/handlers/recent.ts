@@ -7,15 +7,16 @@ import { reportRecentItemsWarning, notifyRecentItemsOk } from '../../recentItems
 import type { Result, OpenedFile, RecentItem } from '../../../shared/ipc-contract'
 import {
   ctx, ok, err, ensureString, validateShape, sanitizeError, toAppError,
-  isRecentEntry, recordRecent, removeRecent, canonicalPath, openFileFromPath
+  isRecentEntry, recordRecent, removeRecent, canonicalPath, openFileFromPath, isAuthorizedRenderer
 } from './context'
 
 /**
  * Recent Items channels (US1/FR-005): open a recorded file, list, clear.
  * Bodies moved verbatim from the old handlers.ts (spec 004 R4/FR-011/FR-012).
  */
-export function registerRecentHandlers(_window: Electron.BrowserWindow, _ctx: typeof ctx): void {
-  ipcMain.handle('recent:openFile', (_e, args: unknown): Result<OpenedFile> => {
+export function registerRecentHandlers(window: Electron.BrowserWindow, _ctx: typeof ctx): void {
+  ipcMain.handle('recent:openFile', (event, args: unknown): Result<OpenedFile> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     try {
       validateShape(args, ['path'])
       ensureString((args as { path: unknown }).path, 'path')
@@ -49,7 +50,8 @@ export function registerRecentHandlers(_window: Electron.BrowserWindow, _ctx: ty
     }
   })
 
-  ipcMain.handle('recent:list', (): Result<RecentItem[]> => {
+  ipcMain.handle('recent:list', (event): Result<RecentItem[]> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     const configPath = recentItemsConfigPath()
     try {
       // Strict read: a genuinely MISSING config (first run, or a cleared
@@ -70,7 +72,8 @@ export function registerRecentHandlers(_window: Electron.BrowserWindow, _ctx: ty
   // FR-011: clearing is best-effort like record/remove — on a persistence
   // failure the empty list cannot be saved, the failure is reported quietly,
   // and nothing else changes.
-  ipcMain.handle('recent:clear', (): Result<null> => {
+  ipcMain.handle('recent:clear', (event): Result<null> => {
+    if (!isAuthorizedRenderer(event, window)) return err('IO', 'Unauthorized renderer')
     try {
       saveRecentItems(recentItemsConfigPath(), [])
       notifyRecentItemsOk()
