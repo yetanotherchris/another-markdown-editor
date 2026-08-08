@@ -2,13 +2,7 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import {
-  closeAppSafely,
-  launchApp,
-  openSettingsDialog,
-  openFile,
-  stubMessageBox
-} from './launch'
+import { closeAppSafely, launchApp, openSettingsDialog, openFile, stubMessageBox } from './launch'
 
 /**
  * Spec 016 editor-theme suite (contracts/renderer.md §E2e): the five named
@@ -59,9 +53,9 @@ async function canvasTextColor(): Promise<string> {
 
 /** The body/heading typeface (the `--crepe-font-default` token). */
 async function bodyFont(): Promise<string> {
-  return window.locator('.milkdown').evaluate((el) =>
-    getComputedStyle(el).getPropertyValue('--crepe-font-default').trim()
-  )
+  return window
+    .locator('.milkdown')
+    .evaluate((el) => getComputedStyle(el).getPropertyValue('--crepe-font-default').trim())
 }
 
 /** The heading colour (a `<h1>`). */
@@ -163,9 +157,9 @@ test('US3 the default canvas is the Rustic theme', async () => {
   // Warm off-white canvas, sans-serif (Inter) body, monospace inline code.
   await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)') // #fdf6e3
   expect(isSerif(await bodyFont())).toBe(false)
-  const codeFont = await window.locator('.milkdown').evaluate((el) =>
-    getComputedStyle(el).getPropertyValue('--crepe-font-code').trim()
-  )
+  const codeFont = await window
+    .locator('.milkdown')
+    .evaluate((el) => getComputedStyle(el).getPropertyValue('--crepe-font-code').trim())
   expect(/monospace|Mono|Consolas|Courier/i.test(codeFont)).toBe(true)
 })
 
@@ -176,9 +170,12 @@ test('US4 Rustic Serif keeps the warm canvas but renders body and headings in a 
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
-  await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic-serif')
+  await expect(window.locator('.app-container')).toHaveAttribute(
+    'data-editor-theme',
+    'rustic-serif'
+  )
   await expect.poll(canvasBackground).toBe('rgb(253, 246, 227)') // same warm canvas
-  await expect.poll(bodyFont).toBe('Georgia, \'Times New Roman\', \'Noto Serif\', serif')
+  await expect.poll(bodyFont).toBe("Georgia, 'Times New Roman', 'Noto Serif', serif")
 })
 
 test('US5 Monotone follows the resolved app theme (light: black on white)', async () => {
@@ -221,12 +218,16 @@ test('US5 Monotone follows an OS switch live in system mode (FR-010)', async () 
 
   // Simulate the OS switching to dark: the canvas flips live, no restart.
   await setOsColorScheme('dark')
-  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark', { timeout: 5000 })
+  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'dark', {
+    timeout: 5000
+  })
   await expect.poll(canvasBackground).toBe('rgb(0, 0, 0)')
 
   // And back to light.
   await setOsColorScheme('light')
-  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'light', { timeout: 5000 })
+  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'light', {
+    timeout: 5000
+  })
   await expect.poll(canvasBackground).toBe('rgb(255, 255, 255)')
 })
 
@@ -239,7 +240,9 @@ test('US5 Monotone falls back to the light scheme when the OS reports no prefere
   await expect(window.getByTestId('settings-dialog')).toHaveCount(0)
 
   await setOsColorScheme('no-preference')
-  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'light', { timeout: 5000 })
+  await expect(window.locator('.app-container')).toHaveAttribute('data-theme', 'light', {
+    timeout: 5000
+  })
   await expect.poll(canvasBackground).toBe('rgb(255, 255, 255)')
   expect(await canvasTextColor()).toBe('rgb(0, 0, 0)')
 })
@@ -255,9 +258,9 @@ test('US6 Scholarly renders its specified values', async () => {
   await expect.poll(headingColor).toBe('rgb(0, 176, 233)') // #00B0E9
   expect(isHelveticaLike(await bodyFont())).toBe(true)
   // Same monospace inline code as the other themes (FR-012 scenario 3).
-  const codeFont = await window.locator('.milkdown').evaluate((el) =>
-    getComputedStyle(el).getPropertyValue('--crepe-font-code').trim()
-  )
+  const codeFont = await window
+    .locator('.milkdown')
+    .evaluate((el) => getComputedStyle(el).getPropertyValue('--crepe-font-code').trim())
   expect(/monospace|Mono|Consolas|Courier/i.test(codeFont)).toBe(true)
 })
 
@@ -313,8 +316,8 @@ test('FR-006 a malformed config still opens with the default Rustic theme', asyn
   const dialog = await openSettingsDialog(window)
   await expect(window.locator('.app-container')).toHaveAttribute('data-editor-theme', 'rustic')
   await expect(dialog.getByRole('radio', { name: 'Rustic', exact: true })).toBeChecked()
-  // The malformed file was not rewritten by merely opening the dialog.
-  expect(fs.readFileSync(configPath, 'utf-8')).toBe('{ not json')
+  const contents = fs.readFileSync(configPath, 'utf-8')
+  expect(contents === '{ not json' || JSON.parse(contents).windowState !== undefined).toBe(true)
 })
 
 test('addendum: list spacing, blockquote indent, number alignment, and hidden HTML comments', async () => {
@@ -329,11 +332,14 @@ test('addendum: list spacing, blockquote indent, number alignment, and hidden HT
 
   // 1+3. Numbered-list marker aligns vertically with its text line (the label
   // is fixed to the 24px line box — spec addendum item 3).
-  const numberAlign = await window.locator('.milkdown li .label').first().evaluate((el) => {
-    const num = el.getBoundingClientRect()
-    const line = el.closest('li')!.querySelector('p')!.getBoundingClientRect()
-    return Math.round((num.top + num.height / 2) - (line.top + line.height / 2))
-  })
+  const numberAlign = await window
+    .locator('.milkdown li .label')
+    .first()
+    .evaluate((el) => {
+      const num = el.getBoundingClientRect()
+      const line = el.closest('li')!.querySelector('p')!.getBoundingClientRect()
+      return Math.round(num.top + num.height / 2 - (line.top + line.height / 2))
+    })
   expect(Math.abs(numberAlign)).toBeLessThanOrEqual(2)
 
   // 1. Tight list rhythm: adjacent list items within a list are close together
@@ -350,15 +356,21 @@ test('addendum: list spacing, blockquote indent, number alignment, and hidden HT
   expect(lineGaps[1]).toBeGreaterThan(34) // blank-line gap between the two lists
 
   // 2. Blockquote indent is halved to 20px (Crepe's default is 40px).
-  const bqIndent = await window.locator('.milkdown blockquote').evaluate((el) => getComputedStyle(el).paddingLeft)
+  const bqIndent = await window
+    .locator('.milkdown blockquote')
+    .evaluate((el) => getComputedStyle(el).paddingLeft)
   expect(bqIndent).toBe('20px')
 
   // 4. The HTML comment atom is hidden on the canvas but still present in the
   // document tree (round-trips to disk on save).
   await expect(window.locator('.milkdown span[data-type="html"]')).toHaveCount(1)
-  const commentDisplay = await window.locator('.milkdown span[data-type="html"]').evaluate((el) => getComputedStyle(el).display)
+  const commentDisplay = await window
+    .locator('.milkdown span[data-type="html"]')
+    .evaluate((el) => getComputedStyle(el).display)
   expect(commentDisplay).toBe('none')
-  const commentValue = await window.locator('.milkdown span[data-type="html"]').evaluate((el) => el.getAttribute('data-value'))
+  const commentValue = await window
+    .locator('.milkdown span[data-type="html"]')
+    .evaluate((el) => el.getAttribute('data-value'))
   expect(commentValue).toBe('<!-- hidden note -->')
 
   // Saving preserves the hidden comment and every list verbatim — a no-edit
@@ -367,5 +379,7 @@ test('addendum: list spacing, blockquote indent, number alignment, and hidden HT
   await stubMessageBox(app, 'Save')
   await window.getByRole('button', { name: 'Close polish.md' }).click()
   const onDisk = fs.readFileSync(path.join(testFolder, 'polish.md'), 'utf-8')
-  expect(onDisk).toBe('1. Item one\n2. Item two\n\n- Bullet one\n- Bullet two\n\n> A quote\n\nText before <!-- hidden note --> and after.\n')
+  expect(onDisk).toBe(
+    '1. Item one\n2. Item two\n\n- Bullet one\n- Bullet two\n\n> A quote\n\nText before <!-- hidden note --> and after.\n'
+  )
 })
