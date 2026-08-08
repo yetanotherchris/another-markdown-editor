@@ -70,14 +70,13 @@ export default function App() {
   const dataEditorTheme = resolvedEditorTheme.kind === 'preset' ? resolvedEditorTheme.name : 'custom'
   const editorThemeStyle = resolvedEditorTheme.kind === 'custom' && editorColors
     ? {
-        '--crepe-color-background': editorColors.background,
-        '--crepe-color-on-background': editorColors.foreground,
-        '--crepe-color-primary': editorColors.accent,
-        '--crepe-color-surface': editorColors.surface,
-        '--crepe-color-outline': editorColors.outline,
-        '--crepe-color-inline-code': editorColors.code,
-        '--crepe-font-default': fontStackFor(editorFont),
-        '--crepe-font-title': fontStackFor(editorFont)
+        '--mm-custom-background': editorColors.background,
+        '--mm-custom-foreground': editorColors.foreground,
+        '--mm-custom-accent': editorColors.accent,
+        '--mm-custom-surface': editorColors.surface,
+        '--mm-custom-outline': editorColors.outline,
+        '--mm-custom-code': editorColors.code,
+        '--mm-custom-font': fontStackFor(editorFont)
       } as React.CSSProperties
     : undefined
 

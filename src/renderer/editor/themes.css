@@ -157,8 +157,7 @@
 }
 
 /* Monotone Serif — identical two-tone schemes, Georgia serif body/headings
- * (FR-011, US4: same colors as Monotone, serif typeface). */
-.app-container[data-editor-theme='monotone-serif'][data-theme='light'] .milkdown {
+ * (FR-011, US4: same colors as Monotone, serif typeface). */.app-container[data-editor-theme='monotone-serif'][data-theme='light'] .milkdown {
   --crepe-color-background: #ffffff;
   --crepe-color-on-background: #000000;
   --crepe-color-surface: #ffffff;
@@ -200,4 +199,24 @@
   --crepe-color-inline-area: #1f1f1f;
   --crepe-font-default: Georgia, 'Times New Roman', 'Noto Serif', serif;
   --crepe-font-title: Georgia, 'Times New Roman', 'Noto Serif', serif;
+}
+
+/* Spec 023 (FR-001/FR-008): the CUSTOM theme. There is no preset block for it —
+ * App.tsx carries the stored six colour tokens and the font stack as
+ * `--mm-custom-*` custom properties on the container, and this block maps them
+ * onto Crepe's tokens at the same specificity as the presets (so the custom
+ * values win over Crepe's `.milkdown` defaults). */
+.app-container[data-editor-theme='custom'] .milkdown {
+  --crepe-color-background: var(--mm-custom-background, #fdf6e3);
+  --crepe-color-on-background: var(--mm-custom-foreground, #1f1b16);
+  --crepe-color-surface: var(--mm-custom-surface, #fdf3d9);
+  --crepe-color-surface-low: var(--mm-custom-surface, #fdf3d9);
+  --crepe-color-on-surface: var(--mm-custom-foreground, #201b13);
+  --crepe-color-on-surface-variant: var(--mm-custom-outline, #4f4539);
+  --crepe-color-outline: var(--mm-custom-outline, #817567);
+  --crepe-color-primary: var(--mm-custom-accent, #805610);
+  --crepe-color-inline-code: var(--mm-custom-code, #ba1a1a);
+  --crepe-color-error: var(--mm-custom-code, #ba1a1a);
+  --crepe-font-default: var(--mm-custom-font, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif);
+  --crepe-font-title: var(--mm-custom-font, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif);
 }

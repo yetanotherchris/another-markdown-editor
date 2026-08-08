@@ -170,10 +170,19 @@ export default function SettingsDialog({ editorTheme, onEditorThemeSave, theme, 
               </label>
             ))}
             {/* Spec 023 FR-003: a display-only Custom option when the stored
-                colours + font match no preset. Not selectable (Assumptions). */}
+                colours + font match no preset. Not selectable (Assumptions); a
+                separate radio-group name so the disabled checked member never
+                blocks the preset radios' selection. Unchecks once a preset is
+                staged. */}
             {editorTheme === 'custom' && (
               <label className="settings-radio">
-                <input type="radio" name="editor-theme" value="custom" checked disabled />
+                <input
+                  type="radio"
+                  name="editor-theme-custom"
+                  value="custom"
+                  checked={draftEditorTheme === null}
+                  disabled
+                />
                 <span>Custom</span>
               </label>
             )}
