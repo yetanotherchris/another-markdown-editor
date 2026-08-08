@@ -93,3 +93,46 @@ describe('findMisspellings', () => {
     expect(miss.map((m) => m.word)).toEqual(['const', 'teh'])
   })
 })
+
+describe('supplemental word list (spec 025)', () => {
+  // The report words (and the curated additions) must never be flagged in
+  // either language, even though no general English dictionary contains them.
+  const words = [
+    'json',
+    'lacanian',
+    'kleinian',
+    'psychodynamic',
+    'hominem',
+    'reproduceable',
+    'experimentations',
+    'maladaptive',
+    'yaml',
+    'frontend',
+    'countertransference'
+  ]
+
+  for (const language of ['en-GB', 'en-US'] as const) {
+    describe(language, () => {
+      it.each(words)('accepts "%s"', (word) => {
+        const checker = getChecker(language)
+        expect(findMisspellings(word, checker, new Set())).toEqual([])
+      })
+    })
+  }
+
+  it('accepts case variants of a supplemental word (JSON / Json / json)', () => {
+    const text = 'JSON Json json'
+    const miss = findMisspellings(text, getChecker('en-US'), new Set())
+    expect(miss).toEqual([])
+  })
+
+  it('still flags a real typo next to a supplemental word', () => {
+    const text = 'The Lacanian recieve reading.'
+    const miss = findMisspellings(text, getChecker('en-GB'), new Set())
+    expect(miss.map((m) => m.word)).toEqual(['recieve'])
+  })
+
+  it('a supplemental word is not written into the custom dictionary set', () => {
+    expect(getChecker('en-GB').correct('json')).toBe(false)
+  })
+})
