@@ -121,6 +121,18 @@ export type EditorThemeName =
  *  be added here later (the mechanism is identical). */
 export type SpellcheckLanguage = 'en-GB' | 'en-US'
 
+/** Spec 023: the six curated editor colour tokens a custom theme stores, mapped
+ *  to Crepe's `--crepe-color-*` variables (contracts/editor-theme.md). A closed
+ *  record of `#rrggbb` hex strings — validated in main (FR-010). */
+export interface EditorColors {
+  background: string
+  foreground: string
+  accent: string
+  surface: string
+  outline: string
+  code: string
+}
+
 export interface Settings {
   sidebarWidth: number
   themeOverride: 'light' | 'dark' | null
@@ -130,13 +142,18 @@ export interface Settings {
   explorerVisible: boolean
   /** The editor font-family choice (spec 012 FR-003/FR-004). Defaults to
    *  'sans-serif'. A closed union — validated in main, never arbitrary text.
-   *  KEPT persisted but INERT since spec 016 (user decision 2026-08-07): the
-   *  editor theme owns the typeface, so this field no longer affects the
-   *  canvas. It survives for clean config migration only. */
+   *  Spec 023 FR-008: ACTIVE — it drives the typeface for a custom editor theme
+   *  and is written to the preset's font when a preset is selected (FR-005). */
   editorFont: 'sans-serif' | 'serif'
   /** The selected editor theme (spec 016 FR-001/FR-002). Defaults to
-   *  'rustic'. A closed union — validated in main, never arbitrary text. */
+   *  'rustic'. A closed union — validated in main, never arbitrary text. When
+   *  `editorColors` is set, the effective theme is detected from the values
+   *  instead (spec 023 FR-003/004/007). */
   editorTheme: EditorThemeName
+  /** Spec 023: custom editor colour overrides, or `null` when the preset's
+   *  colours are used (FR-001). A closed six-key record of `#rrggbb` hex
+   *  strings, validated in main (FR-010). */
+  editorColors: EditorColors | null
   /** Spec 020 FR-006/FR-009: whether the native spellchecker is enabled.
    *  Defaults to true. A closed type — validated in main as a boolean, never
    *  arbitrary text. Persisted via the same settings store as the rest. */

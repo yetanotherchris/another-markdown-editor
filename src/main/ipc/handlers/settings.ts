@@ -14,7 +14,7 @@ export function registerSettingsHandlers(_window: Electron.BrowserWindow, _ctx: 
     try {
       return ok(loadSettings())
     } catch {
-      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', spellcheckEnabled: true, spellcheckLanguage: null })
+      return ok({ sidebarWidth: 30, themeOverride: null, explorerVisible: true, editorFont: 'sans-serif', editorTheme: 'rustic', editorColors: null, spellcheckEnabled: true, spellcheckLanguage: null })
     }
   })
 

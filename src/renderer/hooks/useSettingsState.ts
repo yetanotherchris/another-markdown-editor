@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react'
 import { updateSettings, getSettings } from '../state/settings'
-import type { EditorThemeName, SpellcheckLanguage } from '../../shared/ipc-contract'
+import type { EditorThemeName, SpellcheckLanguage, EditorColors } from '../../shared/ipc-contract'
 import {
   useEffectiveTheme,
   themeChoiceFromOverride,
   themeOverrideFromChoice
 } from './useEffectiveTheme'
 import type { ThemeChoice } from './useEffectiveTheme'
+import { presetFontFor } from '../editor/editorThemePresets'
 
 /**
  * Spec 012/013/016: the settings-dialog state the composition root owns — the
@@ -25,6 +26,8 @@ export function useSettingsState(): {
   setSettingsOpen: (open: boolean) => void
   editorTheme: EditorThemeName
   handleEditorThemeChange: (theme: EditorThemeName) => void
+  editorFont: 'serif' | 'sans-serif'
+  editorColors: import('../../shared/ipc-contract').EditorColors | null
   spellcheckEnabled: boolean
   handleSpellcheckChange: (enabled: boolean) => void
   spellcheckLanguage: SpellcheckLanguage | null
@@ -35,6 +38,8 @@ export function useSettingsState(): {
 } {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editorTheme, setEditorTheme] = useState<EditorThemeName>(getSettings().editorTheme)
+  const [editorFont, setEditorFont] = useState<'serif' | 'sans-serif'>(getSettings().editorFont)
+  const [editorColors, setEditorColors] = useState<EditorColors | null>(getSettings().editorColors)
   const [spellcheckEnabled, setSpellcheckEnabled] = useState<boolean>(getSettings().spellcheckEnabled)
   const [spellcheckLanguage, setSpellcheckLanguage] = useState<SpellcheckLanguage | null>(getSettings().spellcheckLanguage)
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() =>
@@ -46,10 +51,15 @@ export function useSettingsState(): {
   // by the dialog's Save button; the visual switch flows through `editorTheme`
   // → the `data-editor-theme` attribute (editor/themes.css). The persisted
   // value reaches main for validation via updateSettings.
+  // Spec 023 FR-005/FR-008: selecting a preset clears any custom colour
+  // overrides and writes the preset's font into `editorFont`.
   const handleEditorThemeChange = useCallback((theme: EditorThemeName) => {
     setEditorTheme(theme)
-    updateSettings({ editorTheme: theme })
-    window.api.updateSettings({ editorTheme: theme }).catch(() => { /* ignore */ })
+    setEditorColors(null)
+    const presetFont = presetFontFor(theme)
+    setEditorFont(presetFont)
+    updateSettings({ editorTheme: theme, editorColors: null, editorFont: presetFont })
+    window.api.updateSettings({ editorTheme: theme, editorColors: null, editorFont: presetFont }).catch(() => { /* ignore */ })
   }, [])
 
   // Spec 013: apply the theme immediately and persist (FR-006, FR-008). The
@@ -84,6 +94,7 @@ export function useSettingsState(): {
   return {
     settingsOpen, setSettingsOpen,
     editorTheme, handleEditorThemeChange,
+    editorFont, editorColors,
     spellcheckEnabled, handleSpellcheckChange,
     spellcheckLanguage, handleSpellcheckLanguageChange,
     themeChoice, handleThemeChange, themeMode

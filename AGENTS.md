@@ -251,9 +251,8 @@ AGENTS.md                         This file
 - **Archive the spec as part of the implementation PR.** When a spec's feature
   is fully implemented and its PR is opened, move the spec directory from
   `specs/<n>-<name>/` to `specs/archive/<n>-<name>/` in the same change (use
-  `git mv`), set the spec's `**Status**` to `Archived`, and update its row in
-  the Current implementation status table below. Do not leave implemented specs
-  in the active `specs/` directory.
+  `git mv`), set the spec's `**Status**` to `Archived`. Do not leave implemented
+  specs in the active `specs/` directory.
 - PR title format: `feat(phase-N): <description>` with the AI usage line at
   the end of the description.
 - Use bullet points for the changes in the PR description.
@@ -265,30 +264,3 @@ AGENTS.md                         This file
 - The retired `001-markdown-editor` branch was the original feature branch;
   it was merged into `main` (PR #8) and deleted. Do not recreate it or branch
   from it.
-
-## Current implementation status
-
-| Spec | Status | Notes |
-|------|--------|-------|
-| 001-markdown-editor | Archived | Phases 1-6 complete, Phase 7 pending |
-| 002-view-source | Archived | Complete |
-| 003-native-explorer | Archived | Complete |
-| 004-recent-items | Archived | Complete |
-| 005-release-distribution | Archived | Complete |
-| 006-file-association | Spec only | Not yet planned |
-| 007-help-menu | Spec only | Not yet planned |
-| 008-native-dialogs | Archived | Complete |
-| 009-release-binary-naming | Archived | Complete |
-| 010-modern-grey-ui | Archived | Complete |
-| 011-window-state-persistence | Archived | Complete |
-| 012-settings-dialog | Archived | Complete |
-| 013-theme-setting | Archived | Complete |
-| 014-view-source-icon | Archived | Complete |
-| 015-explorer-reveal-location | Archived | Complete |
-| 016-editor-theme | Archived | Complete |
-| 017-codebase-refactor | Archived | Complete |
-| 018-header-bar-shade | Archived | Complete |
-| 019-rename-to-markdownmeister | Archived | Complete |
-| 020-editor-spellcheck | Archived | Complete |
-| 021-frontmatter-handling | Archived | Complete |
-| 022-universal-config-path | Archived | Complete |

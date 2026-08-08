@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-07
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Store the theme colours and font type (serif/sans) in the config.json. If these don't match a theme, then 'custom' is displayed in settings dialog. Changing to a known theme in the settings will override the custom colours."
 
@@ -127,3 +127,14 @@ The application automatically determines whether the current colors and font mat
 ## Clarifications
 
 *(Added during clarify step)*
+
+- **2026-08-08 (code review)** — FR-009/FR-010 literal text vs. implementation:
+  invalid or missing `editorColors` is rejected to `null` and the app falls back
+  to the **stored `editorTheme` preset**, not unconditionally to Rustic, and no
+  warning is logged. This satisfies SC-005 (existing configs without custom
+  colours keep their exact current appearance — a user who selected Scholarly
+  before the feature must not silently become Rustic) and matches
+  `contracts/editor-theme.md`. The literal "fall back to the default preset
+  (Rustic)" only applies to configs that ALSO lack a stored `editorTheme`
+  (which defaults to Rustic). Invalid colour values are rejected and never
+  persisted, per FR-010.

@@ -79,8 +79,12 @@ describe('useSettingsState (spec 016)', () => {
     })
     expect(read().editorTheme).toBe('scholarly')
     expect(getSettings().editorTheme).toBe('scholarly')
+    // Spec 023 FR-005: selecting a preset clears custom colours and writes the
+    // preset's font into editorFont.
+    expect(getSettings().editorColors).toBeNull()
+    expect(getSettings().editorFont).toBe('sans-serif')
     const calls = (globalThis as unknown as { __apiCalls: { editorTheme?: EditorThemeName }[] }).__apiCalls
-    expect(calls).toEqual([{ editorTheme: 'scholarly' }])
+    expect(calls).toEqual([{ editorTheme: 'scholarly', editorColors: null, editorFont: 'sans-serif' }])
   })
 
   it('exposes the persisted spellcheckEnabled as the committed value', () => {

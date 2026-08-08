@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import type { Settings, EditorThemeName, SpellcheckLanguage } from '../shared/ipc-contract'
+import type { Settings, EditorThemeName, SpellcheckLanguage, EditorColors } from '../shared/ipc-contract'
 import { atomicWrite } from './fs/atomicWrite'
 
 /**
@@ -25,6 +25,7 @@ export const DEFAULTS: Settings = {
   explorerVisible: true,
   editorFont: 'sans-serif',
   editorTheme: 'rustic',
+  editorColors: null,
   spellcheckEnabled: true,
   spellcheckLanguage: null
 }
@@ -56,6 +57,24 @@ function isSpellcheckLanguage(value: unknown): value is SpellcheckLanguage {
   return typeof value === 'string' && (SPELLCHECK_LANGUAGES as readonly string[]).includes(value)
 }
 
+/** Spec 023 FR-010: a valid `EditorColors` is either `null` or a closed
+ *  six-key record whose values are all `#rrggbb` hex strings. Anything else is
+ *  rejected whole (falls back to the preset's colours). */
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/
+
+function isEditorColors(value: unknown): value is EditorColors | null {
+  if (value === null) return true
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  const keys = ['background', 'foreground', 'accent', 'surface', 'outline', 'code']
+  for (const key of keys) {
+    if (!(key in record) || typeof record[key] !== 'string' || !HEX_COLOR.test(record[key] as string)) {
+      return false
+    }
+  }
+  return Object.keys(record).length === keys.length
+}
+
 function validateSettings(raw: unknown): Settings {
   if (!raw || typeof raw !== 'object') return { ...DEFAULTS }
   const parsed = raw as Record<string, unknown>
@@ -68,6 +87,7 @@ function validateSettings(raw: unknown): Settings {
     editorFont: (parsed.editorFont === 'sans-serif' || parsed.editorFont === 'serif')
       ? parsed.editorFont : DEFAULTS.editorFont,
     editorTheme: isEditorThemeName(parsed.editorTheme) ? parsed.editorTheme : DEFAULTS.editorTheme,
+    editorColors: isEditorColors(parsed.editorColors) ? parsed.editorColors : null,
     spellcheckEnabled: typeof parsed.spellcheckEnabled === 'boolean'
       ? parsed.spellcheckEnabled : DEFAULTS.spellcheckEnabled,
     spellcheckLanguage: parsed.spellcheckLanguage === null || isSpellcheckLanguage(parsed.spellcheckLanguage)
@@ -94,6 +114,7 @@ export function mergeSettingsPatch(current: Settings, patch: Partial<Settings>):
       ? patch.editorFont as 'sans-serif' | 'serif'
       : current.editorFont,
     editorTheme: isEditorThemeName(patch.editorTheme) ? patch.editorTheme : current.editorTheme,
+    editorColors: isEditorColors(patch.editorColors) ? patch.editorColors : current.editorColors,
     spellcheckEnabled: typeof patch.spellcheckEnabled === 'boolean'
       ? patch.spellcheckEnabled : current.spellcheckEnabled,
     spellcheckLanguage: patch.spellcheckLanguage === null || isSpellcheckLanguage(patch.spellcheckLanguage)
@@ -127,7 +148,7 @@ export function migrateLegacySettingsFile(configPath: string, legacyPath: string
   // legacy file with, say, only `themeOverride` should still be imported rather
   // than dropped whole. validateSettings recovers every field individually.
   if (!legacy || typeof legacy !== 'object') return null
-  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont', 'editorTheme', 'spellcheckEnabled', 'spellcheckLanguage']
+  const known: (keyof Settings)[] = ['sidebarWidth', 'themeOverride', 'explorerVisible', 'editorFont', 'editorTheme', 'editorColors', 'spellcheckEnabled', 'spellcheckLanguage']
   if (!known.some((k) => k in legacy)) return null
   const migrated = validateSettings(legacy)
   try {
