@@ -9,9 +9,9 @@
 export const electronLaunchArgs: string[] = process.env.MM_E2E_HEADED
   ? ['out/main/index.js']
   : [
-      'out/main/index.js',
       '--headless',
-      ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-gpu'] : [])
+      ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-gpu'] : []),
+      'out/main/index.js'
     ]
 
 import { _electron as electron, expect } from '@playwright/test'
