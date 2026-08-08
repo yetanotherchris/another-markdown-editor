@@ -8,7 +8,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 } }
       })
       const docId = s1.documents[0].id
       const s2 = documentsReducer(s1, {
@@ -23,7 +23,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 } }
       })
       const docId = s1.documents[0].id
       const s2 = documentsReducer(s1, {
@@ -42,7 +42,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5 } }
       })
       const docId = s1.documents[0].id
       // Mount captured the editor's serialization: raw bytes + the newline
@@ -70,7 +70,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'hello\n', mtimeMs: 1, size: 6 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'hello\n', mtimeMs: 1, size: 6 } }
       })
       const docId = s1.documents[0].id
       const s2 = documentsReducer(s1, {
@@ -89,7 +89,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: '# Title\r\n\r\nbody', mtimeMs: 1, size: 16 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: '# Title\r\n\r\nbody', mtimeMs: 1, size: 16 } }
       })
       const docId = s1.documents[0].id
       // Mounted editor normalized EOLs; its baseline serialization is LF-only.
@@ -108,7 +108,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5, view: 'source' }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'hello', mtimeMs: 1, size: 5, view: 'source' } }
       })
       const docId = s1.documents[0].id
       // Source view reports raw text — a newline the user typed is an edit,
@@ -125,7 +125,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'original', mtimeMs: 1, size: 8 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'original', mtimeMs: 1, size: 8 } }
       })
       const docId = s1.documents[0].id
 
@@ -155,7 +155,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 } }
       })
       const s2 = documentsReducer(s1, {
         type: 'EXTERNAL_CHANGE',
@@ -168,7 +168,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 } }
       })
       const s2 = documentsReducer(s1, {
         type: 'EXTERNAL_CHANGE',

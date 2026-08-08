@@ -10,10 +10,10 @@ export function createSession(): EditingSession {
 export function openTwoFiles(): EditingSession {
   const s1 = documentsReducer(createSession(), {
     type: 'OPEN_EXISTING',
-    payload: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 }
+    payload: { value: { path: 'a.md', name: 'a.md', content: 'alpha', mtimeMs: 1, size: 5 } }
   })
   return documentsReducer(s1, {
     type: 'OPEN_EXISTING',
-    payload: { path: 'b.md', name: 'b.md', content: 'beta', mtimeMs: 2, size: 4 }
+    payload: { value: { path: 'b.md', name: 'b.md', content: 'beta', mtimeMs: 2, size: 4 } }
   })
 }

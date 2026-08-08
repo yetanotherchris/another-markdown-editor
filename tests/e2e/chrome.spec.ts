@@ -93,9 +93,11 @@ test('US1 chrome buttons sit top-left and the active tab is the #EAEAEA pill', a
 test('US1 inactive tabs truncate their labels', async () => {
   await openFolder()
   // Open the long-named file first, then alpha so alpha is the active tab and
-  // the long label is the inactive one.
+  // the long label is the inactive one. Alpha opens via the explicit new-tab
+  // action (middle-click, spec 024 FR-005) so the clean active tab is not
+  // replaced.
   await window.getByRole('treeitem').getByText(LONG_NAME).click()
-  await window.getByRole('treeitem').getByText('alpha.md').click()
+  await window.getByRole('treeitem').getByText('alpha.md').click({ button: 'middle' })
 
   const longTitle = window.getByRole('tab', { name: new RegExp(LONG_NAME) }).locator('.tab-title')
   const truncates = await longTitle.evaluate((el) => {

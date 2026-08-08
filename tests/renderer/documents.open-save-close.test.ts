@@ -47,7 +47,7 @@ describe('documents reducer', () => {
     it('opens a new document from payload', () => {
       const state = documentsReducer(createSession(), {
         type: 'OPEN_EXISTING',
-        payload: { path: 'readme.md', name: 'readme.md', content: '# Hello', mtimeMs: 100, size: 8 }
+        payload: { value: { path: 'readme.md', name: 'readme.md', content: '# Hello', mtimeMs: 100, size: 8 } }
       })
       expect(state.documents).toHaveLength(1)
       const doc = state.documents[0]
@@ -62,15 +62,15 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'a.md', name: 'a.md', content: 'a', mtimeMs: 1, size: 1 }
+        payload: { value: { path: 'a.md', name: 'a.md', content: 'a', mtimeMs: 1, size: 1 } }
       })
       const s2 = documentsReducer(s1, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'b.md', name: 'b.md', content: 'b', mtimeMs: 2, size: 1 }
+        payload: { value: { path: 'b.md', name: 'b.md', content: 'b', mtimeMs: 2, size: 1 } }
       })
       const s3 = documentsReducer(s2, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'a.md', name: 'a.md', content: 'a', mtimeMs: 1, size: 1 }
+        payload: { value: { path: 'a.md', name: 'a.md', content: 'a', mtimeMs: 1, size: 1 } }
       })
       expect(s3.documents).toHaveLength(2)
       expect(s3.activeId).toBe(s1.activeId)
@@ -82,7 +82,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 } }
       })
       const docId = s1.documents[0].id
       const s2 = documentsReducer(s1, {
@@ -121,7 +121,7 @@ describe('documents reducer', () => {
       const state = createSession()
       const s1 = documentsReducer(state, {
         type: 'OPEN_EXISTING',
-        payload: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 }
+        payload: { value: { path: 'f.md', name: 'f.md', content: 'a', mtimeMs: 1, size: 1 } }
       })
       const docId = s1.documents[0].id
       const s2 = documentsReducer(s1, {

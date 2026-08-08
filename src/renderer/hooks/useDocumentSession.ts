@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import type { DocumentsAction, EditingSession, DocumentState } from '../state/documents'
 import { planClose } from '../state/documents'
+import type { OpenedFile } from '../../shared/ipc-contract'
 import { instancePool } from '../editor/instancePool'
 import {
   getLiveContent as domainGetLiveContent,
@@ -25,6 +26,11 @@ export interface DocumentSessionApi {
   handleCursorState: (id: string, cursorOffset: number, scrollTop: number) => void
   handleActivate: (id: string) => void
   handleNew: () => void
+  /** Spec 024: open a file read from disk, replacing the active tab's content
+   *  when it is live-clean and no explicit-new-tab action was used; otherwise
+   *  create a new tab. Existing-tab activation is preserved (FR-001-005).
+   *  An optional `view` (spec 002) is applied by the reducer. */
+  openFileFromTree: (file: OpenedFile & { view?: 'formatted' | 'source' }, explicitNew?: boolean) => void
   getLiveContent: (doc: DocumentState) => string | null
   isDirtyLive: (doc: DocumentState) => boolean
 }
@@ -281,6 +287,25 @@ export function useDocumentSession(opts: {
     enforcePoolCap(sessionRef.current.activeId)
   }, [dispatch, enforcePoolCap, sessionRef])
 
+  // Spec 024 (FR-001/002/005, research R1): decide whether a file open replaces
+  // the active tab. The gate is the LIVE dirty check (pool), never the debounced
+  // store flag — a keystroke inside the 200 ms debounce must not be silently
+  // discarded (Principle III). Existing-tab activation happens in the reducer.
+  const openFileFromTree = useCallback((file: OpenedFile & { view?: 'formatted' | 'source' }, explicitNew = false) => {
+    const current = sessionRef.current
+    const active = current.documents.find(d => d.id === current.activeId) ?? null
+    const alreadyOpen = file.path !== null && current.documents.some(d => d.path === file.path)
+    const replaceActive = !explicitNew && !alreadyOpen && active !== null && !isDirtyLive(active)
+    dispatch({ type: 'OPEN_EXISTING', payload: { value: file, mode: replaceActive ? 'replace' : 'new' } })
+    if (replaceActive && active) {
+      // Spec 024 (Assumptions): a replaced tab's editor instance is handled the
+      // same way as a closed tab's — drop it from the pool explicitly instead
+      // of leaving it to linger until LRU eviction.
+      instancePool.remove(active.id)
+    }
+    enforcePoolCap(sessionRef.current.activeId)
+  }, [dispatch, enforcePoolCap, isDirtyLive, sessionRef])
+
   return {
     saveDocument,
     doClose,
@@ -293,6 +318,7 @@ export function useDocumentSession(opts: {
     handleCursorState,
     handleActivate,
     handleNew,
+    openFileFromTree,
     getLiveContent,
     isDirtyLive
   }

@@ -40,7 +40,9 @@ async function openFolderAndFile(fileName: string): Promise<void> {
 }
 
 async function openSecondFile(fileName: string): Promise<void> {
-  await window.getByRole('treeitem').getByText(fileName).click()
+  // Spec 024: a single click on a clean active tab REPLACES it, so multi-tab
+  // setups use the explicit new-tab action (middle-click, FR-005).
+  await window.getByRole('treeitem').getByText(fileName).click({ button: 'middle' })
 }
 
 async function typeInEditor(text: string): Promise<void> {
@@ -344,9 +346,10 @@ test('external deletion of an open document: OK keeps it in memory', async () =>
 
 test('switching to the oldest tab at the instance cap keeps its editor alive', async () => {
   await clickHamburgerItem(window, 'Open Folder…')
-  // Fill the pool to the 8-instance cap.
+  // Fill the pool to the 8-instance cap. Middle-click (spec 024 FR-005) so each
+  // file opens in a new tab rather than replacing the clean active tab.
   for (let i = 1; i <= 8; i++) {
-    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
+    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click({ button: 'middle' })
   }
   // Activate the oldest tab; eviction must not take the just-activated editor.
   await window.getByRole('tab', { name: /f01\.md/ }).click()
@@ -358,9 +361,10 @@ test('switching to the oldest tab at the instance cap keeps its editor alive', a
 
 test('reopening an evicted document from the tree brings its editor back', async () => {
   await clickHamburgerItem(window, 'Open Folder…')
-  // Open nine files so the oldest (f01) is evicted by the LRU cap.
+  // Open nine files so the oldest (f01) is evicted by the LRU cap. Middle-click
+  // (spec 024 FR-005) so every file opens in a new tab.
   for (let i = 1; i <= 9; i++) {
-    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click()
+    await window.getByRole('treeitem').getByText(`f${String(i).padStart(2, '0')}.md`).click({ button: 'middle' })
   }
   // Re-open the evicted file from the tree: the active tab must not be dead.
   await window.getByRole('treeitem').getByText('f01.md').click()

@@ -159,7 +159,9 @@ test('US2 context-menu View source reuses the already-open formatted tab', async
   await openFolder()
   await openFile('alpha.md')
   await expect(window.getByRole('tab', { name: /alpha\.md/ })).toBeVisible()
-  await openFile('beta.md')
+  // Second tab via the explicit new-tab action (spec 024 FR-005) so alpha
+  // stays open.
+  await window.getByRole('treeitem').getByText('beta.md').click({ button: 'middle' })
 
   const alphaRow = window.getByRole('treeitem').getByText('alpha.md')
   await alphaRow.click({ button: 'right' })
@@ -393,8 +395,9 @@ test('tab-switch mid-view leaves the other tab usable', async () => {
   await getViewSourceButton().click()
   await expect(window.getByTestId('source-view')).toBeVisible()
 
-  // Switch to the other already-open tab.
-  await openFile('beta.md')
+  // Switch to the other already-open tab (middle-click opens it in a new tab
+  // without replacing the alpha source tab, spec 024 FR-005).
+  await window.getByRole('treeitem').getByText('beta.md').click({ button: 'middle' })
   await expect(window.locator('.document-title')).toContainText('beta.md')
   // The beta tab's (already-open) formatted editor is the live surface; the
   // first contenteditable in DOM order belongs to the hidden alpha panel.

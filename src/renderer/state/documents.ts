@@ -1,5 +1,6 @@
 import { isWithinOrEqual } from './workspace'
 import { splitFrontmatter, joinFrontmatter } from '../domain/frontmatter'
+import type { OpenedFile } from '../../shared/ipc-contract'
 
 /**
  * Trailing-newline / EOL-tolerant equality for comparing text that came from
@@ -129,13 +130,13 @@ export function openFile(opened: {
   }
 }
 
+/** Spec 024: `mode: 'replace'` swaps the active tab's slot for the opened file
+ *  (only when the dispatcher proved the active tab is live-clean); absent or
+ *  `'new'` opens a new tab. Existing-tab activation takes priority over both.
+ *  `view` is the optional requested view (spec 002: View source). */
 interface OpenExistingPayload {
-  path: string | null
-  name: string
-  content: string
-  mtimeMs: number
-  size: number
-  view?: 'formatted' | 'source'
+  value: OpenedFile & { view?: 'formatted' | 'source' }
+  mode?: 'replace'
 }
 
 export interface DocumentsAction {
@@ -177,19 +178,20 @@ export function handleOpenNew(state: EditingSession): EditingSession {
 }
 
 export function handleOpenExisting(state: EditingSession, p: OpenExistingPayload): EditingSession {
-  const existing = state.documents.find(d => d.path === p.path && p.path !== null)
+  const value = p.value
+  const existing = state.documents.find(d => d.path === value.path && value.path !== null)
   if (existing) {
     // Reopening an evicted document must bring its editor back — the
     // active tab would otherwise render the empty evicted container.
     // FR-06: View source from the explorer reactivates the existing tab
     // without duplicating it; the requested view (if given) is applied.
-    if (p.view && existing.view !== p.view) {
+    if (value.view && existing.view !== value.view) {
       return {
         ...state,
         activeId: existing.id,
         documents: state.documents.map(d =>
           d.id === existing.id
-            ? { ...d, view: p.view!, editorState: d.editorState === 'evicted' ? 'live' : d.editorState }
+            ? { ...d, view: value.view!, editorState: d.editorState === 'evicted' ? 'live' : d.editorState }
             : d
         )
       }
@@ -204,7 +206,20 @@ export function handleOpenExisting(state: EditingSession, p: OpenExistingPayload
       )
     }
   }
-  const doc = openFile(p)
+  const doc = openFile(value)
+  // Spec 024 (FR-001/009): when the dispatcher proved the active tab is clean,
+  // swap its slot for the new document — fresh id, clear dirty, fresh undo
+  // (FR-006/007) — instead of creating a new tab.
+  if (p.mode === 'replace') {
+    const active = state.documents.find(d => d.id === state.activeId)
+    if (active && !active.dirty) {
+      return {
+        ...state,
+        documents: state.documents.map(d => (d.id === active.id ? doc : d)),
+        activeId: doc.id
+      }
+    }
+  }
   return {
     ...state,
     documents: [...state.documents, doc],

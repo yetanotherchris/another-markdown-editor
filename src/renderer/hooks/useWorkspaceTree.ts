@@ -39,11 +39,10 @@ export function useWorkspaceTree(opts: {
   sessionRef: React.MutableRefObject<EditingSession>
   workspaceRef: React.MutableRefObject<WorkspaceState>
   dialog: DialogQueue
-  session: Pick<DocumentSessionApi, 'doClose' | 'isDirtyLive'>
+  session: Pick<DocumentSessionApi, 'doClose' | 'isDirtyLive' | 'openFileFromTree'>
   treeApiRef: React.MutableRefObject<TreeApi<TreeNode> | null>
   pendingCreateRef: React.MutableRefObject<Set<string>>
   createCounterRef: React.MutableRefObject<number>
-  enforcePoolCap: (activeId: string | null) => void
   setPendingEditId: (id: string | null) => void
 }): WorkspaceTreeApi {
   const {
@@ -55,11 +54,10 @@ export function useWorkspaceTree(opts: {
     session,
     pendingCreateRef,
     createCounterRef,
-    enforcePoolCap,
     setPendingEditId
   } = opts
   const { dialogInFlightRef, releaseDialogSurface, showOperationError } = dialog
-  const { doClose, isDirtyLive } = session
+  const { doClose, isDirtyLive, openFileFromTree } = session
 
   const handleTreeSelect = useCallback(async (id: string | null) => {
     dispatchWorkspace({ type: 'SELECT', payload: { id } })
@@ -68,12 +66,11 @@ export function useWorkspaceTree(opts: {
     if (!node || node.kind !== 'file') return
     const result = await window.api.readFile(id)
     if (result.ok) {
-      dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-      // Keep the previously visible document safe; the newly opened one is
-      // the newest pool entry and will not be the eviction candidate.
-      enforcePoolCap(sessionRef.current.activeId)
+      // Spec 024: open through the session gate so a clean active tab is
+      // replaced instead of spawning a new tab (FR-001).
+      openFileFromTree(result.value)
     }
-  }, [dispatch, dispatchWorkspace, enforcePoolCap, sessionRef, workspaceRef])
+  }, [dispatchWorkspace, openFileFromTree, workspaceRef])
 
   const handleTreeActivate = useCallback(async (id: string) => {
     const node = findNodeById(workspaceRef.current.nodes, id)
@@ -81,10 +78,9 @@ export function useWorkspaceTree(opts: {
 
     const result = await window.api.readFile(id)
     if (result.ok) {
-      dispatch({ type: 'OPEN_EXISTING', payload: result.value })
-      enforcePoolCap(sessionRef.current.activeId)
+      openFileFromTree(result.value)
     }
-  }, [dispatch, enforcePoolCap, sessionRef, workspaceRef])
+  }, [openFileFromTree, workspaceRef])
 
   const handleTreeToggle = useCallback(async (id: string, isLoaded: boolean) => {
     if (isLoaded) {

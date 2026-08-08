@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-07
 
-**Status**: Draft
+**Status**: Archived
 
 **Input**: User description: "Open files in the current tab when no unsaved changes exist in that tab, otherwise open in a new tab"
 
