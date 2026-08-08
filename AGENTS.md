@@ -236,6 +236,10 @@ AGENTS.md                         This file
 
 ## Branching and PR workflow
 
+- **Whenever asked to make changes, work on a new branch** — never implement
+  on `main`. Create the branch before any work begins, then commit to the
+  branch after finishing each to-do item. This overrides the "do not commit
+  unless asked" rule below once a change request has been made.
 - There is **no persistent feature branch**. Each phase gets its own branch
   created from `main` and is merged straight back into `main`.
 - **The phase branch MUST be created before any implementation work begins** —
