@@ -148,6 +148,9 @@ export interface Settings {
 }
 
 export interface DesktopApi {
+  /** The platform the app runs on (`process.platform`, exposed read-only so the
+   *  sandboxed renderer can adapt labels — spec 015 FR-003). */
+  platform: NodeJS.Platform
   /**
    * Phase 1 of folder open (spec 004, FR-009/FR-010): with `path` undefined,
    * shows the OS folder picker; with `path`, opens only a recorded recent
@@ -173,6 +176,11 @@ export interface DesktopApi {
   moveEntry(fromRelativePath: string, toRelativePath: string): Promise<Result<DirEntry>>
   trashEntry(relativePath: string, permanent?: boolean): Promise<Result<TrashReceipt>>
   describeEntry(relativePath: string): Promise<Result<EntryInfo>>
+  /** Spec 015: reveal a workspace file or folder in the OS file manager. The
+   *  relative path is containment-validated in main before any OS call; files
+   *  open their parent folder with the file highlighted, folders open
+   *  directly (FR-001/002/005). */
+  revealEntry(relativePath: string, kind: EntryKind): Promise<Result<null>>
   getSettings(): Promise<Result<Settings>>
   updateSettings(patch: Partial<Settings>): Promise<Result<Settings>>
   onWorkspaceChanged(cb: (e: WatchEvent) => void): () => void
