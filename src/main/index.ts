@@ -80,18 +80,15 @@ app.whenReady().then(() => {
   // Spec 022 FR-004: move an existing config from the legacy appData location
   // to the universal ~/.config location BEFORE anything reads it. Skipped under
   // the MM_CONFIG_DIR test seam (tests must never move the developer's real
-  // config, US4/FR-010), when the home directory is unavailable (FR-011), when
-  // the legacy and universal paths coincide (Linux without XDG — FR-005), and
-  // in the headless e2e launches (the migration is a production-upgrade
-  // concern; running it from the test suite would mutate the developer's real
-  // profile — review finding 2026-08-08). As a final guard the migration only
-  // runs when appData resolves under the home directory, which is true in
-  // production on every platform but false when an e2e test redirects
-  // HOME/USERPROFILE — Electron resolves appData via the OS user record on
-  // macOS, so a redirected home would otherwise point the legacy path at the
-  // developer's real config and a rename would move (and a test teardown
-  // delete) it.
-  if (!process.env.MM_CONFIG_DIR && !process.argv.includes('--headless')) {
+  // config, US4/FR-010), when the home directory is unavailable (FR-011), and
+  // when the legacy and universal paths coincide (Linux without XDG — FR-005).
+  // As a final guard the migration only runs when appData resolves under the
+  // home directory, which is true in production on every platform but false
+  // when an e2e test redirects HOME/USERPROFILE — Electron resolves appData via
+  // the OS user record on macOS, so a redirected home would otherwise point the
+  // legacy path at the developer's real config and a rename would move (and a
+  // test teardown delete) it (review finding 2026-08-08).
+  if (!process.env.MM_CONFIG_DIR) {
     const homeDir = os.homedir()
     if (homeDir) {
       const appDataDir = app.getPath('appData')
