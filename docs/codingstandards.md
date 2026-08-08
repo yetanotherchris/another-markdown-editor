@@ -232,7 +232,7 @@ switch (action.type) {
 
 **CSS**
 
-* Custom properties in `:root` stay as one dense token block (same `--ame-*` prefix, one property per line).
+* Custom properties in `:root` stay as one dense token block (same `--mm-*` prefix, one property per line).
 
 * Component rules that share a prefix (`.tree-node`, `.tree-node:hover`, `.tree-node.selected`) stay adjacent so the family is one visual group.
 
