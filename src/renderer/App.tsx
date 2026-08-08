@@ -146,9 +146,16 @@ export default function App() {
   // Read-only — a failure surfaces as a quiet footer note and the session is
   // untouched. The relative path + kind are validated in main (FR-005).
   const handleReveal = useCallback((node: TreeNode) => {
-    window.api.revealEntry(node.id, node.kind).then((res) => {
-      if (!res.ok) setFooterNote(res.message)
-    })
+    window.api
+      .revealEntry(node.id, node.kind)
+      .then((res) => {
+        // FR-006: a failure surfaces as a quiet footer note; a success clears a
+        // stale note from a previous failed reveal.
+        setFooterNote(res.ok ? null : res.message)
+      })
+      .catch(() => {
+        setFooterNote('Could not open the item in the file manager')
+      })
   }, [])
 
   useEffect(() => {
