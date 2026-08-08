@@ -5,12 +5,12 @@
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.96/ameditor-0.0.96-windows-x64.zip",
+      "url": "https://github.com/yetanotherchris/another-markdown-editor/releases/download/v0.0.96/markdownmeister-0.0.96-windows-x64.zip",
       "hash": "133962ff1fe9fb66d9f3b18a4ee4e4c6a89a695ffc67e38f53af1a5b358a033e",
       "bin": [
         [
-          "ameditor.exe",
-          "ameditor"
+          "markdownmeister.exe",
+          "markdownmeister"
         ]
       ]
     }
