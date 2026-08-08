@@ -193,7 +193,7 @@ describe('loadSettingsFile', () => {
     })
 
     it('rejects a missing key and falls back to null', () => {
-      const { background, ...rest } = validColors
+      const { background: _background, ...rest } = validColors
       const file = tempSettingsFile(JSON.stringify({ settings: { editorColors: rest } }))
       expect(loadSettingsFile(file).editorColors).toBeNull()
       fs.rmSync(path.dirname(file), { recursive: true, force: true })
