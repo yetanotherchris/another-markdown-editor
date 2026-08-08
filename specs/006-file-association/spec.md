@@ -200,8 +200,8 @@ unrelated existing default application remains unchanged.
 - **File scope**: Only the application's supported markdown extensions, `.md` and
   `.markdown`, receive a file context action. Folders always receive the folder
   action because they can be opened as workspaces.
-- **Naming**: `A.N.E.` and `another-markdown-editor` are working names, not fixed
-  product branding. The implementation plan will define a single product-name
+- **Naming**: `markdownmeister` is the product name used by all native actions
+  (spec 019). The implementation plan will define a single product-name
   constant whose current value is used by all native actions; platform-specific
   conventions may add a standard surrounding label such as "Open with".
 - **Default associations**: The feature adds an explicit context action and does

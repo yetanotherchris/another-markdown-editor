@@ -1,4 +1,4 @@
-# Another Markdown Editor — Design Decisions
+# MarkdownMeister — Design Decisions
 
 Input for a Spec Kit spec against:
 

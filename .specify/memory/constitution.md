@@ -22,7 +22,16 @@ Removed sections: none
 Deferred TODOs: none
 -->
 
-# Another Markdown Editor Constitution
+<!--
+SYNC IMPACT REPORT
+==================
+Version change: 1.0.0 → 1.0.1
+Rationale: PATCH amendment (spec 019, 2026-08-08). The application was renamed
+and the constitution title was updated to match the new product name
+(MarkdownMeister). No principle, requirement, or guidance content changed.
+-->
+
+# MarkdownMeister Constitution
 
 ## Core Principles
 
@@ -190,4 +199,4 @@ violates a principle MUST be justified in writing or removed. Runtime developmen
 guidance for agents lives in `AGENTS.md`; where it conflicts with this document,
 this document governs.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-01 | **Last Amended**: 2026-08-01
+**Version**: 1.0.1 | **Ratified**: 2026-08-01 | **Last Amended**: 2026-08-08
