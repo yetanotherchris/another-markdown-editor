@@ -43,7 +43,7 @@ describe('configPath — universal location (FR-001/002)', () => {
 
 describe('configPath — legacy location (FR-005)', () => {
   it('Windows legacy is %APPDATA%/markdownmeister/config.json', () => {
-    expect(legacyConfigPath(WIN)).toBe(winPath('C:\\Users\\alice', 'AppData\\Roaming', 'markdownmeister', 'config.json'))
+    expect(legacyConfigPath(WIN)).toBe(path.join(WIN.appDataDir!, 'markdownmeister', 'config.json'))
   })
 
   it('macOS legacy is ~/Library/Application Support/markdownmeister/config.json', () => {
