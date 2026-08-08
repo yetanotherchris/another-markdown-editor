@@ -87,14 +87,17 @@ test('US1 keyboard access to expand/collapse via the focused row (FR-013)', asyn
   await window.keyboard.press('Space')
 
   // The focused row carries a visible focus ring (the row that would otherwise
-  // be silently focus-moved with no indicator — WCAG 2.4.7).
-  const ringVisible = await window.evaluate(() => {
-    const el = document.activeElement as HTMLElement | null
-    if (!el) return false
-    const style = getComputedStyle(el)
-    return style.outlineStyle !== 'none' && style.outlineWidth !== '0px'
-  })
-  expect(ringVisible).toBe(true)
+  // be silently focus-moved with no indicator — WCAG 2.4.7). Poll: the
+  // `:focus-visible` keyboard modality applies right after the key press, and
+  // under a loaded suite the window may not hold OS focus for a moment.
+  await expect
+    .poll(() => window.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null
+      if (!el) return false
+      const style = getComputedStyle(el)
+      return style.outlineStyle !== 'none' && style.outlineWidth !== '0px'
+    }))
+    .toBe(true)
 
   await expect(window.getByRole('treeitem').getByText('gamma.md')).toBeVisible()
 })
