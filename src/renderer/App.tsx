@@ -137,7 +137,6 @@ export default function App() {
     treeApiRef,
     pendingCreateRef,
     createCounterRef,
-    enforcePoolCap: pool.enforcePoolCap,
     setPendingEditId
   })
   const external = useExternalFileEvents({ sessionRef, dialog, session: sessionApi })

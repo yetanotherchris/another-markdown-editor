@@ -43,7 +43,6 @@ export function useWorkspaceTree(opts: {
   treeApiRef: React.MutableRefObject<TreeApi<TreeNode> | null>
   pendingCreateRef: React.MutableRefObject<Set<string>>
   createCounterRef: React.MutableRefObject<number>
-  enforcePoolCap: (activeId: string | null) => void
   setPendingEditId: (id: string | null) => void
 }): WorkspaceTreeApi {
   const {
@@ -55,7 +54,6 @@ export function useWorkspaceTree(opts: {
     session,
     pendingCreateRef,
     createCounterRef,
-    enforcePoolCap,
     setPendingEditId
   } = opts
   const { dialogInFlightRef, releaseDialogSurface, showOperationError } = dialog
