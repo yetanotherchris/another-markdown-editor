@@ -33,10 +33,15 @@ export function universalConfigPath(parts: ConfigPathParts): string {
 }
 
 /** The legacy platform-specific config location (FR-005). On Linux the legacy
- *  and universal locations coincide, so there is nothing to migrate. */
+ *  location honours `$XDG_CONFIG_HOME` (matching the pre-022 `appData`-based
+ *  path), so with XDG set it equals the universal path and there is nothing to
+ *  migrate; without XDG both resolve to `~/.config/markdownmeister`. */
 export function legacyConfigPath(parts: ConfigPathParts): string {
   if (parts.platform === 'linux') {
-    return path.join(parts.homeDir, '.config', 'markdownmeister', 'config.json')
+    const configHome = parts.xdgConfigHome && parts.xdgConfigHome.length > 0
+      ? parts.xdgConfigHome
+      : path.join(parts.homeDir, '.config')
+    return path.join(configHome, 'markdownmeister', 'config.json')
   }
   const appDataDir = parts.appDataDir && parts.appDataDir.length > 0 ? parts.appDataDir : parts.homeDir
   return path.join(appDataDir, 'markdownmeister', 'config.json')

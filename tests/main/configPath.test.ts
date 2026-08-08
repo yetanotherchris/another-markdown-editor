@@ -54,6 +54,11 @@ describe('configPath — legacy location (FR-005)', () => {
     expect(legacyConfigPath(LINUX)).toBe(universalConfigPath(LINUX))
   })
 
+  it('Linux legacy honours $XDG_CONFIG_HOME, matching the universal path', () => {
+    const withXdg = { ...LINUX, xdgConfigHome: '/xdg' }
+    expect(legacyConfigPath(withXdg)).toBe(universalConfigPath(withXdg))
+  })
+
   it('falls back to homeDir when appDataDir is absent', () => {
     expect(legacyConfigPath({ homeDir: '/home/alice', platform: 'linux' })).toBe(universalConfigPath(LINUX))
   })
