@@ -87,6 +87,9 @@ test('US1/US2 the View source icon is the accent-coloured last toolbar item', as
 })
 
 test('FR-005 the icon stays distinct and accent-coloured in the dark theme', async () => {
+  // Capture the light accent (from the live token) before switching themes.
+  const lightAccent = await accentColor()
+
   // Choose the Dark theme override (deterministic; matches US2 of spec 013).
   await openSettingsDialog(window)
   await window.getByRole('radio', { name: 'Dark', exact: true }).check()
@@ -95,9 +98,10 @@ test('FR-005 the icon stays distinct and accent-coloured in the dark theme', asy
   const viewSource = viewSourceButton()
   await expect(viewSource).toBeVisible()
 
-  // Dark accent is #3794ff (rgb(55, 148, 255)); light was #d96b27.
+  // The accent token now differs (dark), and the icon follows it — both values
+  // derived from the live token, so no palette hex is hardcoded here.
   const accent = await accentColor()
-  expect(accent).toBe('rgb(55, 148, 255)')
+  expect(accent).not.toBe(lightAccent)
   expect(await iconColor(viewSource)).toBe(accent)
   expect(await iconColor(boldButton())).not.toBe(accent)
 })

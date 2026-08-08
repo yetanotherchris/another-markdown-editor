@@ -51,10 +51,13 @@
    to miss. Make it prominent: the icon is rendered in the app accent token and
    the button sits on a translucent accent background, while keeping Crepe's
    button size/alignment and the muted styling of the surrounding controls
-   (contracts/renderer.md R1-R3). */
+   (contracts/renderer.md R1-R3).
+   The :last-child target is deliberately coupled to Crepe's group order; the
+   e2e `isLast` assertion in tests/e2e/view-source-icon.spec.ts is the tripwire
+   if a future group is appended after 'view'. */
 .milkdown .milkdown-top-bar .top-bar-inner > .top-bar-item:last-child {
   background: color-mix(in srgb, var(--mm-accent) 14%, transparent);
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .milkdown .milkdown-top-bar .top-bar-inner > .top-bar-item:last-child svg {
