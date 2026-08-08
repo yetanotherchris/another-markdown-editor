@@ -142,9 +142,8 @@ export interface Settings {
   explorerVisible: boolean
   /** The editor font-family choice (spec 012 FR-003/FR-004). Defaults to
    *  'sans-serif'. A closed union — validated in main, never arbitrary text.
-   *  KEPT persisted but INERT since spec 016 (user decision 2026-08-07): the
-   *  editor theme owns the typeface, so this field no longer affects the
-   *  canvas. It survives for clean config migration only. */
+   *  Spec 023 FR-008: ACTIVE — it drives the typeface for a custom editor theme
+   *  and is written to the preset's font when a preset is selected (FR-005). */
   editorFont: 'sans-serif' | 'serif'
   /** The selected editor theme (spec 016 FR-001/FR-002). Defaults to
    *  'rustic'. A closed union — validated in main, never arbitrary text. When

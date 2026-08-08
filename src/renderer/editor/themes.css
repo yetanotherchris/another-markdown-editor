@@ -220,3 +220,11 @@
   --crepe-font-default: var(--mm-custom-font, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif);
   --crepe-font-title: var(--mm-custom-font, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif);
 }
+
+/* A custom serif theme keeps the toolbar readable: like the serif presets, the
+   top bar (editor chrome) re-uses the sans-serif Inter stack regardless of the
+   custom body typeface. */
+.app-container[data-editor-theme='custom'] .milkdown .milkdown-top-bar {
+  --crepe-font-default: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
