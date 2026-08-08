@@ -283,7 +283,7 @@ AGENTS.md                         This file
 | 011-window-state-persistence | Archived | Complete |
 | 012-settings-dialog | Archived | Complete |
 | 013-theme-setting | Archived | Complete |
-| 014-view-source-icon | Spec only | Not yet planned |
+| 014-view-source-icon | Archived | Complete |
 | 015-explorer-reveal-location | Spec only | Not yet planned |
 | 016-editor-theme | Archived | Complete |
 | 017-codebase-refactor | Archived | Complete |

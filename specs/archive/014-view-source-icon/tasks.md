@@ -12,7 +12,7 @@ No component or main-process code changes.
 
 ## Phase 1: Foundational (Presentation)
 
-- [ ] T001 Add the View source distinct-presentation rules to
+- [X] T001 Add the View source distinct-presentation rules to
       `src/renderer/editor/editor.css`: the last `.top-bar-item` inside
       `.top-bar-inner` (the appended view-source button) gets an accent-tinted
       rounded background and its `svg` is coloured with `--mm-accent`, with a
@@ -20,20 +20,20 @@ No component or main-process code changes.
 
 ## Phase 2: User Story 1 + 2 + 3 - Verification
 
-- [ ] T002 [P] [US1] Add `tests/e2e/view-source-icon.spec.ts` asserting the View
+- [X] T002 [P] [US1] Add `tests/e2e/view-source-icon.spec.ts` asserting the View
       source icon stands out: its computed `color` equals the resolved `--mm-accent`
       token, a formatting control (Bold) keeps the muted outline colour, the button
       carries the `View source` tooltip, and the accent resolves differently (or
       stays effective) across light and dark themes (SC-003/SC-004, FR-004/005).
-- [ ] T003 [US1] Run `npx playwright test tests/e2e/view-source-icon.spec.ts` and
+- [X] T003 [US1] Run `npx playwright test tests/e2e/view-source-icon.spec.ts` and
       confirm green.
 
 ## Phase 3: Polish
 
-- [ ] T004 Run the gates: `npm run lint`, `npm run typecheck`, `npm run test`,
+- [X] T004 Run the gates: `npm run lint`, `npm run typecheck`, `npm run test`,
       `npm run test:e2e` (the existing `source.spec.ts` must keep passing —
       FR-007).
-- [ ] T005 Archive the feature (`git mv specs/014-view-source-icon
+- [X] T005 Archive the feature (`git mv specs/014-view-source-icon
       specs/archive/014-view-source-icon`), set the spec's **Status** to
       `Archived`, mark all tasks `[X]`, and update the `014-view-source-icon`
       row in `AGENTS.md` to `Archived` / `Complete`.
